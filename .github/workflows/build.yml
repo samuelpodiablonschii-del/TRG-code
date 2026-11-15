@@ -41,6 +41,11 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or $beginnerOutput -notmatch "TRG_BEGINNER_TESTS_PASSED" -or $beginnerOutput -match "ERROR ") {
             throw "TRG beginner syntax regression tests failed."
           }
+          $aiOutput = & .\TRG-console.exe .\tests\ai_library.trg 2>&1 | Out-String
+          Write-Host $aiOutput
+          if ($LASTEXITCODE -ne 0 -or $aiOutput -notmatch "TRG_AI_TESTS_PASSED" -or $aiOutput -match "ERROR ") {
+            throw "TRG AI library regression tests failed."
+          }
           $jsonOutput = & .\TRG-console.exe .\test_json.trg 2>&1 | Out-String
           Write-Host $jsonOutput
           if ($LASTEXITCODE -ne 0 -or $jsonOutput -notmatch "Read back score: 100" -or $jsonOutput -notmatch "Read back player: Hero" -or $jsonOutput -notmatch "Read back ready: true" -or $jsonOutput -match "ERROR ") {
