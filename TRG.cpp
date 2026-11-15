@@ -21,6 +21,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cwchar>
+#include <cwctype>
 #include <variant>
 #include <thread>
 #include <atomic>
@@ -4227,7 +4228,8 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             baseFormat.dwMask = CFM_COLOR | CFM_FACE | CFM_SIZE;
             baseFormat.crTextColor = RGB(220, 220, 220);
             baseFormat.yHeight = 210;
-            wcscpy_s(baseFormat.szFaceName, LF_FACESIZE, L"Consolas");
+            std::wcsncpy(baseFormat.szFaceName, L"Consolas", LF_FACESIZE - 1);
+            baseFormat.szFaceName[LF_FACESIZE - 1] = L'\0';
             SendMessageW(codeEditor, EM_SETCHARFORMAT, SCF_ALL, reinterpret_cast<LPARAM>(&baseFormat));
         }
         layoutOutputControls(window);
