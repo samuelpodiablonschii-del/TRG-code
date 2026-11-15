@@ -650,7 +650,7 @@ std::string lower(std::string s) {
 
 std::string suggestedCommand(const std::string& input) {
     static const std::vector<std::string> commands = {
-        "say", "ask", "word", "num", "toggle", "color", "if", "else", "loop", "every", "random",
+        "say", "print", "show", "let", "ask", "word", "num", "toggle", "color", "if", "else", "loop", "every", "random",
         "group", "define", "stop", "exit", "break", "continue", "add", "text",
         "button", "block", "animate", "collides", "touching", "move_ui", "register", "move", "subtract", "multiply",
         "watch_collision",
