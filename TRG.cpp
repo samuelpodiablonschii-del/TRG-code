@@ -4077,16 +4077,16 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         wchar_t executablePath[32768] = {};
         const DWORD executableLength = GetModuleFileNameW(nullptr, executablePath, 32768);
         if (executableLength == 0 || executableLength >= 32768) {
-            appendOutput("ERROR Could not locate the TRG runtime for building.\\r\\n");
+            appendOutput("ERROR Could not locate the TRG runtime for building.\r\n");
             return 0;
         }
-        const std::wstring parameters = L"compile \\\"" + currentSourcePath.wstring() + L"\\\"";
+        const std::wstring parameters = L"compile \"" + currentSourcePath.wstring() + L"\"";
         const HINSTANCE launched = ShellExecuteW(window, L"open", executablePath, parameters.c_str(),
             projectRoot.c_str(), SW_SHOWNORMAL);
         if (reinterpret_cast<INT_PTR>(launched) <= 32)
-            appendOutput("ERROR Could not start the TRG build process.\\r\\n");
+            appendOutput("ERROR Could not start the TRG build process.\r\n");
         else
-            appendOutput("Building standalone app for " + currentSourcePath.u8string() + "...\\r\\n");
+            appendOutput("Building standalone app for " + currentSourcePath.u8string() + "...\r\n");
         return 0;
     }
     if (message == WM_COMMAND && LOWORD(wParam) == previewButtonId) {
