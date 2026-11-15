@@ -130,13 +130,22 @@ These are simple field containers; they do not yet define methods or inheritance
 
 ### Lists and strings
 
-String helpers are `upper VALUE RESULT`, `lower VALUE RESULT`, `length VALUE RESULT`, `contains VALUE SEARCH RESULT`, and `replace VALUE SEARCH REPLACEMENT RESULT`. Lists store text values and use indexes that start at zero:
+String helpers include `upper VALUE RESULT`, `lower VALUE RESULT`, `trim VALUE RESULT`, `length VALUE RESULT`, `contains VALUE SEARCH RESULT`, `index_of VALUE SEARCH RESULT`, `replace VALUE SEARCH REPLACEMENT RESULT`, and `substring VALUE START LENGTH RESULT`. `index_of` returns `-1` when the text is not found. `split VALUE DELIMITER RESULT` converts text into a list.
+
+Lists store text values and use indexes that start at zero. `push` adds to the end, `insert` adds at an index, `get` reads an item, `remove` deletes an item, `pop` removes the last item and stores it in a variable, and `join` combines a list into text:
 
 ```text
 list names = "Alex", "Sam"
 push names "Taylor"
+insert names 1 "Jordan"
 get names 1 selected
-remove names 0
+index_of selected "or" found_at
+pop names last_name
+join names ", " all_names
+split "red|green|blue" "|" colors
+trim "  hello  " clean_text
+substring "TRG language" 0 3 prefix
+say selected found_at last_name all_names
 ```
 
 ## Libraries
