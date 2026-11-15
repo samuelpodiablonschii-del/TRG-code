@@ -30,7 +30,12 @@ jobs:
           $testOutput = & .\TRG-console.exe .\tests\collections_strings.trg 2>&1 | Out-String
           Write-Host $testOutput
           if ($LASTEXITCODE -ne 0 -or $testOutput -notmatch "TRG_FEATURE_TESTS_PASSED" -or $testOutput -match "ERROR ") {
-            throw "TRG language regression tests failed."
+            throw "TRG collection/string regression tests failed."
+          }
+          $beginnerOutput = & .\TRG-console.exe .\tests\beginner_syntax.trg 2>&1 | Out-String
+          Write-Host $beginnerOutput
+          if ($LASTEXITCODE -ne 0 -or $beginnerOutput -notmatch "TRG_BEGINNER_TESTS_PASSED" -or $beginnerOutput -match "ERROR ") {
+            throw "TRG beginner syntax regression tests failed."
           }
           .\build-installer.bat
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
