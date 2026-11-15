@@ -1,3 +1,0 @@
-lib/armeabi-v7a\libtrg.so->Project
-lib/arm64-v8a\libtrg.so->Project
-lib/x86_64\libtrg.so->Project

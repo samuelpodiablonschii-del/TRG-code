@@ -1,2 +1,0 @@
-com.trg.studio:style/AppTheme = 0x7f020000
-com.trg.studio:drawable/ic_trg = 0x7f010000

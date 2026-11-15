@@ -1,1 +1,0 @@
-C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\cpp\CMakeLists.txt

@@ -1,2 +1,0 @@
-ninja: Entering directory `C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\.cxx\Debug\6o39372i\armeabi-v7a'
-ninja: no work to do.
