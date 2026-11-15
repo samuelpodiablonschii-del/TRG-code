@@ -93,13 +93,13 @@ goto :finish_failed
 
 :finish_success
 popd
-pause
+if not defined CI pause
 endlocal
 exit /b 0
 
 :finish_failed
 popd
-pause
+if not defined CI pause
 endlocal
 exit /b 1
 
