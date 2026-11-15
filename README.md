@@ -201,7 +201,7 @@ add (json)
 add (all)
 ```
 
-`add (all)` enables every built-in library, including `json`, `math`, `ai`, `binary`, `regex`, and `compression`.
+`add (all)` enables every built-in library, including `json`, `math`, `ai`, `binary`, `regex`, and `compression`. Everyday text and number commands such as `find`, `replace_text`, `add_numbers`, and `square_root` work without adding a library.
 
 ### Math
 
@@ -219,6 +219,39 @@ math round 2.6 nearest
 ```
 
 Supported operations: `sin`, `cos`, `tan`, `abs`, `floor`, `ceil`, `round`, `sqrt`, `min`, `max`, `clamp`, and `distance`.
+### Plain-English commands
+
+You do not need to know terms like *regular expression* to do common text jobs. These commands work directly:
+
+```text
+find "Hello there" "there" found
+find_position "Hello there" "there" place
+replace_text "Hello there" "there" "TRG" updated
+count_text "one fish two fish" "fish" how_many
+starts_with "TRG language" "TRG" begins
+ends_with "TRG language" "language" ends
+
+add_numbers 5 3 total
+subtract_numbers 5 3 difference
+multiply_numbers 5 3 product
+divide_numbers 10 2 answer
+square_root 81 root
+round_number 2.6 rounded
+absolute_number -12 positive
+minimum 5 3 smaller
+maximum 5 3 bigger
+distance_between 0 0 3 4 distance
+```
+
+- `find` gives `true` if the text is there, otherwise `false`.
+- `find_position` gives the starting character number, or `-1` if it is missing.
+- `replace_text` changes every matching part of the text.
+- `count_text` counts matching parts that do not overlap.
+- `starts_with` and `ends_with` check the beginning and end.
+- The number commands do the operation named by their command. Division by zero is reported as an error.
+
+These are built-in commands; you do not need to add a library first. Advanced `regex` and `math` commands remain available too.
+
 ### Binary and bitwise tools
 
 TRG includes byte conversion, encoding, bitwise operations, and checksums without extra packages.
