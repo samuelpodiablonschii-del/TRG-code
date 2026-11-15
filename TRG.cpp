@@ -176,6 +176,9 @@ struct EveryTask {
 
 struct CollisionWatch { std::string first; std::string second; std::string result; };
 
+struct AiSample { std::vector<double> inputs; double expected = 0; };
+struct AiModel { std::vector<double> weights; double bias = 0; std::vector<AiSample> samples; };
+
 struct UserFunction {
     std::string name;
     std::vector<std::string> params;
@@ -269,6 +272,7 @@ std::vector<UiSprite> uiSprites;
 std::vector<UiAnimation> uiAnimations;
 std::vector<EveryTask> everyTasks;
 std::vector<CollisionWatch> collisionWatches;
+std::unordered_map<std::string, AiModel> aiModels;
 std::vector<UiButton> uiButtons;
 std::vector<UiText> uiTexts;
 std::vector<UiGroup> uiGroups;
@@ -291,6 +295,7 @@ std::unordered_map<std::string, unsigned> controllerControls;
 bool controlsEnabled = false;
 bool webEnabled = false;
 bool collisionEnabled = false;
+bool aiEnabled = false;
 std::string webPageHtml;
 std::vector<std::string> readProgram(std::istream& source);
 std::size_t errorCount = 0;
@@ -1743,6 +1748,7 @@ struct LibraryState {
     bool ui = false;
     bool controls = false;
     bool network = false;
+    bool ai = false;
 };
 
 std::string parenContent(const std::string& line) {
@@ -1834,7 +1840,7 @@ void scanLibraries(const std::vector<std::string>& program, LibraryState& librar
         const std::string name = lower(second.substr(1, second.size() - 2));
         if (name == "all") {
             libraries.files = libraries.json = libraries.web = libraries.collision = true;
-            libraries.manual = libraries.ui = libraries.controls = libraries.network = true;
+            libraries.manual = libraries.ui = libraries.controls = libraries.network = libraries.ai = true;
         } else if (name == "files") libraries.files = true;
         else if (name == "json") libraries.json = true;
         else if (name == "web") libraries.web = true;
@@ -1843,6 +1849,7 @@ void scanLibraries(const std::vector<std::string>& program, LibraryState& librar
         else if (name == "ui" || name == "animation") libraries.ui = true;
         else if (name == "controls") libraries.controls = true;
         else if (name == "network") libraries.network = true;
+        else if (name == "ai") libraries.ai = true;
     }
 }
 
@@ -2795,8 +2802,9 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 if (library == "(ui)" || library == "(animation)") { uiMode = true; continue; }
                 if (library == "(controls)") { initializeControls(variables, types); continue; }
                 if (library == "(network)") { networkEnabled = true; appendOutput("TRG network library enabled.\\r\\n"); continue; }
+                if (library == "(ai)") { aiEnabled = true; appendOutput("TRG AI library enabled.\\r\\n"); continue; }
                 if (library == "(all)") {
-                    filesEnabled = jsonEnabled = webEnabled = collisionEnabled = networkEnabled = true;
+                    filesEnabled = jsonEnabled = webEnabled = collisionEnabled = networkEnabled = aiEnabled = true;
                     initializeControls(variables, types);
                     manualMode = true;
                     uiMode = true;
@@ -2949,6 +2957,122 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             std::ofstream output(outputPath, std::ios::binary | std::ios::trunc);
             if (!output) { reportError(i + 1, "could not write JSON file", relative); continue; }
             output << content;
+            continue;
+        }
+
+        if (cmd == "ai") {
+            if (!aiEnabled) { reportError(i + 1, "AI commands need add (ai)"); continue; }
+            if (tokens.size() < 2) { reportError(i + 1, "use ai create, teach, train, predict, or classify"); continue; }
+            const std::string action = lower(tokens[1]);
+            if (action == "create") {
+                if (tokens.size() != 4 || !validName(tokens[2])) {
+                    reportError(i + 1, "use ai create MODEL INPUT_COUNT");
+                    continue;
+                }
+                double inputCount = 0;
+                if (!parseNumber(tokens[3], inputCount) || inputCount < 1 || inputCount > 64 ||
+                    std::floor(inputCount) != inputCount) {
+                    reportError(i + 1, "AI input count must be a whole number from 1 to 64", tokens[3]);
+                    continue;
+                }
+                AiModel model;
+                model.weights.resize(static_cast<std::size_t>(inputCount), 0.0);
+                std::uniform_real_distribution<double> initialWeight(-0.05, 0.05);
+                for (double& weight : model.weights) weight = initialWeight(trgRandomEngine);
+                aiModels[tokens[2]] = std::move(model);
+                appendOutput("Created AI model " + tokens[2] + " with " + tokens[3] + " inputs.\r\n");
+                continue;
+            }
+            if (action == "teach") {
+                if (tokens.size() != 5 || !aiModels.count(tokens[2])) {
+                    reportError(i + 1, "use ai teach MODEL INPUTS EXPECTED (create the model first)");
+                    continue;
+                }
+                std::vector<double> inputValues;
+                std::stringstream inputStream(tokens[3]);
+                std::string inputPart;
+                bool validInputs = true;
+                while (std::getline(inputStream, inputPart, ';')) {
+                    double value = 0;
+                    if (!parseNumber(trim(inputPart), value) || !std::isfinite(value)) { validInputs = false; break; }
+                    inputValues.push_back(value);
+                }
+                double expected = 0;
+                AiModel& model = aiModels[tokens[2]];
+                if (!validInputs || inputValues.size() != model.weights.size() ||
+                    !parseNumber(tokens[4], expected) || (expected != 0.0 && expected != 1.0)) {
+                    reportError(i + 1, "AI examples need the correct number of semicolon-separated inputs and an output of 0 or 1");
+                    continue;
+                }
+                model.samples.push_back({std::move(inputValues), expected});
+                appendOutput("Added training example to " + tokens[2] + ".\r\n");
+                continue;
+            }
+            if (action == "train") {
+                if ((tokens.size() != 4 && tokens.size() != 5) || !aiModels.count(tokens[2])) {
+                    reportError(i + 1, "use ai train MODEL EPOCHS [LEARNING_RATE]");
+                    continue;
+                }
+                AiModel& model = aiModels[tokens[2]];
+                double epochsValue = 0, learningRate = 0.1;
+                if (model.samples.empty() || !parseNumber(tokens[3], epochsValue) ||
+                    epochsValue < 1 || epochsValue > 100000 || std::floor(epochsValue) != epochsValue ||
+                    (tokens.size() == 5 && !parseNumber(tokens[4], learningRate)) ||
+                    learningRate <= 0 || learningRate > 1) {
+                    reportError(i + 1, "training needs examples, 1-100000 epochs, and a learning rate above 0 and at most 1");
+                    continue;
+                }
+                for (int epoch = 0; epoch < static_cast<int>(epochsValue); ++epoch) {
+                    for (const AiSample& sample : model.samples) {
+                        double total = model.bias;
+                        for (std::size_t index = 0; index < model.weights.size(); ++index)
+                            total += model.weights[index] * sample.inputs[index];
+                        total = std::clamp(total, -30.0, 30.0);
+                        const double prediction = 1.0 / (1.0 + std::exp(-total));
+                        const double error = prediction - sample.expected;
+                        for (std::size_t index = 0; index < model.weights.size(); ++index)
+                            model.weights[index] -= learningRate * error * sample.inputs[index];
+                        model.bias -= learningRate * error;
+                    }
+                }
+                appendOutput("Trained " + tokens[2] + " using " + std::to_string(model.samples.size()) +
+                    " examples for " + tokens[3] + " epochs.\r\n");
+                continue;
+            }
+            if (action == "predict" || action == "classify") {
+                if (tokens.size() != 5 || !validName(tokens[4]) || !aiModels.count(tokens[2])) {
+                    reportError(i + 1, "use ai predict MODEL INPUTS RESULT or ai classify MODEL INPUTS RESULT");
+                    continue;
+                }
+                AiModel& model = aiModels[tokens[2]];
+                std::vector<double> inputValues;
+                std::stringstream inputStream(tokens[3]);
+                std::string inputPart;
+                bool validInputs = true;
+                while (std::getline(inputStream, inputPart, ';')) {
+                    double value = 0;
+                    if (!parseNumber(trim(inputPart), value) || !std::isfinite(value)) { validInputs = false; break; }
+                    inputValues.push_back(value);
+                }
+                if (!validInputs || inputValues.size() != model.weights.size()) {
+                    reportError(i + 1, "AI input count does not match the model");
+                    continue;
+                }
+                double total = model.bias;
+                for (std::size_t index = 0; index < model.weights.size(); ++index)
+                    total += model.weights[index] * inputValues[index];
+                total = std::clamp(total, -30.0, 30.0);
+                const double prediction = 1.0 / (1.0 + std::exp(-total));
+                if (action == "predict") {
+                    variables[tokens[4]] = prediction;
+                    types[tokens[4]] = "num";
+                } else {
+                    variables[tokens[4]] = prediction >= 0.5;
+                    types[tokens[4]] = "toggle";
+                }
+                continue;
+            }
+            reportError(i + 1, "unknown AI action; use create, teach, train, predict, or classify", action);
             continue;
         }
 
@@ -4636,6 +4760,8 @@ void executeProgram(const std::vector<std::string>& program) {
     webEnabled = libraries.web;
     collisionEnabled = libraries.collision;
     networkEnabled = libraries.network;
+    aiEnabled = libraries.ai;
+    aiModels.clear();
     if (libraries.controls) initializeControls(uiVariables, uiTypes);
     registerFunctions(uiProgram);
     executeBlock(uiProgram, 0, uiProgram.size(), uiVariables, uiTypes, uiDefaults, flow,
