@@ -6,11 +6,9 @@ title TRG - BUILD INSTALLER
 if exist "C:\mingw64\bin\g++.exe" set "PATH=C:\mingw64\bin;%PATH%"
 if exist "C:\msys64\mingw64\bin\g++.exe" set "PATH=C:\msys64\mingw64\bin;%PATH%"
 
-rem Prefer the freshly built installer runtime; fall back to TRG.exe only if needed.
-if not exist "TRG-fixed.exe" if exist "TRG.exe" copy /Y "TRG.exe" "TRG-fixed.exe" >nul
-if not exist "TRG-fixed.exe" (
-    echo ERROR: No current runtime was found.
-    echo Run build.bat first.
+if not exist "TRG-build.exe" (
+    echo ERROR: TRG-build.exe was not found.
+    echo Run build.bat immediately before building the installer.
     goto :failed
 )
 if not exist "TRG-Example.trg" (
@@ -42,7 +40,7 @@ if errorlevel 1 (
     echo ERROR: windres.exe was not found.
     goto :failed
 )
-echo Building installer resources...
+echo Building installer resources with the fresh TRG-build.exe...
 windres.exe TRG-Installer.rc -O coff -o trg-installer-resource.o
 if errorlevel 1 goto :failed
 
@@ -57,7 +55,7 @@ if errorlevel 1 (
     echo ERROR: rc.exe was not found. Use a Visual Studio Developer Command Prompt.
     goto :failed
 )
-echo Building installer resources...
+echo Building installer resources with the fresh TRG-build.exe...
 rc.exe /nologo /fo trg-installer-resource.res TRG-Installer.rc
 if errorlevel 1 goto :failed
 
@@ -69,7 +67,7 @@ if errorlevel 1 goto :failed
 echo.
 echo BUILD SUCCESSFUL
 echo Output: TRG-Installer.exe
-echo Embedded runtime: TRG-fixed.exe
+echo Embedded runtime: TRG-build.exe
 popd
 endlocal
 exit /b 0
