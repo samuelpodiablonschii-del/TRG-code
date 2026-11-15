@@ -2,11 +2,11 @@
 add (json)
 
 // Group-scoped variables for JSON
-group MyGroup {
+group MyGroup (
     num score = 100
     word player = "Hero"
     toggle ready = true
-}
+)
 
 // Create a JSON object in compressed mode (no spaces)
 json MyGroup compressed MyJsonResult
