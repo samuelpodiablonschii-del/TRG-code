@@ -446,6 +446,7 @@ bool runSourceFile(const std::filesystem::path& path);
 bool loadSourceFile(const std::filesystem::path& path);
 bool saveSourceFile();
 bool runEditorSource();
+void applyEditorSyntaxHighlighting();
 
 int windowDpi(HWND window) {
     using GetDpiForWindowFunction = UINT (WINAPI*)(HWND);
