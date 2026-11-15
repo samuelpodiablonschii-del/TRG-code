@@ -27,8 +27,8 @@ windres.exe TRG.rc -O coff -o trg-resource.o
 if errorlevel 1 goto :failed
 
 echo.
-echo [2/2] Building TRG-fixed.exe...
-g++ -std=c++17 -O2 -static -static-libgcc -static-libstdc++ -mwindows -municode TRG.cpp trg-resource.o -lcomdlg32 -lshell32 -lgdiplus -lgdi32 -luser32 -lwinhttp -lwinmm -o TRG-fixed.exe
+echo [2/2] Building the latest TRG runtime...
+g++ -std=c++17 -O2 -static -static-libgcc -static-libstdc++ -mwindows -municode TRG.cpp trg-resource.o -lcomdlg32 -lshell32 -lgdiplus -lgdi32 -luser32 -lwinhttp -lwinmm -o TRG-build.exe
 if errorlevel 1 goto :failed
 goto :install_latest
 
@@ -43,29 +43,29 @@ rc.exe /nologo /fo trg-resource.res TRG.rc
 if errorlevel 1 goto :failed
 
 echo.
-echo [2/2] Building TRG-fixed.exe...
-cl.exe /nologo /std:c++17 /EHsc /O2 /MT TRG.cpp trg-resource.res /link /SUBSYSTEM:WINDOWS comdlg32.lib shell32.lib gdiplus.lib user32.lib gdi32.lib winhttp.lib winmm.lib /OUT:TRG-fixed.exe
+echo [2/2] Building the latest TRG runtime...
+cl.exe /nologo /std:c++17 /EHsc /O2 /MT TRG.cpp trg-resource.res /link /SUBSYSTEM:WINDOWS comdlg32.lib shell32.lib gdiplus.lib user32.lib gdi32.lib winhttp.lib winmm.lib /OUT:TRG-build.exe
 if errorlevel 1 goto :failed
 
 :install_latest
-if not exist "TRG-fixed.exe" (
-    echo ERROR: The compiler did not produce TRG-fixed.exe.
+if not exist "TRG-build.exe" (
+    echo ERROR: The compiler did not produce TRG-build.exe.
     goto :failed
 )
 
 echo.
 echo Updating TRG.exe when it is not currently in use...
-copy /Y "TRG-fixed.exe" "TRG.exe" >nul
+copy /Y "TRG-build.exe" "TRG.exe" >nul
 if errorlevel 1 (
     echo WARNING: Windows could not replace TRG.exe, probably because it is running.
-    echo The newest build is available as TRG-fixed.exe.
+    echo The newest build is available as TRG-build.exe.
 ) else (
     echo Updated TRG.exe successfully.
 )
 
 echo.
 echo BUILD SUCCESSFUL
-echo Latest build: TRG-fixed.exe
+echo Latest build: TRG-build.exe
 echo Main app: TRG.exe
 popd
 endlocal
