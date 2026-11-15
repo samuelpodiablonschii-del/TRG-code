@@ -660,7 +660,7 @@ std::string lower(std::string s) {
 
 std::string suggestedCommand(const std::string& input) {
     static const std::vector<std::string> commands = {
-        "say", "print", "show", "let", "ask", "word", "num", "toggle", "color", "if", "else", "loop", "every", "random",
+        "say", "print", "show", "let", "ask", "ai", "math", "word", "num", "toggle", "color", "if", "else", "loop", "every", "random",
         "group", "define", "stop", "exit", "break", "continue", "add", "text",
         "button", "block", "animate", "collides", "touching", "move_ui", "register", "move", "subtract", "multiply",
         "watch_collision",
@@ -3092,7 +3092,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             }
             const std::string operation = lower(tokens[1]);
             const std::size_t expected = operation == "min" || operation == "max" ? 5 :
-                (operation == "clamp" || operation == "distance" ? 6 : 4);
+                (operation == "distance" ? 7 : (operation == "clamp" ? 6 : 4));
             if (tokens.size() != expected || !validName(tokens.back())) {
                 reportError(i + 1, "invalid arguments for math " + operation);
                 continue;
