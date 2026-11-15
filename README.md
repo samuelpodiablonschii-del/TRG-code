@@ -203,6 +203,33 @@ add (all)
 
 `add (all)` enables every built-in library, including `json`, `math`, `ai`, `binary`, `regex`, and `compression`. Everyday text and number commands such as `find`, `replace_text`, `add_numbers`, and `square_root` work without adding a library.
 
+The PowerShell, Raspberry, and accessibility libraries are also registered:
+
+```text
+add (powershell)
+powershell get_date current_date
+
+add (raspberry)
+pin_mode 15 output
+digital_write 15 high
+digital_read 14 button_state
+
+add (accessibility)
+popup "Hello from TRG"
+tap 500 300
+open_app "Calculator"
+autoclick 500 300 interval 100ms
+stop_autoclick
+```
+
+Command style:
+- PowerShell commands keep the `powershell` prefix because they invoke a separate shell.
+- Raspberry commands do not repeat `raspberry` on every line. Use direct commands such as `pin_mode`, `digital_write`, and `analog_read`.
+- Accessibility commands do not repeat `accessibility`. Use direct commands such as `popup`, `tap`, `swipe`, `open_app`, and `autoclick`.
+
+**Implementation status:** the three library names are recognised by the library scanner and `add (all)`. Their hardware and operating-system command backends are not implemented yet; the examples above describe the intended syntax, not commands that are ready to run. The existing PowerShell helper is currently a whitelist-checking placeholder and does not launch PowerShell.
+
+
 ### Math
 
 `add (math)` enables beginner-friendly math commands. Angles for `sin`, `cos`, and `tan` are in radians.
