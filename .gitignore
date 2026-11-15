@@ -28,3 +28,6 @@ android-app/local.properties
 *.iml
 .DS_Store
 Thumbs.db
+
+# TRG JSON smoke-test output
+test_output.json
