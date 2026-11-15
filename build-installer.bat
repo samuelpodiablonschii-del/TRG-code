@@ -1,58 +1,82 @@
 @echo off
 setlocal EnableExtensions
-cd /d "%~dp0"
+pushd "%~dp0" || exit /b 1
+title TRG - BUILD INSTALLER
 
-if not exist "TRG-build.exe" if not exist "TRG.exe" (
-    echo Building TRG first...
-    call build.bat
-    if errorlevel 1 exit /b 1
+if exist "C:\mingw64\bin\g++.exe" set "PATH=C:\mingw64\bin;%PATH%"
+if exist "C:\msys64\mingw64\bin\g++.exe" set "PATH=C:\msys64\mingw64\bin;%PATH%"
+
+rem Prefer the freshly built installer runtime; fall back to TRG.exe only if needed.
+if not exist "TRG-fixed.exe" if exist "TRG.exe" copy /Y "TRG.exe" "TRG-fixed.exe" >nul
+if not exist "TRG-fixed.exe" (
+    echo ERROR: No current runtime was found.
+    echo Run build.bat first.
+    goto :failed
+)
+if not exist "TRG-Example.trg" (
+    echo ERROR: TRG-Example.trg is missing.
+    goto :failed
+)
+if not exist "trg.ico" (
+    echo ERROR: trg.ico is missing.
+    goto :failed
+)
+if not exist "README.md" (
+    echo ERROR: README.md is missing.
+    goto :failed
 )
 
-if exist "TRG-build.exe" (
-    set "TRG_RUNTIME=TRG-build.exe"
-) else (
-    set "TRG_RUNTIME=TRG.exe"
-)
+where g++.exe >nul 2>nul
+if not errorlevel 1 goto :build_mingw
 
-for %%F in (TRG-Example.trg README.md trg.ico TRG-Installer.cpp resource.h) do (
-    if not exist "%%F" (
-        echo ERROR: Missing %%F.
-        exit /b 1
-    )
-)
+where cl.exe >nul 2>nul
+if not errorlevel 1 goto :build_msvc
 
-where windres >nul 2>nul
+echo ERROR: No C++ compiler was found.
+echo Install MinGW-w64 or open a Visual Studio Developer Command Prompt.
+goto :failed
+
+:build_mingw
+where windres.exe >nul 2>nul
 if errorlevel 1 (
-    echo ERROR: windres was not found. Install MinGW-w64.
-    exit /b 1
+    echo ERROR: windres.exe was not found.
+    goto :failed
 )
-where g++ >nul 2>nul
-if errorlevel 1 (
-    echo ERROR: g++ was not found. Install MinGW-w64.
-    exit /b 1
-)
+echo Building installer resources...
+windres.exe TRG-Installer.rc -O coff -o trg-installer-resource.o
+if errorlevel 1 goto :failed
 
-(
-    echo #include "resource.h"
-    echo #define IDR_RUNTIME 201
-    echo #define IDR_EXAMPLE 202
-    echo #define IDR_README 203
-    echo #define IDR_ICON 204
-    echo IDI_TRG ICON "trg.ico"
-    echo IDR_RUNTIME RCDATA "%TRG_RUNTIME%"
-    echo IDR_EXAMPLE RCDATA "TRG-Example.trg"
-    echo IDR_README RCDATA "README.md"
-    echo IDR_ICON RCDATA "trg.ico"
-) > TRG-Installer-generated.rc
-
-windres TRG-Installer-generated.rc -O coff -o trg-installer-resource.o
-if errorlevel 1 exit /b 1
-
-echo Building TRG Installer...
+echo Building TRG-Installer.exe...
 g++ -std=c++17 -O2 -static -static-libgcc -static-libstdc++ -mwindows -municode TRG-Installer.cpp trg-installer-resource.o -lcomctl32 -lshell32 -ladvapi32 -lole32 -luuid -luser32 -lgdi32 -o TRG-Installer.exe
-if errorlevel 1 exit /b 1
+if errorlevel 1 goto :failed
+goto :success
 
+:build_msvc
+where rc.exe >nul 2>nul
+if errorlevel 1 (
+    echo ERROR: rc.exe was not found. Use a Visual Studio Developer Command Prompt.
+    goto :failed
+)
+echo Building installer resources...
+rc.exe /nologo /fo trg-installer-resource.res TRG-Installer.rc
+if errorlevel 1 goto :failed
+
+echo Building TRG-Installer.exe...
+cl.exe /nologo /std:c++17 /EHsc /O2 /MT TRG-Installer.cpp trg-installer-resource.res /link /SUBSYSTEM:WINDOWS comctl32.lib shell32.lib advapi32.lib ole32.lib uuid.lib user32.lib gdi32.lib /OUT:TRG-Installer.exe
+if errorlevel 1 goto :failed
+
+:success
 echo.
-echo BUILD SUCCESS: TRG-Installer.exe
-echo Runtime embedded: %TRG_RUNTIME%
+echo BUILD SUCCESSFUL
+echo Output: TRG-Installer.exe
+echo Embedded runtime: TRG-fixed.exe
+popd
+endlocal
 exit /b 0
+
+:failed
+echo.
+echo BUILD FAILED. See the error above.
+popd
+endlocal
+exit /b 1
