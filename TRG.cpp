@@ -296,6 +296,7 @@ bool controlsEnabled = false;
 bool webEnabled = false;
 bool collisionEnabled = false;
 bool aiEnabled = false;
+bool mathEnabled = false;
 std::string webPageHtml;
 std::vector<std::string> readProgram(std::istream& source);
 std::size_t errorCount = 0;
@@ -1749,6 +1750,7 @@ struct LibraryState {
     bool controls = false;
     bool network = false;
     bool ai = false;
+    bool math = false;
 };
 
 std::string parenContent(const std::string& line) {
@@ -1840,7 +1842,7 @@ void scanLibraries(const std::vector<std::string>& program, LibraryState& librar
         const std::string name = lower(second.substr(1, second.size() - 2));
         if (name == "all") {
             libraries.files = libraries.json = libraries.web = libraries.collision = true;
-            libraries.manual = libraries.ui = libraries.controls = libraries.network = libraries.ai = true;
+            libraries.manual = libraries.ui = libraries.controls = libraries.network = libraries.ai = libraries.math = true;
         } else if (name == "files") libraries.files = true;
         else if (name == "json") libraries.json = true;
         else if (name == "web") libraries.web = true;
@@ -1850,6 +1852,7 @@ void scanLibraries(const std::vector<std::string>& program, LibraryState& librar
         else if (name == "controls") libraries.controls = true;
         else if (name == "network") libraries.network = true;
         else if (name == "ai") libraries.ai = true;
+        else if (name == "math") libraries.math = true;
     }
 }
 
@@ -2748,6 +2751,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 webEnabled = webEnabled || connectedLibraries.web;
                 collisionEnabled = collisionEnabled || connectedLibraries.collision;
                 aiEnabled = aiEnabled || connectedLibraries.ai;
+                mathEnabled = mathEnabled || connectedLibraries.math;
                 if (connectedLibraries.controls) initializeControls(variables, types);
                 registerFunctions(connectedProgram, false);
                 ++connectDepth;
@@ -2780,6 +2784,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     webEnabled = webEnabled || moduleLibraries.web;
                     collisionEnabled = collisionEnabled || moduleLibraries.collision;
                     aiEnabled = aiEnabled || moduleLibraries.ai;
+                    mathEnabled = mathEnabled || moduleLibraries.math;
                     if (moduleLibraries.controls) initializeControls(variables, types);
                     registerFunctions(moduleProgram, false);
                     ++includeDepth;
@@ -2805,8 +2810,9 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 if (library == "(controls)") { initializeControls(variables, types); continue; }
                 if (library == "(network)") { networkEnabled = true; appendOutput("TRG network library enabled.\\r\\n"); continue; }
                 if (library == "(ai)") { aiEnabled = true; appendOutput("TRG AI library enabled.\\r\\n"); continue; }
+                if (library == "(math)") { mathEnabled = true; appendOutput("TRG math library enabled.\\r\\n"); continue; }
                 if (library == "(all)") {
-                    filesEnabled = jsonEnabled = webEnabled = collisionEnabled = networkEnabled = aiEnabled = true;
+                    filesEnabled = jsonEnabled = webEnabled = collisionEnabled = networkEnabled = aiEnabled = mathEnabled = true;
                     initializeControls(variables, types);
                     manualMode = true;
                     uiMode = true;
@@ -3075,6 +3081,58 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 continue;
             }
             reportError(i + 1, "unknown AI action; use create, teach, train, predict, or classify", action);
+            continue;
+        }
+
+        if (cmd == "math") {
+            if (!mathEnabled) { reportError(i + 1, "math commands need add (math)"); continue; }
+            if (tokens.size() < 4) {
+                reportError(i + 1, "use math sin/cos/tan/abs/floor/ceil/round/sqrt VALUE RESULT, min/max A B RESULT, clamp VALUE MIN MAX RESULT, or distance X1 Y1 X2 Y2 RESULT");
+                continue;
+            }
+            const std::string operation = lower(tokens[1]);
+            const std::size_t expected = operation == "min" || operation == "max" ? 5 :
+                (operation == "clamp" || operation == "distance" ? 6 : 4);
+            if (tokens.size() != expected || !validName(tokens.back())) {
+                reportError(i + 1, "invalid arguments for math " + operation);
+                continue;
+            }
+            std::vector<double> values;
+            bool validValues = true;
+            for (std::size_t index = 2; index + 1 < tokens.size(); ++index) {
+                double value = 0;
+                if (!evaluateExpression(valueFor(tokens[index], variables), variables, value)) {
+                    validValues = false;
+                    break;
+                }
+                values.push_back(value);
+            }
+            if (!validValues) { reportError(i + 1, "math needs valid numeric inputs"); continue; }
+            double result = 0;
+            if (operation == "sin") result = std::sin(values[0]);
+            else if (operation == "cos") result = std::cos(values[0]);
+            else if (operation == "tan") result = std::tan(values[0]);
+            else if (operation == "abs") result = std::abs(values[0]);
+            else if (operation == "floor") result = std::floor(values[0]);
+            else if (operation == "ceil") result = std::ceil(values[0]);
+            else if (operation == "round") result = std::round(values[0]);
+            else if (operation == "sqrt") {
+                if (values[0] < 0) { reportError(i + 1, "sqrt needs a value of zero or greater"); continue; }
+                result = std::sqrt(values[0]);
+            } else if (operation == "min") result = (std::min)(values[0], values[1]);
+            else if (operation == "max") result = (std::max)(values[0], values[1]);
+            else if (operation == "clamp") {
+                if (values[1] > values[2]) { reportError(i + 1, "clamp minimum must not exceed maximum"); continue; }
+                result = std::clamp(values[0], values[1], values[2]);
+            } else if (operation == "distance") {
+                result = std::hypot(values[2] - values[0], values[3] - values[1]);
+            } else {
+                reportError(i + 1, "unknown math operation", operation);
+                continue;
+            }
+            if (!std::isfinite(result)) { reportError(i + 1, "math result is outside the supported numeric range"); continue; }
+            variables[tokens.back()] = result;
+            types[tokens.back()] = "num";
             continue;
         }
 
@@ -4763,6 +4821,7 @@ void executeProgram(const std::vector<std::string>& program) {
     collisionEnabled = libraries.collision;
     networkEnabled = libraries.network;
     aiEnabled = libraries.ai;
+    mathEnabled = libraries.math;
     aiModels.clear();
     if (libraries.controls) initializeControls(uiVariables, uiTypes);
     registerFunctions(uiProgram);
