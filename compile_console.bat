@@ -1,9 +1,20 @@
 @echo off
-setlocal
-set PATH=C:\mingw64\bin;%PATH%
-g++ -std=c++17 -O2 -static -static-libgcc -static-libstdc++ -municode -DTRG_TEST_CONSOLE TRG.cpp trg-resource.o -lcomdlg32 -lshell32 -lgdiplus -lgdi32 -luser32 -o TRG-console.exe
+setlocal EnableExtensions
+cd /d "%~dp0"
+
+if exist "C:\mingw64\bin\g++.exe" set "PATH=C:\mingw64\bin;%PATH%"
+if exist "C:\msys64\mingw64\bin\g++.exe" set "PATH=C:\msys64\mingw64\bin;%PATH%"
+
+where g++ >nul 2>nul
 if errorlevel 1 (
-    echo Build failed.
+    echo ERROR: g++ was not found.
     exit /b 1
 )
-echo Built TRG-console.exe
+
+echo Building the TRG console test runner...
+g++ -std=c++17 -O2 -DTRG_TEST_CONSOLE -mconsole TRG.cpp -lwinhttp -lbluetoothapis -o TRG-console.exe
+if errorlevel 1 (
+    echo BUILD FAILED.
+    exit /b 1
+)
+echo BUILD SUCCESS: TRG-console.exe
