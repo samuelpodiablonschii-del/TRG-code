@@ -53,8 +53,15 @@ echo.
 echo Building the debug APK with Gradle...
 echo.
 
-call "%GRADLEW%" --no-daemon assembleDebug
-if errorlevel 1 goto :failed
+pushd "%~dp0android-app"
+if errorlevel 1 (
+    echo ERROR: Could not enter the Android project folder.
+    goto :failed
+)
+call gradlew.bat --no-daemon assembleDebug
+set "GRADLE_RESULT=%ERRORLEVEL%"
+popd
+if not "%GRADLE_RESULT%"=="0" goto :failed
 
 if not exist "%APK%" (
     echo ERROR: Gradle finished but the APK was not found:
