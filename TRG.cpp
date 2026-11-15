@@ -3076,7 +3076,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             const std::size_t expected = cmd == "pop" || cmd == "trim" ? 3 :
                 (cmd == "insert" || cmd == "index_of" || cmd == "split" ? 4 :
                  (cmd == "substring" ? 5 : 4));
-            if (tokens.size() != expected || !validName(tokens.back())) {
+            if (tokens.size() != expected || (cmd != "insert" && !validName(tokens.back()))) {
                 reportError(i + 1, "invalid arguments for " + cmd, cmd);
                 continue;
             }
