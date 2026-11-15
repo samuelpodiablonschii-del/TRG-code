@@ -1523,11 +1523,6 @@ bool readJsonIntoVariables(const std::filesystem::path& path, Vars& variables, T
     return true;
 }
 
-
-
-
-}
-
 // ---------------------------------------------------------
 // HTTP / network implementation (add (network))
 // ---------------------------------------------------------
