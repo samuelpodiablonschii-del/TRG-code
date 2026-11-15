@@ -201,7 +201,7 @@ add (json)
 add (all)
 ```
 
-`add (all)` enables every built-in library, including `json`, `math`, and `ai`.
+`add (all)` enables every built-in library, including `json`, `math`, `ai`, `binary`, `regex`, and `compression`.
 
 ### Math
 
@@ -219,6 +219,58 @@ math round 2.6 nearest
 ```
 
 Supported operations: `sin`, `cos`, `tan`, `abs`, `floor`, `ceil`, `round`, `sqrt`, `min`, `max`, `clamp`, and `distance`.
+### Binary and bitwise tools
+
+TRG includes byte conversion, encoding, bitwise operations, and checksums without extra packages.
+
+```text
+add (binary)
+
+binary to_bin 42 binary_text
+binary from_bin 101010 number_again
+binary to_hex "TRG" hex_text
+binary from_hex "545247" decoded_text
+binary base64_encode "Hello TRG" encoded
+binary base64_decode "SGVsbG8gVFJH" decoded
+
+bit and 12 10 bit_result
+bit xor 12 10 xor_result
+bit shift_left 3 2 shifted
+bit not 0 inverted
+
+checksum crc32 "123456789" crc
+checksum fnv1a "TRG" fingerprint
+```
+
+- `binary to_bin VALUE RESULT` and `from_bin` convert unsigned whole numbers (up to 53 bits) to/from binary text.
+- `to_hex` and `from_hex` convert text bytes to/from hexadecimal.
+- `base64_encode` and `base64_decode` handle Base64 text.
+- `bit and|or|xor|not|shift_left|shift_right` perform unsigned 32-bit operations.
+- `checksum crc32|fnv1a TEXT RESULT` calculates a non-cryptographic checksum/hash. These are **not encryption or password-security functions**.
+
+### Regular expressions
+
+`add (regex)` enables pattern matching, search, and replacement using C++ ECMAScript regular expressions.
+
+```text
+add (regex)
+regex match "TRG language" "^TRG" starts_with_trg
+regex search "version 4.2" "[0-9]+\\.[0-9]+" version_position
+regex replace "TRG language" "language" "runtime" updated
+```
+
+### Compression
+
+`add (compression)` enables a built-in run-length encoding (RLE) format. It is useful for learning and repeated data; it is not a general-purpose replacement for ZIP, zlib, or LZMA.
+
+```text
+add (compression)
+compress encode "aaabbbcccc" packed
+compress decode packed restored
+```
+
+RLE output is text-safe and stores each run as a count plus a hexadecimal byte. Decoding is limited to 16 MiB per result.
+
 ### AI
 
 `add (ai)` enables TRG's small, beginner-friendly machine-learning library. It uses a trainable logistic model for simple yes/no classification. It is designed for learning and small experiments, not as a replacement for full PyTorch or large language models.
