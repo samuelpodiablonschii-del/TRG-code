@@ -4,7 +4,7 @@
 
 In the developer project folder, run `build.bat` to build `TRG.exe`. It builds a Windows desktop app (no terminal window), embeds the purple TRG icon, and statically links the MinGW runtime. It can also use MSVC from a Developer Command Prompt. The script first writes a fresh `TRG-build.exe`, then replaces `TRG.exe` when possible. If `TRG.exe` is running, the fresh build remains as `TRG-build.exe` so it can still be packaged or copied after the old instance closes. The installer does not include C++ source or build scripts.
 
-Run `build-installer.bat` after `build.bat` to create `TRG-Installer.exe`. The installer embeds `TRG-build.exe` when a fresh locked-file fallback exists; otherwise it embeds `TRG.exe`. The installer reports the package's storage size, asks for administrator permission to install under `C:\Program Files\TRG-code`, and shows progress while installing. It includes the runtime, icon, README, and interactive example, but not C++ source code. It associates `.trg` files with TRG and places both a TRG desktop shortcut (using the purple icon) and `TRG-Example.trg` on the Desktop. Existing desktop files are preserved; if `TRG.lnk` already exists, the installer creates a uniquely named shortcut instead. The installer uses its embedded files and does not download anything from the internet.
+Run `build-installer.bat` to rebuild the latest desktop runtime and create `TRG-Installer.exe` in one step. You can still run `build.bat` alone when you only want the desktop app. The installer embeds `TRG-build.exe` when a fresh locked-file fallback exists; otherwise it embeds `TRG.exe`. The installer reports the package's storage size, asks for administrator permission to install under `C:\Program Files\TRG-code`, and shows progress while installing. It includes the runtime, icon, README, and interactive example, but not C++ source code. It associates `.trg` files with TRG and places both a TRG desktop shortcut (using the purple icon) and `TRG-Example.trg` on the Desktop. Existing desktop files are preserved; if `TRG.lnk` already exists, the installer creates a uniquely named shortcut instead. The installer uses its embedded files and does not download anything from the internet.
 
 The Windows desktop editor has **Open**, **Save**, **Run**, **Preview**, **New**, and **Build** buttons. **Build** saves the current file and creates a standalone `.exe` beside it. **Save** overwrites the currently opened file; use the Save dialog when creating a new file.
 
@@ -201,7 +201,7 @@ add (json)
 add (all)
 ```
 
-`add (all)` enables every built-in library, including `json` and `ai`.
+`add (all)` enables every built-in library, including `json`, `math`, and `ai`.
 
 ### Math
 
