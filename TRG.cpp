@@ -70,6 +70,7 @@ TRG_BLUETOOTH_DLL_EXPORT std::vector<std::string> bluetoothDevices;
 #include <commdlg.h>
 #include <shellapi.h>
 #include <gdiplus.h>
+#include <richedit.h>
 #include "resource.h"
 #elif defined(__ANDROID__)
 #include <jni.h>
@@ -410,6 +411,7 @@ HWND mainWindow = nullptr;
 HWND inputControl = nullptr;
 HFONT openButtonFont = nullptr;
 HFONT codeEditorFont = nullptr;
+HMODULE richEditModule = nullptr;
 bool inputFinished = false;
 bool inputAccepted = false;
 bool loadingEditorText = false;
@@ -424,6 +426,7 @@ constexpr int runButtonId = 103;
 constexpr int previewButtonId = 104;
 constexpr int newButtonId = 105;
 constexpr int buildButtonId = 106;
+constexpr int dictionaryButtonId = 107;
 constexpr int codeEditorId = 301;
 HWND openButton = nullptr;
 HWND saveButton = nullptr;
@@ -431,6 +434,7 @@ HWND runButton = nullptr;
 HWND previewButton = nullptr;
 HWND newButton = nullptr;
 HWND buildButton = nullptr;
+HWND dictionaryButton = nullptr;
 HWND codeEditor = nullptr;
 std::wstring inputPrompt;
 std::wstring outputBuffer;
@@ -478,7 +482,7 @@ void setOpenButtonFont(HWND window) {
     openButtonFont = CreateFontW(scaleForDpi(window, 14), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
         DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
-    const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton, buildButton};
+    const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton, buildButton, dictionaryButton};
     if (openButtonFont) for (HWND button : buttons) if (button)
         SendMessageW(button, WM_SETFONT, reinterpret_cast<WPARAM>(openButtonFont), TRUE);
     if (codeEditorFont) DeleteObject(codeEditorFont);
@@ -533,12 +537,12 @@ void layoutOutputControls(HWND window) {
     const LONG gap = scaleForDpi(window, 5);
     const LONG margin = scaleForDpi(window, 12);
     const LONG desiredWidth = scaleForDpi(window, 88);
-    const LONG available = std::max<LONG>(scaleForDpi(window, 6 * 52 + 5 * 5), width - scaleForDpi(window, 205) - margin * 2);
-    const LONG buttonWidth = std::clamp<LONG>((available - gap * 5) / 6,
+    const LONG available = std::max<LONG>(scaleForDpi(window, 7 * 52 + 6 * 5), width - scaleForDpi(window, 205) - margin * 2);
+    const LONG buttonWidth = std::clamp<LONG>((available - gap * 6) / 7,
         scaleForDpi(window, 52), desiredWidth);
     const LONG buttonHeight = scaleForDpi(window, 34);
-    const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton, buildButton};
-    LONG x = width - margin - (buttonWidth + gap) * 6 + gap;
+    const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton, buildButton, dictionaryButton};
+    LONG x = width - margin - (buttonWidth + gap) * 7 + gap;
     const LONG y = std::max<LONG>(0, (headerHeight - buttonHeight) / 2);
     for (HWND button : buttons) {
         if (button) MoveWindow(button, x, y, buttonWidth, buttonHeight, TRUE);
@@ -4201,16 +4205,31 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         newButton = CreateWindowExW(0, L"BUTTON", L"New",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(newButtonId), GetModuleHandleW(nullptr), nullptr);
-        buildButton = CreateWindowExW(0, L"BUTTON", L"Build",
+        buildButton = CreateWindowExW(0, L"BUTTON", L"Compile EXE",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(buildButtonId), GetModuleHandleW(nullptr), nullptr);
-        codeEditor = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
+        dictionaryButton = CreateWindowExW(0, L"BUTTON", L"Dictionary",
+            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            reinterpret_cast<HMENU>(dictionaryButtonId), GetModuleHandleW(nullptr), nullptr);
+        richEditModule = LoadLibraryW(L"Msftedit.dll");
+        const wchar_t* editorClass = richEditModule ? MSFTEDIT_CLASS : L"EDIT";
+        codeEditor = CreateWindowExW(WS_EX_CLIENTEDGE, editorClass, L"",
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | WS_HSCROLL |
                 ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | ES_NOHIDESEL,
             0, 0, 100, 100, window, reinterpret_cast<HMENU>(codeEditorId),
             GetModuleHandleW(nullptr), nullptr);
         SendMessageW(codeEditor, EM_SETLIMITTEXT, 8 * 1024 * 1024, 0);
         setOpenButtonFont(window);
+        if (codeEditor && richEditModule) {
+            SendMessageW(codeEditor, EM_SETBKGNDCOLOR, 0, RGB(38, 38, 38));
+            CHARFORMAT2W baseFormat = {};
+            baseFormat.cbSize = sizeof(baseFormat);
+            baseFormat.dwMask = CFM_COLOR | CFM_FACE | CFM_SIZE;
+            baseFormat.crTextColor = RGB(220, 220, 220);
+            baseFormat.yHeight = 210;
+            wcscpy_s(baseFormat.szFaceName, LF_FACESIZE, L"Consolas");
+            SendMessageW(codeEditor, EM_SETCHARFORMAT, SCF_ALL, reinterpret_cast<LPARAM>(&baseFormat));
+        }
         layoutOutputControls(window);
         updateEditorWindowTitle();
         return 0;
@@ -4222,7 +4241,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
     }
     if (message == WM_GETMINMAXINFO) {
         auto* limits = reinterpret_cast<MINMAXINFO*>(lParam);
-        limits->ptMinTrackSize.x = scaleForDpi(window, 760);
+        limits->ptMinTrackSize.x = scaleForDpi(window, 820);
         limits->ptMinTrackSize.y = scaleForDpi(window, 420);
         return 0;
     }
@@ -4240,6 +4259,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         if (!loadingEditorText) {
             editorDirty = true;
             updateEditorWindowTitle();
+            applyEditorSyntaxHighlighting();
         }
         return 0;
     }
@@ -4254,6 +4274,26 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
     }
     if (message == WM_COMMAND && LOWORD(wParam) == runButtonId) {
         runEditorSource();
+        return 0;
+    }
+    if (message == WM_COMMAND && LOWORD(wParam) == dictionaryButtonId) {
+        const wchar_t* dictionary =
+            L"TRG COMMAND DICTIONARY\n\n"
+            L"OUTPUT: print / show / say\n"
+            L"INPUT: ask \"Question?\" variable\n"
+            L"VARIABLES: let name = value; num, word, toggle, color\n"
+            L"FLOW: if, else, loop, break, stop, every, wait\n"
+            L"FUNCTIONS: function, return, call\n"
+            L"DATA: list, push, insert, get, set, remove, pop, join, split\n"
+            L"TEXT: upper, lower, trim, length, contains, replace, substring\n"
+            L"MATH: random; add (math) for sin, cos, tan, sqrt, abs, min, max, clamp, distance\n"
+            L"AI: add (ai); ai create, teach, train, predict, classify\n"
+            L"FILES: add (files); read_file, write_file, append_file, file_exists\n"
+            L"JSON: add (json); json GROUP clean RESULT / compressed RESULT\n"
+            L"UI: add (ui); text, button, rectangle, circle, image, animate\n\n"
+            L"Blocks use parentheses: if score > 0 ( ... )\n"
+            L"Libraries are file-wide: add (math), add (ai), add (json), add (all).";
+        MessageBoxW(window, dictionary, L"TRG - Command Dictionary", MB_OK | MB_ICONINFORMATION);
         return 0;
     }
     if (message == WM_COMMAND && LOWORD(wParam) == buildButtonId) {
@@ -4605,7 +4645,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
     if (message == WM_DESTROY) {
         mainWindow = nullptr;
         codeEditor = nullptr;
-        openButton = saveButton = runButton = previewButton = newButton = buildButton = nullptr;
+        openButton = saveButton = runButton = previewButton = newButton = buildButton = dictionaryButton = nullptr;
         desktopSpriteCache.clear();
         if (gdiplusToken != 0) {
             Gdiplus::GdiplusShutdown(gdiplusToken);
@@ -4619,6 +4659,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             DeleteObject(codeEditorFont);
             codeEditorFont = nullptr;
         }
+        if (richEditModule) { FreeLibrary(richEditModule); richEditModule = nullptr; }
         PostQuitMessage(0);
         return 0;
     }
@@ -4842,6 +4883,78 @@ void executeProgram(const std::vector<std::string>& program) {
 }
 
 #ifdef _WIN32
+
+void applyEditorSyntaxHighlighting() {
+    if (!codeEditor || !richEditModule) return;
+    const int length = GetWindowTextLengthW(codeEditor);
+    if (length <= 0) return;
+    std::wstring source(static_cast<std::size_t>(length) + 1, L'\0');
+    GetWindowTextW(codeEditor, source.data(), length + 1);
+    source.resize(static_cast<std::size_t>(length));
+    DWORD selectionStart = 0, selectionEnd = 0;
+    SendMessageW(codeEditor, EM_GETSEL, reinterpret_cast<WPARAM>(&selectionStart),
+                 reinterpret_cast<LPARAM>(&selectionEnd));
+    CHARFORMAT2W base = {};
+    base.cbSize = sizeof(base);
+    base.dwMask = CFM_COLOR | CFM_BOLD;
+    base.crTextColor = RGB(220, 220, 220);
+    base.dwEffects = 0;
+    SendMessageW(codeEditor, EM_SETSEL, 0, length);
+    SendMessageW(codeEditor, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&base));
+    static const std::unordered_set<std::wstring> keywords = {
+        L"let",L"num",L"word",L"toggle",L"color",L"list",L"record",L"struct",L"class",L"new",
+        L"if",L"else",L"loop",L"every",L"wait",L"break",L"stop",L"return",L"function",L"call",
+        L"say",L"print",L"show",L"ask",L"random",L"add",L"create",L"json",L"read_file",
+        L"write_file",L"append_file",L"file_exists",L"delete_file",L"push",L"insert",L"get",
+        L"set",L"remove",L"pop",L"join",L"split",L"upper",L"lower",L"trim",L"length",
+        L"contains",L"index_of",L"replace",L"substring",L"math",L"ai",L"text",L"button",
+        L"rectangle",L"circle",L"image",L"animate",L"true",L"false",L"none"
+    };
+    auto paint = [&](std::size_t start, std::size_t count, COLORREF color, bool bold = false) {
+        if (!count) return;
+        CHARFORMAT2W format = {};
+        format.cbSize = sizeof(format);
+        format.dwMask = CFM_COLOR | CFM_BOLD;
+        format.crTextColor = color;
+        format.dwEffects = bold ? CFE_BOLD : 0;
+        SendMessageW(codeEditor, EM_SETSEL, static_cast<WPARAM>(start), static_cast<LPARAM>(start + count));
+        SendMessageW(codeEditor, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&format));
+    };
+    std::size_t i = 0;
+    while (i < source.size()) {
+        if (source[i] == L'/' && i + 1 < source.size() && source[i + 1] == L'/') {
+            const std::size_t start = i;
+            while (i < source.size() && source[i] != L'\n') ++i;
+            paint(start, i - start, RGB(106, 153, 85));
+        } else if (source[i] == L'"') {
+            const std::size_t start = i++;
+            bool escaped = false;
+            while (i < source.size()) {
+                const wchar_t ch = source[i++];
+                if (ch == L'"' && !escaped) break;
+                if (ch == L'\\' && !escaped) escaped = true;
+                else escaped = false;
+            }
+            paint(start, i - start, RGB(206, 145, 120));
+        } else if (iswdigit(source[i])) {
+            const std::size_t start = i++;
+            while (i < source.size() && (iswalnum(source[i]) || source[i] == L'.')) ++i;
+            paint(start, i - start, RGB(181, 206, 168));
+        } else if (iswalpha(source[i]) || source[i] == L'_') {
+            const std::size_t start = i++;
+            while (i < source.size() && (iswalnum(source[i]) || source[i] == L'_')) ++i;
+            std::wstring word = source.substr(start, i - start);
+            std::transform(word.begin(), word.end(), word.begin(), towlower);
+            if (keywords.count(word)) paint(start, i - start, RGB(86, 156, 214), true);
+        } else if (source[i] == L'#') {
+            const std::size_t start = i++;
+            while (i < source.size() && iswxdigit(source[i])) ++i;
+            if (i - start == 7 || i - start == 9) paint(start, i - start, RGB(197, 134, 192));
+        } else ++i;
+    }
+    SendMessageW(codeEditor, EM_SETSEL, selectionStart, selectionEnd);
+}
+
 bool loadSourceFile(const std::filesystem::path& path) {
     std::ifstream file(path, std::ios::binary);
     if (!file) {
@@ -4857,6 +4970,7 @@ bool loadSourceFile(const std::filesystem::path& path) {
     loadingEditorText = true;
     SetWindowTextW(codeEditor, wideFromUtf8(source).c_str());
     loadingEditorText = false;
+    applyEditorSyntaxHighlighting();
     currentSourcePath = std::filesystem::absolute(path);
     projectRoot = currentSourcePath.parent_path();
     editorDirty = false;
