@@ -10,6 +10,12 @@ ai train gate 3000 0.1
 
 ai classify gate 0;0 off
 ai classify gate 1;0 on
+if off = true (
+    say "ERROR AI incorrectly classified zero inputs as true"
+)
+if on = false (
+    say "ERROR AI failed to recognise the OR input"
+)
 say "AI_OR_OFF=" off
 say "AI_OR_ON=" on
 say "TRG_AI_TESTS_PASSED"
