@@ -1609,6 +1609,7 @@ std::string httpGet(const std::string& url, std::string& error) {
 std::string httpGet(const std::string& url, std::string& error) { error = "network only on Windows"; return {}; }
 #endif
 
+#ifdef _WIN32
 std::string httpPost(const std::string& url, const std::string& body, std::string& error) {
     error.clear();
     std::string result;
@@ -1680,6 +1681,13 @@ std::string httpPost(const std::string& url, const std::string& body, std::strin
     WinHttpCloseHandle(session);
     return result;
 }
+
+#else
+std::string httpPost(const std::string&, const std::string&, std::string& error) {
+    error = "network only on Windows";
+    return {};
+}
+#endif
 
 // ---------------------------------------------------------
 
