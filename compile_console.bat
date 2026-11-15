@@ -12,7 +12,7 @@ if errorlevel 1 (
 )
 
 echo Building the TRG console test runner...
-g++ -std=c++17 -O2 -DTRG_TEST_CONSOLE -mconsole TRG.cpp -lwinhttp -lbluetoothapis -o TRG-console.exe
+g++ -std=c++17 -O2 -DTRG_TEST_CONSOLE -mconsole TRG.cpp -lcomdlg32 -lshell32 -lgdiplus -lgdi32 -luser32 -lwinhttp -lbluetoothapis -o TRG-console.exe
 if errorlevel 1 (
     echo BUILD FAILED.
     exit /b 1
