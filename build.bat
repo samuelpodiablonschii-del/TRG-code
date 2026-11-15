@@ -77,17 +77,17 @@ goto :success
 echo.
 echo BUILD FAILED. See the error above.
 popd
-if not defined TRG_NO_PAUSE pause
+if not defined TRG_NO_PAUSE if not defined CI pause
 endlocal
 exit /b 1
 
 :success
 popd
-if not defined TRG_NO_PAUSE pause
+if not defined TRG_NO_PAUSE if not defined CI pause
 endlocal
 exit /b 0
 
 :failed_no_push
-if not defined TRG_NO_PAUSE pause
+if not defined TRG_NO_PAUSE if not defined CI pause
 endlocal
 exit /b 1
