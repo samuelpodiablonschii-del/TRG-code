@@ -331,6 +331,9 @@ std::vector<HttpRequest> pendingHttpRequests;
 std::string httpGet(const std::string& url, std::string& error);
 std::string httpPost(const std::string& url, const std::string& body, std::string& error);
 
+// Shared by the Windows editor, Android editor bridge, and project-relative commands.
+std::filesystem::path currentSourcePath;
+
 bool uiGroupIsVisible(const std::string& name) {
     if (name.empty() || name == "default") return true;
     const auto group = std::find_if(uiGroups.begin(), uiGroups.end(), [&](const UiGroup& item) {
@@ -423,7 +426,6 @@ HWND newButton = nullptr;
 HWND codeEditor = nullptr;
 std::wstring inputPrompt;
 std::wstring outputBuffer;
-std::filesystem::path currentSourcePath;
 ULONG_PTR gdiplusToken = 0;
 std::unordered_map<std::string, std::unique_ptr<Gdiplus::Image>> desktopSpriteCache;
 
