@@ -4207,7 +4207,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         newButton = CreateWindowExW(0, L"BUTTON", L"New",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(newButtonId), GetModuleHandleW(nullptr), nullptr);
-        buildButton = CreateWindowExW(0, L"BUTTON", L"Compile EXE",
+        buildButton = CreateWindowExW(0, L"BUTTON", L"Compile",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(buildButtonId), GetModuleHandleW(nullptr), nullptr);
         dictionaryButton = CreateWindowExW(0, L"BUTTON", L"Dictionary",
@@ -4939,19 +4939,19 @@ void applyEditorSyntaxHighlighting() {
                 else escaped = false;
             }
             paint(start, i - start, RGB(206, 145, 120));
-        } else if (iswdigit(source[i])) {
+        } else if (std::iswdigit(source[i])) {
             const std::size_t start = i++;
-            while (i < source.size() && (iswalnum(source[i]) || source[i] == L'.')) ++i;
+            while (i < source.size() && (std::iswalnum(source[i]) || source[i] == L'.')) ++i;
             paint(start, i - start, RGB(181, 206, 168));
-        } else if (iswalpha(source[i]) || source[i] == L'_') {
+        } else if (std::iswalpha(source[i]) || source[i] == L'_') {
             const std::size_t start = i++;
             while (i < source.size() && (iswalnum(source[i]) || source[i] == L'_')) ++i;
             std::wstring word = source.substr(start, i - start);
-            std::transform(word.begin(), word.end(), word.begin(), towlower);
+            std::transform(word.begin(), word.end(), word.begin(), [](wchar_t ch) { return static_cast<wchar_t>(std::towlower(ch)); });
             if (keywords.count(word)) paint(start, i - start, RGB(86, 156, 214), true);
         } else if (source[i] == L'#') {
             const std::size_t start = i++;
-            while (i < source.size() && iswxdigit(source[i])) ++i;
+            while (i < source.size() && std::iswxdigit(source[i])) ++i;
             if (i - start == 7 || i - start == 9) paint(start, i - start, RGB(197, 134, 192));
         } else ++i;
     }
