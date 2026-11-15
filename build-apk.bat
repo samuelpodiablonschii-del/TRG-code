@@ -17,6 +17,7 @@ if not exist "%GRADLEW%" (
 )
 
 if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" goto :java_ready
+set "JAVA_HOME="
 if exist "%ProgramFiles%\Android\Android Studio\jbr\bin\java.exe" (
     set "JAVA_HOME=%ProgramFiles%\Android\Android Studio\jbr"
     set "PATH=%JAVA_HOME%\bin;%PATH%"
