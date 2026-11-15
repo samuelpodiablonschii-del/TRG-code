@@ -330,6 +330,8 @@ double viewportX = 0;
 double viewportY = 0;
 bool networkEnabled = false;
 bool powershellEnabled = false;
+bool raspberryEnabled = false;
+bool accessibilityEnabled = false;
 
 struct HttpRequest {
     std::string method;
@@ -1919,7 +1921,7 @@ void scanLibraries(const std::vector<std::string>& program, LibraryState& librar
         else if (name == "compression") libraries.compression = true;
         else if (name == "powershell") libraries.powershell = true;
         else if (name == "raspberry") libraries.raspberry = true;
-        else if (name == "accessibility" || name == "accessibility") libraries.accessibility = true;
+        else if (name == "accessibility") libraries.accessibility = true;
     }
 }
 
@@ -2890,12 +2892,12 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 if (library == "(regex)") { regexEnabled = true; appendOutput("TRG regex library enabled.\\r\\n"); continue; }
                 if (library == "(compression)") { compressionEnabled = true; appendOutput("TRG compression library enabled.\\r\\n"); continue; }
                 if (library == "(powershell)") { powershellEnabled = true; appendOutput("TRG PowerShell library enabled.\\r\\n"); continue; }
-                if (library == "(raspberry)") { appendOutput("TRG Raspberry library selected; hardware commands require the Raspberry backend.\\r\\n"); continue; }
-                if (library == "(accessibility)") { appendOutput("TRG accessibility library selected; platform accessibility support is required.\\r\\n"); continue; }
+                if (library == "(raspberry)") { raspberryEnabled = true; appendOutput("TRG Raspberry library enabled.\\r\\n"); continue; }
+                if (library == "(accessibility)") { accessibilityEnabled = true; appendOutput("TRG accessibility library enabled.\\r\\n"); continue; }
                 if (library == "(all)") {
                     filesEnabled = jsonEnabled = webEnabled = collisionEnabled = networkEnabled = aiEnabled = mathEnabled = true;
                     binaryEnabled = regexEnabled = compressionEnabled = true;
-                    powershellEnabled = true;
+                    powershellEnabled = raspberryEnabled = accessibilityEnabled = true;
                     initializeControls(variables, types);
                     manualMode = true;
                     uiMode = true;
@@ -5072,6 +5074,8 @@ void executeProgram(const std::vector<std::string>& program) {
     regexEnabled = libraries.regex;
     compressionEnabled = libraries.compression;
     powershellEnabled = libraries.powershell;
+    raspberryEnabled = libraries.raspberry;
+    accessibilityEnabled = libraries.accessibility;
     aiModels.clear();
     if (libraries.controls) initializeControls(uiVariables, uiTypes);
     registerFunctions(uiProgram);
