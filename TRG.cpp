@@ -2825,6 +2825,8 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             regexEnabled = regexEnabled || connectedLibraries.regex;
             compressionEnabled = compressionEnabled || connectedLibraries.compression;
                 powershellEnabled = powershellEnabled || connectedLibraries.powershell;
+                raspberryEnabled = raspberryEnabled || connectedLibraries.raspberry;
+                accessibilityEnabled = accessibilityEnabled || connectedLibraries.accessibility;
                 if (connectedLibraries.controls) initializeControls(variables, types);
                 registerFunctions(connectedProgram, false);
                 ++connectDepth;
@@ -2862,6 +2864,8 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     regexEnabled = regexEnabled || moduleLibraries.regex;
                     compressionEnabled = compressionEnabled || moduleLibraries.compression;
                     powershellEnabled = powershellEnabled || moduleLibraries.powershell;
+                    raspberryEnabled = raspberryEnabled || moduleLibraries.raspberry;
+                    accessibilityEnabled = accessibilityEnabled || moduleLibraries.accessibility;
                     if (moduleLibraries.controls) initializeControls(variables, types);
                     registerFunctions(moduleProgram, false);
                     ++includeDepth;
