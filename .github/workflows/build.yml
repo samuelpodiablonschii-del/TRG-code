@@ -51,6 +51,11 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or $mathOutput -notmatch "TRG_MATH_TESTS_PASSED" -or $mathOutput -match "ERROR ") {
             throw "TRG math library regression tests failed."
           }
+                    $plainOutput = & .\TRG-console.exe .\tests\plain_english.trg 2>&1 | Out-String
+          Write-Host $plainOutput
+          if ($LASTEXITCODE -ne 0 -or $plainOutput -notmatch "TRG_PLAIN_ENGLISH_TESTS_PASSED" -or $plainOutput -match "ERROR ") {
+            throw "TRG plain-English command regression tests failed."
+          }
           $advancedOutput = & .\TRG-console.exe .\tests\advanced_libraries.trg 2>&1 | Out-String
           Write-Host $advancedOutput
           if ($LASTEXITCODE -ne 0 -or $advancedOutput -notmatch "TRG_ADVANCED_LIBRARIES_PASSED" -or $advancedOutput -match "ERROR ") {
