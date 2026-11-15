@@ -45,14 +45,19 @@
 #include <bluetooth/hci_lib.h>
 #endif
 
+#if defined(_WIN32)
 #define TRG_NETWORK_DLL_EXPORT __declspec(dllexport)
 #define TRG_BLUETOOTH_DLL_EXPORT __declspec(dllexport)
+#else
+#define TRG_NETWORK_DLL_EXPORT __attribute__((visibility("default")))
+#define TRG_BLUETOOTH_DLL_EXPORT __attribute__((visibility("default")))
+#endif
 
 #include <string>
 
-TRG_NETWORK_DLL_EXPORT std::string httpGet(std::string url, std::string& error);
-TRG_NETWORK_DLL_EXPORT std::string httpPost(std::string url, std::string body, std::string& error);
-TRG_NETWORK_DLL_EXPORT bool networkEnabled = false;
+TRG_NETWORK_DLL_EXPORT std::string httpGet(const std::string& url, std::string& error);
+TRG_NETWORK_DLL_EXPORT std::string httpPost(const std::string& url, const std::string& body, std::string& error);
+extern TRG_NETWORK_DLL_EXPORT bool networkEnabled;
 
 TRG_BLUETOOTH_DLL_EXPORT bool bluetoothConnect(std::string deviceAddress);
 TRG_BLUETOOTH_DLL_EXPORT int bluetoothSend(std::string data);
