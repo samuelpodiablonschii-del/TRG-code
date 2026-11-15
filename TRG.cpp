@@ -36,14 +36,9 @@
 #pragma comment(lib, "winhttp.lib")
 #endif
 
-#ifdef _WIN32
-#include <bluetoothleapi.h>
-#pragma comment(lib, "bluetooth.lib")
-#elif defined(__linux__)
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/hci.h>
-#include <bluetooth/hci_lib.h>
-#endif
+// The current runtime exposes Bluetooth extension declarations but does not
+// call platform Bluetooth APIs directly. Avoid requiring platform-specific
+// Bluetooth development headers just to build the interpreter.
 
 #if defined(_WIN32)
 #define TRG_NETWORK_DLL_EXPORT __declspec(dllexport)
