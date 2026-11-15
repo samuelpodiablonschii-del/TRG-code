@@ -1,6 +1,10 @@
 @echo off
 setlocal EnableExtensions
-pushd "%~dp0" || exit /b 1
+pushd "%~dp0"
+if errorlevel 1 (
+    echo ERROR: Could not enter the TRG project folder.
+    goto :failed_no_push
+)
 title TRG - BUILD
 
 if exist "C:\mingw64\bin\g++.exe" set "PATH=C:\mingw64\bin;%PATH%"
@@ -67,13 +71,23 @@ echo.
 echo BUILD SUCCESSFUL
 echo Latest build: TRG-build.exe
 echo Main app: TRG.exe
-popd
-endlocal
-exit /b 0
+goto :success
 
 :failed
 echo.
 echo BUILD FAILED. See the error above.
 popd
+if not defined TRG_NO_PAUSE pause
+endlocal
+exit /b 1
+
+:success
+popd
+if not defined TRG_NO_PAUSE pause
+endlocal
+exit /b 0
+
+:failed_no_push
+if not defined TRG_NO_PAUSE pause
 endlocal
 exit /b 1
