@@ -4,7 +4,7 @@
 
 In the developer project folder, run `build.bat` to build `TRG.exe`. It builds a Windows desktop app (no terminal window), embeds the purple TRG icon, and statically links the MinGW runtime. It can also use MSVC from a Developer Command Prompt. If `TRG.exe` is already running and Windows prevents replacing it, the script builds `TRG-fixed.exe`; close the old instance and run the script again to update `TRG.exe`. The installer does not include C++ source or build scripts.
 
-Run `build-installer.bat` after building `TRG-fixed.exe` to create `TRG-Installer.exe`. The installer reports the package's storage size, asks for administrator permission to install under `C:\Program Files\TRG-code`, and shows progress while installing. It includes the runtime, icon, README, and interactive example, but not C++ source code. It associates `.trg` files with TRG and places both a TRG desktop shortcut (using the purple icon) and `TRG-Example.trg` on the Desktop. Existing desktop files are preserved; if `TRG.lnk` already exists, the installer creates a uniquely named shortcut instead. The installer uses its embedded files and does not download anything from the internet.
+Run `build-installer.bat` after `build.bat` to create `TRG-Installer.exe`. The installer embeds `TRG-build.exe` when a fresh locked-file fallback exists; otherwise it embeds `TRG.exe`. The installer reports the package's storage size, asks for administrator permission to install under `C:\Program Files\TRG-code`, and shows progress while installing. It includes the runtime, icon, README, and interactive example, but not C++ source code. It associates `.trg` files with TRG and places both a TRG desktop shortcut (using the purple icon) and `TRG-Example.trg` on the Desktop. Existing desktop files are preserved; if `TRG.lnk` already exists, the installer creates a uniquely named shortcut instead. The installer uses its embedded files and does not download anything from the internet.
 
 After installation, double-click a `.trg` file to open it with TRG. Before installation, drag a file onto the app or click **Open .trg**. TRG displays output and errors in its window and stays open until you close it. `ask` opens an input dialog. You can also run a file from a command prompt:
 
@@ -323,3 +323,8 @@ loop true (
     )
 )
 ```
+
+
+## Repository hygiene
+
+Generated Windows executables, DLLs, object/resource files, Android Gradle caches, CMake intermediates, APKs, and machine-specific `local.properties` are ignored by Git. Build them locally with the scripts above or the Gradle wrapper; do not commit generated outputs.
