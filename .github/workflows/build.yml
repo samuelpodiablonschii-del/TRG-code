@@ -74,10 +74,9 @@ jobs:
         shell: pwsh
         run: |
           sdkmanager "platforms;android-35" "build-tools;36.0.0" "ndk;28.2.13676358" "cmake;3.22.1"
-      - name: Build Android APK with Gradle
+      - name: Build Android APK with build-apk.bat
         shell: pwsh
-        working-directory: android-app
-        run: .\gradlew.bat --no-daemon assembleDebug
+        run: .\build-apk.bat
       - uses: actions/upload-artifact@v4
         with:
           name: TRG-Studio-debug-apk
