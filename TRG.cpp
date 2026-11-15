@@ -2054,7 +2054,8 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
         
         const std::vector<std::string> tokens = tokenize(line);
         if (tokens.empty()) continue;
-        const std::string cmd = lower(tokens[0]);
+        std::string cmd = lower(tokens[0]);
+        if (cmd == "print" || cmd == "show") cmd = "say";
 
 #if defined(__ANDROID__) && defined(TRG_BOUNCYBALLS_EXTENSION)
         
@@ -3351,6 +3352,49 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
         }
 
         
+        // Beginner-friendly inferred variable declaration: let name = value.
+        if (cmd == "let") {
+            if (tokens.size() < 4 || !validName(tokens[1])) {
+                reportError(i + 1, "use let NAME = VALUE", "let");
+                continue;
+            }
+            const std::size_t namePos = positionAfterArgument(line, tokens[1]);
+            if (namePos == std::string::npos) {
+                reportError(i + 1, "let needs a variable name", tokens[1]);
+                continue;
+            }
+            std::string rawValue = trim(line.substr(namePos));
+            if (!rawValue.empty() && rawValue.front() == '=') rawValue = trim(rawValue.substr(1));
+            if (rawValue.empty()) {
+                reportError(i + 1, "let needs a value", tokens[1]);
+                continue;
+            }
+            const std::string name = tokens[1];
+            const std::vector<std::string> valueTokens = tokenize(rawValue);
+            if (valueTokens.empty()) { reportError(i + 1, "let needs a value", name); continue; }
+            const std::string first = lower(valueTokens[0]);
+            double number = 0;
+            if (first == "true" || first == "false") {
+                variables[name] = first == "true";
+                types[name] = "toggle";
+            } else if (evaluateExpression(rawValue, variables, number)) {
+                variables[name] = number;
+                types[name] = "num";
+            } else {
+                std::string value;
+                if (rawValue.front() == '"' || rawValue.front() == 39) {
+                    value = valueTokens.size() == 1 ? valueTokens[0] : rawValue;
+                    if (value == rawValue && value.size() >= 2) value = value.substr(1, value.size() - 2);
+                } else if (valueTokens.size() == 1 && variables.count(valueTokens[0])) {
+                    value = valueFor(valueTokens[0], variables);
+                } else {
+                    value = rawValue;
+                }
+                variables[name] = value;
+                types[name] = "word";
+            }
+            continue;
+        }
         if (cmd == "word" || cmd == "num" || cmd == "toggle" || cmd == "color") {
             if (tokens.size() < 2 || !validName(tokens[1])) {
                 reportError(i + 1, "invalid declaration", tokens.size() > 1 ? tokens[1] : "");
