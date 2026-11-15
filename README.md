@@ -203,6 +203,22 @@ add (all)
 
 `add (all)` enables every built-in library, including `json` and `ai`.
 
+### Math
+
+`add (math)` enables beginner-friendly math commands. Angles for `sin`, `cos`, and `tan` are in radians.
+
+```text
+add (math)
+math sin 0 result
+math sqrt 81 root
+math min 5 10 smaller
+math max 5 10 larger
+math clamp 15 0 10 limited
+math distance 0 0 3 4 distance_value
+math round 2.6 nearest
+```
+
+Supported operations: `sin`, `cos`, `tan`, `abs`, `floor`, `ceil`, `round`, `sqrt`, `min`, `max`, `clamp`, and `distance`.
 ### AI
 
 `add (ai)` enables TRG's small, beginner-friendly machine-learning library. It uses a trainable logistic model for simple yes/no classification. It is designed for learning and small experiments, not as a replacement for full PyTorch or large language models.
