@@ -2747,6 +2747,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 jsonEnabled = jsonEnabled || connectedLibraries.json;
                 webEnabled = webEnabled || connectedLibraries.web;
                 collisionEnabled = collisionEnabled || connectedLibraries.collision;
+                aiEnabled = aiEnabled || connectedLibraries.ai;
                 if (connectedLibraries.controls) initializeControls(variables, types);
                 registerFunctions(connectedProgram, false);
                 ++connectDepth;
@@ -2778,6 +2779,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     jsonEnabled = jsonEnabled || moduleLibraries.json;
                     webEnabled = webEnabled || moduleLibraries.web;
                     collisionEnabled = collisionEnabled || moduleLibraries.collision;
+                    aiEnabled = aiEnabled || moduleLibraries.ai;
                     if (moduleLibraries.controls) initializeControls(variables, types);
                     registerFunctions(moduleProgram, false);
                     ++includeDepth;
