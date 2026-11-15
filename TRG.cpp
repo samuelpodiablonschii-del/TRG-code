@@ -3154,6 +3154,79 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             continue;
         }
 
+        if (cmd == "find" || cmd == "find_position" || cmd == "replace_text" ||
+            cmd == "count_text" || cmd == "starts_with" || cmd == "ends_with") {
+            const std::string source = tokens.size() > 1 ? valueFor(tokens[1], variables) : std::string();
+            const std::string search = tokens.size() > 2 ? valueFor(tokens[2], variables) : std::string();
+            if (cmd == "replace_text") {
+                if (tokens.size() != 5 || !validName(tokens[4])) { reportError(i + 1, "use replace_text TEXT OLD_TEXT NEW_TEXT RESULT"); continue; }
+                std::string result = source;
+                if (!search.empty()) {
+                    const std::string replacement = valueFor(tokens[3], variables);
+                    std::size_t position = 0;
+                    while ((position = result.find(search, position)) != std::string::npos) {
+                        result.replace(position, search.size(), replacement);
+                        position += replacement.size();
+                    }
+                }
+                variables[tokens[4]] = result; types[tokens[4]] = "word";
+            } else {
+                if (tokens.size() != 4 || !validName(tokens[3])) {
+                    reportError(i + 1, "use find TEXT SEARCH RESULT, find_position TEXT SEARCH RESULT, count_text TEXT SEARCH RESULT, starts_with TEXT PREFIX RESULT, or ends_with TEXT SUFFIX RESULT");
+                    continue;
+                }
+                if (cmd == "find") { variables[tokens[3]] = source.find(search) != std::string::npos; types[tokens[3]] = "toggle"; }
+                else if (cmd == "find_position") { const auto p = source.find(search); variables[tokens[3]] = p == std::string::npos ? -1.0 : static_cast<double>(p); types[tokens[3]] = "num"; }
+                else if (cmd == "count_text") {
+                    std::size_t count = 0, position = 0;
+                    if (!search.empty()) while ((position = source.find(search, position)) != std::string::npos) { ++count; position += search.size(); }
+                    variables[tokens[3]] = static_cast<double>(count); types[tokens[3]] = "num";
+                } else if (cmd == "starts_with") { variables[tokens[3]] = source.rfind(search, 0) == 0; types[tokens[3]] = "toggle"; }
+                else { variables[tokens[3]] = source.size() >= search.size() && source.compare(source.size() - search.size(), search.size(), search) == 0; types[tokens[3]] = "toggle"; }
+            }
+            continue;
+        }
+
+        if (cmd == "add_numbers" || cmd == "subtract_numbers" || cmd == "multiply_numbers" ||
+            cmd == "divide_numbers" || cmd == "square_root" || cmd == "round_number" ||
+            cmd == "absolute_number" || cmd == "minimum" || cmd == "maximum" ||
+            cmd == "distance_between") {
+            const bool two = cmd == "add_numbers" || cmd == "subtract_numbers" ||
+                cmd == "multiply_numbers" || cmd == "divide_numbers" || cmd == "minimum" || cmd == "maximum";
+            const bool distance = cmd == "distance_between";
+            const std::size_t expected = distance ? 6u : (two ? 4u : 3u);
+            if (tokens.size() != expected || !validName(tokens.back())) {
+                reportError(i + 1, "check the numbers and result name in this command");
+                continue;
+            }
+            std::vector<double> values;
+            bool valid = true;
+            for (std::size_t index = 1; index + 1 < tokens.size(); ++index) {
+                double value = 0;
+                if (!evaluateExpression(valueFor(tokens[index], variables), variables, value)) { valid = false; break; }
+                values.push_back(value);
+            }
+            if (!valid) { reportError(i + 1, "this command needs valid numbers"); continue; }
+            double result = 0;
+            if (cmd == "add_numbers") result = values[0] + values[1];
+            else if (cmd == "subtract_numbers") result = values[0] - values[1];
+            else if (cmd == "multiply_numbers") result = values[0] * values[1];
+            else if (cmd == "divide_numbers") {
+                if (values[1] == 0) { reportError(i + 1, "cannot divide by zero"); continue; }
+                result = values[0] / values[1];
+            } else if (cmd == "square_root") {
+                if (values[0] < 0) { reportError(i + 1, "square_root needs a number of zero or greater"); continue; }
+                result = std::sqrt(values[0]);
+            } else if (cmd == "round_number") result = std::round(values[0]);
+            else if (cmd == "absolute_number") result = std::abs(values[0]);
+            else if (cmd == "minimum") result = (std::min)(values[0], values[1]);
+            else if (cmd == "maximum") result = (std::max)(values[0], values[1]);
+            else result = std::hypot(values[2] - values[0], values[3] - values[1]);
+            if (!std::isfinite(result)) { reportError(i + 1, "the answer is outside the supported number range"); continue; }
+            variables[tokens.back()] = result; types[tokens.back()] = "num";
+            continue;
+        }
+
         if (cmd == "binary") {
             if (!binaryEnabled) { reportError(i + 1, "binary commands need add (binary)"); continue; }
             if (tokens.size()!=4) { reportError(i+1,"use binary to_bin|from_bin|to_hex|from_hex|base64_encode|base64_decode VALUE RESULT"); continue; }
@@ -5030,7 +5103,9 @@ void applyEditorSyntaxHighlighting() {
         L"say",L"print",L"show",L"ask",L"random",L"add",L"create",L"json",L"read_file",
         L"write_file",L"append_file",L"file_exists",L"delete_file",L"push",L"insert",L"get",
         L"set",L"remove",L"pop",L"join",L"split",L"upper",L"lower",L"trim",L"length",
-        L"contains",L"index_of",L"replace",L"substring",L"math",L"ai",L"text",L"button",
+        L"contains",L"index_of",L"replace",L"substring",L"find",L"find_position",L"replace_text",
+        L"count_text",L"starts_with",L"ends_with",L"add_numbers",L"subtract_numbers",L"multiply_numbers",
+        L"divide_numbers",L"square_root",L"round_number",L"absolute_number",L"minimum",L"maximum",L"distance_between",L"math",L"ai",L"text",L"button",
         L"rectangle",L"circle",L"image",L"animate",L"true",L"false",L"none"
     };
     auto paint = [&](std::size_t start, std::size_t count, COLORREF color, bool bold = false) {
