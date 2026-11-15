@@ -16,11 +16,27 @@ if not exist "%GRADLEW%" (
     goto :failed
 )
 
+if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" goto :java_ready
+if exist "%ProgramFiles%\Android\Android Studio\jbr\bin\java.exe" (
+    set "JAVA_HOME=%ProgramFiles%\Android\Android Studio\jbr"
+    set "PATH=%JAVA_HOME%\bin;%PATH%"
+    goto :java_ready
+)
+if exist "%LOCALAPPDATA%\Programs\Android Studio\jbr\bin\java.exe" (
+    set "JAVA_HOME=%LOCALAPPDATA%\Programs\Android Studio\jbr"
+    set "PATH=%JAVA_HOME%\bin;%PATH%"
+    goto :java_ready
+)
 where java.exe >nul 2>nul
 if errorlevel 1 (
-    echo ERROR: Java was not found on PATH.
-    echo Install a JDK (Android Studio includes one) or add it to PATH.
+    echo ERROR: Java was not found.
+    echo Install a JDK or point JAVA_HOME to Android Studio's jbr folder.
     goto :failed
+)
+:java_ready
+if not defined ANDROID_HOME if not defined ANDROID_SDK_ROOT if exist "%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe" (
+    set "ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk"
+    set "ANDROID_SDK_ROOT=%LOCALAPPDATA%\Android\Sdk"
 )
 
 if not defined ANDROID_HOME if not defined ANDROID_SDK_ROOT (
