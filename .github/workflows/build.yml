@@ -25,6 +25,13 @@ jobs:
           $env:Path = "C:\msys64\mingw64\bin;" + $env:Path
           .\build.bat
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\compile_console.bat
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $testOutput = & .\TRG-console.exe .\tests\collections_strings.trg 2>&1 | Out-String
+          Write-Host $testOutput
+          if ($LASTEXITCODE -ne 0 -or $testOutput -notmatch "TRG_FEATURE_TESTS_PASSED" -or $testOutput -match "ERROR ") {
+            throw "TRG language regression tests failed."
+          }
           .\build-installer.bat
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
