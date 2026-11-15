@@ -417,12 +417,14 @@ constexpr int saveButtonId = 102;
 constexpr int runButtonId = 103;
 constexpr int previewButtonId = 104;
 constexpr int newButtonId = 105;
+constexpr int buildButtonId = 106;
 constexpr int codeEditorId = 301;
 HWND openButton = nullptr;
 HWND saveButton = nullptr;
 HWND runButton = nullptr;
 HWND previewButton = nullptr;
 HWND newButton = nullptr;
+HWND buildButton = nullptr;
 HWND codeEditor = nullptr;
 std::wstring inputPrompt;
 std::wstring outputBuffer;
@@ -470,7 +472,7 @@ void setOpenButtonFont(HWND window) {
     openButtonFont = CreateFontW(scaleForDpi(window, 14), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
         DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
-    const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton};
+    const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton, buildButton};
     if (openButtonFont) for (HWND button : buttons) if (button)
         SendMessageW(button, WM_SETFONT, reinterpret_cast<WPARAM>(openButtonFont), TRUE);
     if (codeEditorFont) DeleteObject(codeEditorFont);
@@ -525,12 +527,12 @@ void layoutOutputControls(HWND window) {
     const LONG gap = scaleForDpi(window, 5);
     const LONG margin = scaleForDpi(window, 12);
     const LONG desiredWidth = scaleForDpi(window, 88);
-    const LONG available = std::max<LONG>(scaleForDpi(window, 5 * 56 + 4 * 5), width - scaleForDpi(window, 205) - margin * 2);
-    const LONG buttonWidth = std::clamp<LONG>((available - gap * 4) / 5,
-        scaleForDpi(window, 56), desiredWidth);
+    const LONG available = std::max<LONG>(scaleForDpi(window, 6 * 52 + 5 * 5), width - scaleForDpi(window, 205) - margin * 2);
+    const LONG buttonWidth = std::clamp<LONG>((available - gap * 5) / 6,
+        scaleForDpi(window, 52), desiredWidth);
     const LONG buttonHeight = scaleForDpi(window, 34);
-    const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton};
-    LONG x = width - margin - (buttonWidth + gap) * 5 + gap;
+    const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton, buildButton};
+    LONG x = width - margin - (buttonWidth + gap) * 6 + gap;
     const LONG y = std::max<LONG>(0, (headerHeight - buttonHeight) / 2);
     for (HWND button : buttons) {
         if (button) MoveWindow(button, x, y, buttonWidth, buttonHeight, TRUE);
@@ -4015,6 +4017,9 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         newButton = CreateWindowExW(0, L"BUTTON", L"New",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(newButtonId), GetModuleHandleW(nullptr), nullptr);
+        buildButton = CreateWindowExW(0, L"BUTTON", L"Build",
+            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            reinterpret_cast<HMENU>(buildButtonId), GetModuleHandleW(nullptr), nullptr);
         codeEditor = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
             WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | WS_HSCROLL |
                 ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | ES_NOHIDESEL,
@@ -4033,7 +4038,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
     }
     if (message == WM_GETMINMAXINFO) {
         auto* limits = reinterpret_cast<MINMAXINFO*>(lParam);
-        limits->ptMinTrackSize.x = scaleForDpi(window, 640);
+        limits->ptMinTrackSize.x = scaleForDpi(window, 760);
         limits->ptMinTrackSize.y = scaleForDpi(window, 420);
         return 0;
     }
@@ -4065,6 +4070,23 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
     }
     if (message == WM_COMMAND && LOWORD(wParam) == runButtonId) {
         runEditorSource();
+        return 0;
+    }
+    if (message == WM_COMMAND && LOWORD(wParam) == buildButtonId) {
+        if (!saveSourceFile()) return 0;
+        wchar_t executablePath[32768] = {};
+        const DWORD executableLength = GetModuleFileNameW(nullptr, executablePath, 32768);
+        if (executableLength == 0 || executableLength >= 32768) {
+            appendOutput("ERROR Could not locate the TRG runtime for building.\\r\\n");
+            return 0;
+        }
+        const std::wstring parameters = L"compile \\\"" + currentSourcePath.wstring() + L"\\\"";
+        const HINSTANCE launched = ShellExecuteW(window, L"open", executablePath, parameters.c_str(),
+            projectRoot.c_str(), SW_SHOWNORMAL);
+        if (reinterpret_cast<INT_PTR>(launched) <= 32)
+            appendOutput("ERROR Could not start the TRG build process.\\r\\n");
+        else
+            appendOutput("Building standalone app for " + currentSourcePath.u8string() + "...\\r\\n");
         return 0;
     }
     if (message == WM_COMMAND && LOWORD(wParam) == previewButtonId) {
@@ -4399,7 +4421,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
     if (message == WM_DESTROY) {
         mainWindow = nullptr;
         codeEditor = nullptr;
-        openButton = saveButton = runButton = previewButton = newButton = nullptr;
+        openButton = saveButton = runButton = previewButton = newButton = buildButton = nullptr;
         desktopSpriteCache.clear();
         if (gdiplusToken != 0) {
             Gdiplus::GdiplusShutdown(gdiplusToken);
@@ -4663,7 +4685,7 @@ bool loadSourceFile(const std::filesystem::path& path) {
 
 bool saveSourceFile() {
     std::filesystem::path path = currentSourcePath;
-    if (!saveSourceDialog(path, mainWindow)) return false;
+    if (path.empty() && !saveSourceDialog(path, mainWindow)) return false;
     const int length = GetWindowTextLengthW(codeEditor);
     std::wstring wideSource(static_cast<std::size_t>(length) + 1, L'\0');
     GetWindowTextW(codeEditor, wideSource.data(), length + 1);
