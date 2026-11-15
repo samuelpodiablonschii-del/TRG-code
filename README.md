@@ -6,6 +6,8 @@ In the developer project folder, run `build.bat` to build `TRG.exe`. It builds a
 
 Run `build-installer.bat` after `build.bat` to create `TRG-Installer.exe`. The installer embeds `TRG-build.exe` when a fresh locked-file fallback exists; otherwise it embeds `TRG.exe`. The installer reports the package's storage size, asks for administrator permission to install under `C:\Program Files\TRG-code`, and shows progress while installing. It includes the runtime, icon, README, and interactive example, but not C++ source code. It associates `.trg` files with TRG and places both a TRG desktop shortcut (using the purple icon) and `TRG-Example.trg` on the Desktop. Existing desktop files are preserved; if `TRG.lnk` already exists, the installer creates a uniquely named shortcut instead. The installer uses its embedded files and does not download anything from the internet.
 
+The Windows desktop editor has **Open**, **Save**, **Run**, **Preview**, **New**, and **Build** buttons. **Build** saves the current file and creates a standalone `.exe` beside it. **Save** overwrites the currently opened file; use the Save dialog when creating a new file.
+
 After installation, double-click a `.trg` file to open it with TRG. Before installation, drag a file onto the app or click **Open .trg**. TRG displays output and errors in its window and stays open until you close it. `ask` opens an input dialog. You can also run a file from a command prompt:
 
 ```text
