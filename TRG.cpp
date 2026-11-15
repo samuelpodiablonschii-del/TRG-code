@@ -660,7 +660,7 @@ std::string suggestedCommand(const std::string& input) {
         "button", "block", "animate", "collides", "touching", "move_ui", "register", "move", "subtract", "multiply",
         "watch_collision",
         "divide", "write_file", "append_file", "read_file", "delete_file", "file_exists",
-        "upper", "lower", "length", "contains", "replace", "push", "get", "remove", "set", "increase", "decrease",
+        "upper", "lower", "length", "contains", "replace", "push", "get", "remove", "pop", "insert", "index_of", "split", "join", "trim", "substring", "set", "increase", "decrease",
         "play_audio", "show_image", "play_video", "run_wasm", "web_page", "web_heading",
         "web_text", "web_color", "web_button", "web_image", "web_show"
     };
@@ -3070,6 +3070,97 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 } else items->erase(items->begin() + static_cast<std::ptrdiff_t>(index));
             }
             continue;
+        }
+
+        if (cmd == "pop" || cmd == "insert" || cmd == "index_of" || cmd == "split" || cmd == "join" || cmd == "trim" || cmd == "substring") {
+            const std::size_t expected = cmd == "pop" || cmd == "trim" ? 3 :
+                (cmd == "insert" || cmd == "index_of" || cmd == "split" ? 4 :
+                 (cmd == "substring" ? 5 : 4));
+            if (tokens.size() != expected || !validName(tokens.back())) {
+                reportError(i + 1, "invalid arguments for " + cmd, cmd);
+                continue;
+            }
+
+            if (cmd == "pop" || cmd == "insert" || cmd == "join") {
+                if (!variables.count(tokens[1]) || types[tokens[1]] != "list") {
+                    reportError(i + 1, cmd + " needs a list variable", tokens[1]);
+                    continue;
+                }
+                auto* items = std::get_if<std::vector<std::string>>(&variables[tokens[1]].value);
+                if (!items) { reportError(i + 1, "variable is not a list", tokens[1]); continue; }
+                if (cmd == "pop") {
+                    if (items->empty()) { reportError(i + 1, "cannot pop an empty list", tokens[1]); continue; }
+                    variables[tokens[2]] = items->back();
+                    types[tokens[2]] = "word";
+                    items->pop_back();
+                } else if (cmd == "insert") {
+                    double parsedIndex = 0;
+                    if (!parseNumber(valueFor(tokens[2], variables), parsedIndex) || parsedIndex < 0 ||
+                        parsedIndex > static_cast<double>(items->size()) || std::floor(parsedIndex) != parsedIndex) {
+                        reportError(i + 1, "insert index must be a whole number from 0 to list length", tokens[2]);
+                        continue;
+                    }
+                    items->insert(items->begin() + static_cast<std::ptrdiff_t>(parsedIndex), valueFor(tokens[3], variables));
+                } else {
+                    const std::string delimiter = valueFor(tokens[2], variables);
+                    std::string joined;
+                    for (std::size_t n = 0; n < items->size(); ++n) {
+                        if (n) joined += delimiter;
+                        joined += (*items)[n];
+                    }
+                    variables[tokens[3]] = joined;
+                    types[tokens[3]] = "word";
+                }
+                continue;
+            }
+
+            if (cmd == "index_of") {
+                const std::string source = valueFor(tokens[1], variables);
+                const std::string search = valueFor(tokens[2], variables);
+                const auto found = source.find(search);
+                variables[tokens[3]] = found == std::string::npos ? -1.0 : static_cast<double>(found);
+                types[tokens[3]] = "num";
+                continue;
+            }
+
+            if (cmd == "split") {
+                const std::string source = valueFor(tokens[1], variables);
+                const std::string delimiter = valueFor(tokens[2], variables);
+                if (delimiter.empty()) { reportError(i + 1, "split delimiter cannot be empty", tokens[2]); continue; }
+                std::vector<std::string> parts;
+                std::size_t begin = 0;
+                std::size_t found = 0;
+                while ((found = source.find(delimiter, begin)) != std::string::npos) {
+                    parts.push_back(source.substr(begin, found - begin));
+                    begin = found + delimiter.size();
+                }
+                parts.push_back(source.substr(begin));
+                variables[tokens[3]] = std::move(parts);
+                types[tokens[3]] = "list";
+                continue;
+            }
+
+            if (cmd == "trim") {
+                variables[tokens[2]] = trim(valueFor(tokens[1], variables));
+                types[tokens[2]] = "word";
+                continue;
+            }
+
+            if (cmd == "substring") {
+                const std::string source = valueFor(tokens[1], variables);
+                double startValue = 0, lengthValue = 0;
+                if (!parseNumber(valueFor(tokens[2], variables), startValue) ||
+                    !parseNumber(valueFor(tokens[3], variables), lengthValue) ||
+                    startValue < 0 || lengthValue < 0 ||
+                    std::floor(startValue) != startValue || std::floor(lengthValue) != lengthValue ||
+                    startValue > static_cast<double>(source.size())) {
+                    reportError(i + 1, "substring needs non-negative whole-number START and LENGTH values", cmd);
+                    continue;
+                }
+                variables[tokens[4]] = source.substr(static_cast<std::size_t>(startValue), static_cast<std::size_t>(lengthValue));
+                types[tokens[4]] = "word";
+                continue;
+            }
         }
 
         if (cmd == "upper" || cmd == "lower" || cmd == "length" || cmd == "contains" || cmd == "replace") {
