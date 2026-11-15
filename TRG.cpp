@@ -4738,40 +4738,6 @@ int runApplication(int argc, char** argv) {
     return 0;
 }
 
-#ifdef _WIN32
-    return 0;
-}
-
-#ifdef _WIN32
-#include <bluetoothleapi.h>
-#pragma comment(lib, "bluetooth.lib")
-#elif defined(__linux__)
-#include <bluetooth/bluetooth.h>
-#include <bluetooth/hci.h>
-#include <bluetooth/hci_lib.h>
-#endif
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-TRG_BLUETOOTH_DLL_EXPORT bool bluetoothConnect(std::string deviceAddress);
-
-TRG_BLUETOOTH_DLL_EXPORT int bluetoothSend(std::string data);
-
-TRG_BLUETOOTH_DLL_EXPORT std::string bluetoothReceive();
-
-TRG_BLUETOOTH_DLL_EXPORT bool bluetoothAvailable();
-
-TRG_BLUETOOTH_DLL_EXPORT std::string bluetoothGetLocalAddress();
-
-#ifdef __cplusplus
-}
-#endif
-
-TRG_BLUETOOTH_DLL_EXPORT bool bluetoothEnabled = false;
-
-TRG_BLUETOOTH_DLL_EXPORT std::vector<std::string> bluetoothDevices;
 
 #if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
