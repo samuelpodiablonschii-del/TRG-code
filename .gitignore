@@ -1,0 +1,30 @@
+# Native build outputs
+*.exe
+*.dll
+*.o
+*.obj
+*.res
+*.pdb
+*.ilk
+*.lib
+*.exp
+TRG-build.exe
+TRG-console.exe
+TRG-Installer-generated.rc
+
+# Android / Gradle generated files
+android-app/.gradle/
+android-app/.gradle-user/
+android-app/build/
+android-app/app/.cxx/
+android-app/app/build/
+android-app/local.properties
+*.apk
+*.aab
+
+# IDE and local machine files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
