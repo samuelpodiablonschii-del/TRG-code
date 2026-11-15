@@ -1,18 +1,20 @@
-// Beginner syntax regression test.
-let player = "Sam"
-let score = 10
-let ready = true
+// Your first TRG program.
+// Lines starting with // are notes for you.
 
-print "PLAYER=" player
-print "SCORE=" score
-print "READY=" ready
+let name = "friend"
+let score = 0
 
-score = score + 5
-print "UPDATED=" score
+print "Hello!" name
+ask "What is your name?" name
 
-if ready = true (
-    print "TRG_BEGINNER_TESTS_PASSED"
+print "Nice to meet you," name
+
+score = score + 10
+print "You earned" score "points!"
+
+if score > 5 (
+    print "Great work!"
 )
 else (
-    print "TRG_BEGINNER_TESTS_FAILED"
+    print "Keep going!"
 )
