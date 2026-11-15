@@ -1,31 +1,58 @@
 @echo off
-setlocal
+setlocal EnableExtensions
+cd /d "%~dp0"
 
-if exist "C:\mingw64\bin\g++.exe" set "PATH=C:\mingw64\bin;%PATH%"
-if exist "C:\msys64\mingw64\bin\g++.exe" set "PATH=C:\msys64\mingw64\bin;%PATH%"
-
-if not exist "TRG-fixed.exe" (
-    echo Build TRG-fixed.exe first by running build.bat.
-    exit /b 1
+if not exist "TRG-build.exe" if not exist "TRG.exe" (
+    echo Building TRG first...
+    call build.bat
+    if errorlevel 1 exit /b 1
 )
-if not exist "TRG-Example.trg" (
-    echo Could not find TRG-Example.trg.
-    exit /b 1
+
+if exist "TRG-build.exe" (
+    set "TRG_RUNTIME=TRG-build.exe"
+) else (
+    set "TRG_RUNTIME=TRG.exe"
+)
+
+for %%F in (TRG-Example.trg README.md trg.ico TRG-Installer.cpp resource.h) do (
+    if not exist "%%F" (
+        echo ERROR: Missing %%F.
+        exit /b 1
+    )
 )
 
 where windres >nul 2>nul
 if errorlevel 1 (
-    echo Could not find windres. Install MinGW-w64 and run this file again.
+    echo ERROR: windres was not found. Install MinGW-w64.
     exit /b 1
 )
 where g++ >nul 2>nul
 if errorlevel 1 (
-    echo Could not find g++. Install MinGW-w64 and run this file again.
+    echo ERROR: g++ was not found. Install MinGW-w64.
     exit /b 1
 )
 
-windres TRG-Installer.rc -O coff -o trg-installer-resource.o
+(
+    echo #include "resource.h"
+    echo #define IDR_RUNTIME 201
+    echo #define IDR_EXAMPLE 202
+    echo #define IDR_README 203
+    echo #define IDR_ICON 204
+    echo IDI_TRG ICON "trg.ico"
+    echo IDR_RUNTIME RCDATA "%TRG_RUNTIME%"
+    echo IDR_EXAMPLE RCDATA "TRG-Example.trg"
+    echo IDR_README RCDATA "README.md"
+    echo IDR_ICON RCDATA "trg.ico"
+) > TRG-Installer-generated.rc
+
+windres TRG-Installer-generated.rc -O coff -o trg-installer-resource.o
 if errorlevel 1 exit /b 1
+
+echo Building TRG Installer...
 g++ -std=c++17 -O2 -static -static-libgcc -static-libstdc++ -mwindows -municode TRG-Installer.cpp trg-installer-resource.o -lcomctl32 -lshell32 -ladvapi32 -lole32 -luuid -luser32 -lgdi32 -o TRG-Installer.exe
 if errorlevel 1 exit /b 1
-echo Built TRG-Installer.exe. It contains the runtime, icon, README, and interactive example, but no C++ source.
+
+echo.
+echo BUILD SUCCESS: TRG-Installer.exe
+echo Runtime embedded: %TRG_RUNTIME%
+exit /b 0
