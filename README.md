@@ -43,6 +43,47 @@ UI text labels can be declared inside `add (ui)`:
 text "TRG Studio" x 8 y 10 size 8 color #FFFFFF
 ```
 
+## Learn TRG the easy way
+
+You can start coding without learning variable types first. TRG figures out the type when you use `let`.
+
+Your first program:
+
+```text
+let name = "Sam"
+let score = 10
+
+print "Hello" name
+print "Your score is" score
+
+score = score + 5
+print "New score:" score
+```
+
+That's the basics:
+- `let` creates a variable. Numbers, text, and true/false values are detected automatically.
+- `print` displays something. It is the easy-to-remember version of `say`.
+- `ask` asks the user a question and stores their answer.
+- `if` checks something; `else` runs when it is not true.
+- `loop` repeats code while a condition is true.
+- Use `(` and `)` around blocks.
+
+A small interactive program:
+
+```text
+let name = "there"
+ask "What is your name?" name
+
+if name = "Sam" (
+    print "Welcome back!"
+)
+else (
+    print "Nice to meet you," name
+)
+```
+
+You can still use the typed declarations (`num`, `word`, `toggle`, and `color`) and `say`. They work exactly as before. The shorter beginner syntax is just another way to write TRG.
+
 ## Language
 
 Comments start with `//`. Variables receive defaults when declared without a value: `num` is `0`, `word` is `none`, `toggle` is `false`, and `color` is `#222222`.
