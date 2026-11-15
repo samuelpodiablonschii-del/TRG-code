@@ -1,0 +1,165 @@
+// TRG interactive command tour. Click a purple button to read the code and run it.
+color accent = #7448C8
+num x_pos = 0
+num score
+word answer
+toggle ready
+
+add (controls)
+{
+}
+
+define greet who
+{
+    say "Hello," who
+}
+
+say "Welcome to TRG!"
+say "Choose a purple button above to see its explanation, source, and result."
+
+add (ui)
+{
+    block z 0 x 0 y 0 h 100 w 100 color #26242C name DEMO_BACKGROUND
+    block z 1 x 12 y 47 h 38 w 76 color #35313F name DEMO_PANEL
+    block z 2 x 43 y 57 h 12 w 12 color accent name DEMO_ORB
+
+    button variables "Variables + say" x 2 y 7 w 22 h 12
+    {
+        say "Variables store typed values. say writes to the output panel."
+        say "Code:"
+        say "num demo_count = 3"
+        say "word demo_name = TRG"
+        say "toggle demo_ready = true"
+        num demo_count = 3
+        word demo_name = "TRG"
+        toggle demo_ready = true
+        say "Count:" demo_count "Name:" demo_name "Ready:" demo_ready
+    }
+
+    button input "ask + if / else" x 26 y 7 w 22 h 12
+    {
+        say "ask opens an input dialog; if and else choose a branch."
+        say "Code: ask \"Type yes\" answer"
+        say "      if answer = yes ( say \"You typed yes\" )"
+        ask "Type yes or something else:" answer
+        if answer = yes
+        {
+            say "You typed yes."
+        }
+        else
+        {
+            say "You typed something else."
+        }
+    }
+
+    button defaults "Groups + defaults" x 50 y 7 w 22 h 12
+    {
+        say "A group scopes changed defaults; declarations outside it keep standard defaults."
+        say "Code: group demo_group { default num 9; num group_score; say group_score }"
+        group demo_group
+        {
+            default num 9
+            default word "group default"
+            default toggle true
+            default color #445566
+            num group_score
+            word group_name
+            toggle group_ready
+            color group_color
+            say "Group defaults:" group_score group_name group_ready group_color
+        }
+        num standard_score
+        say "A normal num still defaults to:" standard_score
+    }
+
+    button functions "Functions + loops" x 74 y 7 w 22 h 12
+    {
+        say "define creates a reusable function; loop repeats while its condition is true."
+        say "Code: greet \"TRG learner\""
+        greet "TRG learner"
+        say "Code: loop loop_index < 3 { loop_index = loop_index + 1; say loop_index }"
+        num loop_index = 0
+        loop loop_index < 5
+        {
+            loop_index = loop_index + 1
+            if loop_index = 2
+            {
+                continue
+            }
+            say "Loop pass:" loop_index
+            if loop_index = 4
+            {
+                break
+            }
+        }
+        say "The loop used continue at 2 and break at 4."
+    }
+
+    button stop "Stop / exit" x 2 y 43 w 22 h 12
+    {
+        say "stop and exit end the current script action; the TRG window stays open."
+        say "Code: say \"Before stop\"; stop; say \"Not shown\""
+        say "Before stop."
+        stop
+        say "This line is intentionally not reached."
+    }
+
+    button exit_alias "Run exit alias" x 26 y 43 w 22 h 12
+    {
+        say "exit is an alias for stop; it ends this button action."
+        say "Code: say \"Before exit\"; exit; say \"Not shown\""
+        say "Before exit."
+        exit
+        say "This line is intentionally not reached."
+    }
+
+    button manual "Manual registers" x 14 y 25 w 22 h 12
+    {
+        say "Low-level register operations are enabled only inside add (manual)."
+        say "Code: register {counter} num; move {counter} 2; add {counter} 3"
+        add (manual)
+        {
+            register {counter} num
+            registry {scratch} num
+            move {scratch} 1
+            move {counter} 2
+            add {counter} 3
+            subtract {counter} 1
+            multiply {counter} 2
+            divide {counter} 2
+            say "Register result:" counter
+        }
+    }
+
+    button graphics "UI + animation" x 38 y 25 w 22 h 12
+    {
+        say "UI blocks draw colored shapes. animate moves a named block over time."
+        say "Code: add (animation) { animate DEMO_ORB x 10 y 0 fps 60 time 2s }"
+        add (animation)
+        {
+            animate DEMO_ORB x 10 y 0 fps 60 time 2s
+        }
+        say "The purple square in the panel should move to the right."
+    }
+
+    button controls "Keyboard + controller" x 62 y 25 w 22 h 12
+    {
+        say "add (controls) creates key_* and controller_* state words."
+        say "Press X or controller A, then click this button again."
+        say "Code: if key_x = press ( x_pos = x_pos + 1 )"
+        if key_x = press
+        {
+            x_pos = x_pos + 1
+            say "X is pressed. x_pos is now:" x_pos
+        }
+        else
+        {
+            say "X is not pressed. Variables include key_x, controller_a, and mobile_tap."
+            say "Mobile inputs are declared as unavailable on this Windows runtime."
+        }
+        if controller_a = press
+        {
+            say "Controller A is pressed."
+        }
+    }
+}

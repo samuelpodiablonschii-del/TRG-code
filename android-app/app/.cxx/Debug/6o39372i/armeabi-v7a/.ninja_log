@@ -1,0 +1,17 @@
+# ninja log v5
+1	9793	8156152004243904	CMakeFiles/trg.dir/native_bridge.cpp.o	fe095ce4d531e544
+9822	10431	8156152010243995	C:/Users/ipodi/OneDrive/Desktop/TRG code/android-app/app/build/intermediates/cxx/Debug/6o39372i/obj/armeabi-v7a/libtrg.so	dfc7cd1734e4c60d
+31	11576	8156153984001371	CMakeFiles/trg.dir/native_bridge.cpp.o	fe095ce4d531e544
+11579	11950	8156153988021457	C:/Users/ipodi/OneDrive/Desktop/TRG code/android-app/app/build/intermediates/cxx/Debug/6o39372i/obj/armeabi-v7a/libtrg.so	dfc7cd1734e4c60d
+26	8926	8156158074272448	CMakeFiles/trg.dir/native_bridge.cpp.o	fe095ce4d531e544
+8928	9308	8156158078312495	C:/Users/ipodi/OneDrive/Desktop/TRG code/android-app/app/build/intermediates/cxx/Debug/6o39372i/obj/armeabi-v7a/libtrg.so	dfc7cd1734e4c60d
+41	8757	8156158868199762	CMakeFiles/trg.dir/native_bridge.cpp.o	fe095ce4d531e544
+8759	9191	8156158872689844	C:/Users/ipodi/OneDrive/Desktop/TRG code/android-app/app/build/intermediates/cxx/Debug/6o39372i/obj/armeabi-v7a/libtrg.so	dfc7cd1734e4c60d
+26	12703	8156197478895631	CMakeFiles/trg.dir/native_bridge.cpp.o	fe095ce4d531e544
+12707	13224	8156197485086441	C:/Users/ipodi/OneDrive/Desktop/TRG code/android-app/app/build/intermediates/cxx/Debug/6o39372i/obj/armeabi-v7a/libtrg.so	dfc7cd1734e4c60d
+17	8689	8156275670398616	CMakeFiles/trg.dir/native_bridge.cpp.o	fe095ce4d531e544
+8690	9124	8156275674844375	C:/Users/ipodi/OneDrive/Desktop/TRG code/android-app/app/build/intermediates/cxx/Debug/6o39372i/obj/armeabi-v7a/libtrg.so	dfc7cd1734e4c60d
+27	8944	8157002029660443	CMakeFiles/trg.dir/native_bridge.cpp.o	fe095ce4d531e544
+8947	9693	8157002037367724	C:/Users/ipodi/OneDrive/Desktop/TRG code/android-app/app/build/intermediates/cxx/Debug/6o39372i/obj/armeabi-v7a/libtrg.so	dfc7cd1734e4c60d
+29	11043	8157026973050340	CMakeFiles/trg.dir/native_bridge.cpp.o	fe095ce4d531e544
+11046	11823	8157026981198716	C:/Users/ipodi/OneDrive/Desktop/TRG code/android-app/app/build/intermediates/cxx/Debug/6o39372i/obj/armeabi-v7a/libtrg.so	dfc7cd1734e4c60d

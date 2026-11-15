@@ -1,0 +1,3 @@
+com.trg.studio
+drawable ic_trg
+style AppTheme

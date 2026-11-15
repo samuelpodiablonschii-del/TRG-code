@@ -1,0 +1,136 @@
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\build.gradle:13: Warning: Not targeting the latest versions of Android; compatibility modes apply. Consider testing and updating this version. Consult the android.os.Build.VERSION_CODES javadoc for details. [OldTargetApi]
+        targetSdk 35
+        ~~~~~~~~~~~~
+
+   Explanation for issues of type "OldTargetApi":
+   When your application or sdk runs on a version of Android that is more
+   recent than your targetSdk specifies that it has been tested with, various
+   compatibility modes kick in. This ensures that your application continues
+   to work, but it may look out of place. For example, if the targetSdk is
+   less than 14, your app may get an option button in the UI.
+
+   To fix this issue, set the targetSdk to the highest available value. Then
+   test your app to make sure everything works correctly. You may want to
+   consult the compatibility notes to see what changes apply to each version
+   you are adding support for:
+   https://developer.android.com/reference/android/os/Build.VERSION_CODES.html
+   as well as follow this guide:
+   https://developer.android.com/distribute/best-practices/develop/target-sdk.
+   html
+
+   https://developer.android.com/distribute/best-practices/develop/target-sdk.html
+
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\gradle\wrapper\gradle-wrapper.properties:3: Warning: A newer version of Gradle than 9.6.0 is available: 9.8.2 [AndroidGradlePluginVersion]
+distributionUrl=https\://services.gradle.org/distributions/gradle-9.6.0-bin.zip
+                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Explanation for issues of type "AndroidGradlePluginVersion":
+   This detector looks for usage of the Android Gradle Plugin where the
+   version you are using is not the current stable release. Using older
+   versions is fine, and there are cases where you deliberately want to stick
+   with an older version. However, you may simply not be aware that a more
+   recent version is available, and that is what this lint check helps find.
+
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\build.gradle:7: Warning: A newer version of compileSdk than 35 is available: 37 [GradleDependency]
+    compileSdk 35
+    ~~~~~~~~~~~~~
+
+   Explanation for issues of type "GradleDependency":
+   This detector looks for usages of libraries where the version you are using
+   is not the current stable release. Using older versions is fine, and there
+   are cases where you deliberately want to stick with an older version.
+   However, you may simply not be aware that a more recent version is
+   available, and that is what this lint check helps find.
+
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:126: Warning: String literal in setText can not be translated. Use Android resources instead. [SetTextI18n]
+        editorHeader.setText("  >   program.trg");
+                             ~~~~~~~~~~~~~~~~~~~
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:166: Warning: String literal in setText can not be translated. Use Android resources instead. [SetTextI18n]
+        outputHeader.setText("  >   PROGRAM OUTPUT");
+                             ~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:191: Warning: String literal in setText can not be translated. Use Android resources instead. [SetTextI18n]
+        status.setText("Ready  |  TRG C++ interpreter");
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:223: Warning: String literal in setText can not be translated. Use Android resources instead. [SetTextI18n]
+        status.setText("Running  |  program.trg");
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:248: Warning: String literal in setText can not be translated. Use Android resources instead. [SetTextI18n]
+                    status.setText("Example loaded  |  program.trg");
+                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:289: Warning: String literal in setText can not be translated. Use Android resources instead. [SetTextI18n]
+                    status.setText("Example loaded  |  program.trg");
+                                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:315: Warning: String literal in setText can not be translated. Use Android resources instead. [SetTextI18n]
+        status.setText("Editor ready  |  program.trg");
+                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:368: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+                status.setText("Finished with " + state.optInt("errors") + " error(s).");
+                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:368: Warning: String literal in setText can not be translated. Use Android resources instead. [SetTextI18n]
+                status.setText("Finished with " + state.optInt("errors") + " error(s).");
+                               ~~~~~~~~~~~~~~~~
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:368: Warning: String literal in setText can not be translated. Use Android resources instead. [SetTextI18n]
+                status.setText("Finished with " + state.optInt("errors") + " error(s).");
+                                                                           ~~~~~~~~~~~~
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:370: Warning: String literal in setText can not be translated. Use Android resources instead. [SetTextI18n]
+                status.setText("Ready  |  TRG C++ interpreter");
+                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:372: Warning: String literal in setText can not be translated. Use Android resources instead. [SetTextI18n]
+                status.setText("Finished  |  use MENU to return to code");
+                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:379: Warning: String literal in setText can not be translated. Use Android resources instead. [SetTextI18n]
+            status.setText("Could not read the interpreter result.");
+                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:380: Warning: Do not concatenate text displayed with setText. Use resource string with placeholders. [SetTextI18n]
+            output.setText("Interpreter response error: " + exception.getMessage());
+                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:380: Warning: String literal in setText can not be translated. Use Android resources instead. [SetTextI18n]
+            output.setText("Interpreter response error: " + exception.getMessage());
+                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:453: Warning: String literal in setText can not be translated. Use Android resources instead. [SetTextI18n]
+            status.setText("Source imported.");
+                           ~~~~~~~~~~~~~~~~~~
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:483: Warning: String literal in setText can not be translated. Use Android resources instead. [SetTextI18n]
+            status.setText("TRG source exported.");
+                           ~~~~~~~~~~~~~~~~~~~~~~
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:503: Warning: String literal in setText can not be translated. Use Android resources instead. [SetTextI18n]
+            status.setText("Importable .trgpack created. It is not a standalone native executable.");
+                           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Explanation for issues of type "SetTextI18n":
+   When calling TextView#setText
+   * Never call Number#toString() to format numbers; it will not handle
+   fraction separators and locale-specific digits properly. Consider using
+   String#format with proper format specifications (%d or %f) instead.
+   * Do not pass a string literal (e.g. "Hello") to display text. Hardcoded
+   text can not be properly translated to other languages. Consider using
+   Android resource strings instead.
+   * Do not build messages by concatenating text chunks. Such messages can not
+   be properly translated.
+
+   https://developer.android.com/guide/topics/resources/localization.html
+
+C:\Users\ipodi\OneDrive\Desktop\TRG code\android-app\app\src\main\java\com\trg\studio\MainActivity.java:141: Warning: Use "Gravity.END" instead of "Gravity.RIGHT" to ensure correct behavior in right-to-left locales [RtlHardcoded]
+        lineNumbers.setGravity(Gravity.TOP | Gravity.RIGHT);
+                                                     ~~~~~
+
+   Explanation for issues of type "RtlHardcoded":
+   Using Gravity#LEFT and Gravity#RIGHT can lead to problems when a layout is
+   rendered in locales where text flows from right to left. Use Gravity#START
+   and Gravity#END instead. Similarly, in XML gravity and layout_gravity
+   attributes, use start rather than left.
+
+   For XML attributes such as paddingLeft and layout_marginLeft, use
+   paddingStart and layout_marginStart. NOTE: If your minSdkVersion is less
+   than 17, you should add both the older left/right attributes as well as the
+   new start/end attributes. On older platforms, where RTL is not supported
+   and the start/end attributes are unknown and therefore ignored, you need
+   the older left/right attributes. There is a separate lint check which
+   catches that type of error.
+
+   (Note: For Gravity#LEFT and Gravity#START, you can use these constants even
+   when targeting older platforms, because the start bitmask is a superset of
+   the left bitmask. Therefore, you can use gravity="start" rather than
+   gravity="left|start".)
+
+0 errors, 22 warnings

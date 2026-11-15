@@ -1,0 +1,1072 @@
+{
+    "$schema" : "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+    "version" : "2.1.0",
+    "runs" : [
+        {
+            "tool": {
+                "driver": {
+                    "name": "Android Lint",
+                    "fullName": "Android Lint (in gradle)",
+                    "version": "9.4.0",
+                    "semanticVersion": "9.4.0",
+                    "organization": "Google",
+                    "informationUri": "https://developer.android.com/studio/write/lint",
+                    "fullDescription": {
+                        "text": "Static analysis originally for Android source code but now performing general analysis"
+                    },
+                    "language": "en-US",
+                    "rules": [
+                        {
+                            "id": "AndroidGradlePluginVersion",
+                            "shortDescription": {
+                                "text": "Obsolete Android Gradle Plugin Version"
+                            },
+                            "fullDescription": {
+                                "text": "This detector looks for usage of the Android Gradle Plugin where the version you are using is not the current stable release. Using older versions is fine, and there are cases where you deliberately want to stick with an older version. However, you may simply not be aware that a more recent version is available, and that is what this lint check helps find."
+                            },
+                            "defaultConfiguration": {
+                                "level": "warning",
+                                "rank": 70
+                            },
+                            "properties": {
+                                "tags": [
+                                    "Correctness"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "GradleDependency",
+                            "shortDescription": {
+                                "text": "Obsolete Gradle Dependency"
+                            },
+                            "fullDescription": {
+                                "text": "This detector looks for usages of libraries where the version you are using is not the current stable release. Using older versions is fine, and there are cases where you deliberately want to stick with an older version. However, you may simply not be aware that a more recent version is available, and that is what this lint check helps find."
+                            },
+                            "defaultConfiguration": {
+                                "level": "warning",
+                                "rank": 70
+                            },
+                            "properties": {
+                                "tags": [
+                                    "Correctness"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "OldTargetApi",
+                            "shortDescription": {
+                                "text": "Target SDK attribute is not targeting latest version"
+                            },
+                            "fullDescription": {
+                                "text": "When your application or sdk runs on a version of Android that is more recent than your targetSdk specifies that it has been tested with, various compatibility modes kick in. This ensures that your application continues to work, but it may look out of place. For example, if the targetSdk is less than 14, your app may get an option button in the UI.\n\nTo fix this issue, set the targetSdk to the highest available value. Then test your app to make sure everything works correctly. You may want to consult the compatibility notes to see what changes apply to each version you are adding support for: https://developer.android.com/reference/android/os/Build.VERSION_CODES.html as well as follow this guide:\nhttps://developer.android.com/distribute/best-practices/develop/target-sdk.html",
+                                "markdown": "When your application or sdk runs on a version of Android that is more recent than your `targetSdk` specifies that it has been tested with, various compatibility modes kick in. This ensures that your application continues to work, but it may look out of place. For example, if the `targetSdk` is less than 14, your app may get an option button in the UI.\n\nTo fix this issue, set the `targetSdk` to the highest available value. Then test your app to make sure everything works correctly. You may want to consult the compatibility notes to see what changes apply to each version you are adding support for: https://developer.android.com/reference/android/os/Build.VERSION_CODES.html as well as follow this guide:\nhttps://developer.android.com/distribute/best-practices/develop/target-sdk.html"
+                            },
+                            "defaultConfiguration": {
+                                "level": "warning",
+                                "rank": 50
+                            },
+                            "properties": {
+                                "tags": [
+                                    "Correctness"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "RtlHardcoded",
+                            "shortDescription": {
+                                "text": "Using left/right instead of start/end attributes"
+                            },
+                            "fullDescription": {
+                                "text": "Using Gravity#LEFT and Gravity#RIGHT can lead to problems when a layout is rendered in locales where text flows from right to left. Use Gravity#START and Gravity#END instead. Similarly, in XML gravity and layout_gravity attributes, use start rather than left.\n\nFor XML attributes such as paddingLeft and layout_marginLeft, use paddingStart and layout_marginStart. NOTE: If your minSdkVersion is less than 17, you should add both the older left/right attributes as well as the new start/end attributes. On older platforms, where RTL is not supported and the start/end attributes are unknown and therefore ignored, you need the older left/right attributes. There is a separate lint check which catches that type of error.\n\n(Note: For Gravity#LEFT and Gravity#START, you can use these constants even when targeting older platforms, because the start bitmask is a superset of the left bitmask. Therefore, you can use gravity=\"start\" rather than gravity=\"left|start\".)",
+                                "markdown": "Using `Gravity#LEFT` and `Gravity#RIGHT` can lead to problems when a layout is rendered in locales where text flows from right to left. Use `Gravity#START` and `Gravity#END` instead. Similarly, in XML `gravity` and `layout_gravity` attributes, use `start` rather than `left`.\n\nFor XML attributes such as paddingLeft and `layout_marginLeft`, use `paddingStart` and `layout_marginStart`. **NOTE**: If your `minSdkVersion` is less than 17, you should add **both** the older left/right attributes **as well as** the new start/end attributes. On older platforms, where RTL is not supported and the start/end attributes are unknown and therefore ignored, you need the older left/right attributes. There is a separate lint check which catches that type of error.\n\n(Note: For `Gravity#LEFT` and `Gravity#START`, you can use these constants even when targeting older platforms, because the `start` bitmask is a superset of the `left` bitmask. Therefore, you can use `gravity=\"start\"` rather than `gravity=\"left|start\"`.)"
+                            },
+                            "defaultConfiguration": {
+                                "level": "warning",
+                                "rank": 60
+                            },
+                            "properties": {
+                                "tags": [
+                                    "Bidirectional Text",
+                                    "Internationalization"
+                                ]
+                            }
+                        },
+                        {
+                            "id": "SetTextI18n",
+                            "shortDescription": {
+                                "text": "TextView Internationalization"
+                            },
+                            "fullDescription": {
+                                "text": "When calling TextView#setText\n* Never call Number#toString() to format numbers; it will not handle fraction separators and locale-specific digits properly. Consider using String#format with proper format specifications (%d or %f) instead.\n* Do not pass a string literal (e.g. \"Hello\") to display text. Hardcoded text can not be properly translated to other languages. Consider using Android resource strings instead.\n* Do not build messages by concatenating text chunks. Such messages can not be properly translated.",
+                                "markdown": "When calling `TextView#setText`\n* Never call `Number#toString()` to format numbers; it will not handle fraction separators and locale-specific digits properly. Consider using `String#format` with proper format specifications (`%d` or `%f`) instead.\n* Do not pass a string literal (e.g. \"Hello\") to display text. Hardcoded text can not be properly translated to other languages. Consider using Android resource strings instead.\n* Do not build messages by concatenating text chunks. Such messages can not be properly translated."
+                            },
+                            "defaultConfiguration": {
+                                "level": "warning",
+                                "rank": 50
+                            },
+                            "properties": {
+                                "tags": [
+                                    "Internationalization"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            },
+            "originalUriBaseIds": {
+                "%SRCROOT%": {
+                    "uri": "file:///C:/Users/ipodi/OneDrive/Desktop/TRG%20code/android-app/"
+                }
+            },
+            "results": [
+                {
+                    "ruleId": "OldTargetApi",
+                    "ruleIndex": 2,
+                    "message": {
+                        "text": "Not targeting the latest versions of Android; compatibility modes apply. Consider testing and updating this version. Consult the android.os.Build.VERSION_CODES javadoc for details.",
+                        "markdown": "Not targeting the latest versions of Android; compatibility modes apply. Consider testing and updating this version. Consult the `android.os.Build.VERSION_CODES` javadoc for details."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/build.gradle"
+                                },
+                                "region": {
+                                    "startLine": 13,
+                                    "startColumn": 9,
+                                    "endLine": 13,
+                                    "endColumn": 21,
+                                    "charOffset": 234,
+                                    "charLength": 12,
+                                    "snippet": {
+                                        "text": "targetSdk 35"
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 11,
+                                    "endLine": 16,
+                                    "snippet": {
+                                        "text": "        applicationId \"com.trg.studio\"\r\n        minSdk 26\r\n        targetSdk 35\r\n        versionCode 1\r\n        versionName \"1.0\"\r\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "fixes": [
+                        {
+                            "description": {
+                                "text": "Update targetSdkVersion to 37"
+                            },
+                            "artifactChanges": [
+                                {
+                                    "artifactLocation": {
+                                        "uriBaseId": "%SRCROOT%",
+                                        "uri": "app/build.gradle"
+                                    },
+                                    "replacements": [
+                                        {
+                                            "deletedRegion": {
+                                                "startLine": 13,
+                                                "startColumn": 19,
+                                                "charOffset": 244,
+                                                "endLine": 13,
+                                                "endColumn": 21,
+                                                "charLength": 2
+                                            },
+                                            "insertedContent": {
+                                                "text": "37\n"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "ad5f52a62e85d04e"
+                    }
+                },
+                {
+                    "ruleId": "AndroidGradlePluginVersion",
+                    "ruleIndex": 0,
+                    "message": {
+                        "text": "A newer version of Gradle than 9.6.0 is available: 9.8.2"
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "gradle/wrapper/gradle-wrapper.properties"
+                                },
+                                "region": {
+                                    "startLine": 3,
+                                    "startColumn": 17,
+                                    "endLine": 3,
+                                    "endColumn": 80,
+                                    "charOffset": 81,
+                                    "charLength": 63,
+                                    "snippet": {
+                                        "text": "https\\://services.gradle.org/distributions/gradle-9.6.0-bin.zip"
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 1,
+                                    "endLine": 6,
+                                    "snippet": {
+                                        "text": "distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-9.6.0-bin.zip\nnetworkTimeout=10000\nretries=0\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "fixes": [
+                        {
+                            "description": {
+                                "text": "Update to 9.8.2"
+                            },
+                            "artifactChanges": [
+                                {
+                                    "artifactLocation": {
+                                        "uriBaseId": "%SRCROOT%",
+                                        "uri": "gradle/wrapper/gradle-wrapper.properties"
+                                    },
+                                    "replacements": [
+                                        {
+                                            "deletedRegion": {
+                                                "startLine": 3,
+                                                "startColumn": 67,
+                                                "charOffset": 131,
+                                                "endLine": 3,
+                                                "endColumn": 72,
+                                                "charLength": 5
+                                            },
+                                            "insertedContent": {
+                                                "text": "9.8.2\n"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "f432da114eda1530"
+                    }
+                },
+                {
+                    "ruleId": "GradleDependency",
+                    "ruleIndex": 1,
+                    "message": {
+                        "text": "A newer version of compileSdk than 35 is available: 37",
+                        "markdown": "A newer version of `compileSdk` than 35 is available: 37"
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/build.gradle"
+                                },
+                                "region": {
+                                    "startLine": 7,
+                                    "startColumn": 5,
+                                    "endLine": 7,
+                                    "endColumn": 18,
+                                    "charOffset": 97,
+                                    "charLength": 13,
+                                    "snippet": {
+                                        "text": "compileSdk 35"
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 5,
+                                    "endLine": 10,
+                                    "snippet": {
+                                        "text": "android {\r\n    namespace \"com.trg.studio\"\r\n    compileSdk 35\r\n    ndkVersion \"28.2.13676358\"\r\n\r\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "fixes": [
+                        {
+                            "description": {
+                                "text": "Set compileSdk to 37"
+                            },
+                            "artifactChanges": [
+                                {
+                                    "artifactLocation": {
+                                        "uriBaseId": "%SRCROOT%",
+                                        "uri": "app/build.gradle"
+                                    },
+                                    "replacements": [
+                                        {
+                                            "deletedRegion": {
+                                                "startLine": 7,
+                                                "startColumn": 16,
+                                                "charOffset": 108,
+                                                "endLine": 7,
+                                                "endColumn": 18,
+                                                "charLength": 2
+                                            },
+                                            "insertedContent": {
+                                                "text": "37\n"
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "fe1ea7204f70443d"
+                    }
+                },
+                {
+                    "ruleId": "SetTextI18n",
+                    "ruleIndex": 4,
+                    "message": {
+                        "text": "String literal in setText can not be translated. Use Android resources instead.",
+                        "markdown": "String literal in `setText` can not be translated. Use Android resources instead."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 126,
+                                    "startColumn": 30,
+                                    "endLine": 126,
+                                    "endColumn": 49,
+                                    "charOffset": 4384,
+                                    "charLength": 19,
+                                    "snippet": {
+                                        "text": "\"  >   program.trg\""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 124,
+                                    "endLine": 129,
+                                    "snippet": {
+                                        "text": "        editorScreen.setBackgroundColor(Color.rgb(13, 11, 18));\n        TextView editorHeader = new TextView(this);\n        editorHeader.setText(\"  >   program.trg\");\n        editorHeader.setTextColor(Color.rgb(194, 180, 214));\n        editorHeader.setTextSize(11);\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "17c2f23e54c42db8"
+                    }
+                },
+                {
+                    "ruleId": "SetTextI18n",
+                    "ruleIndex": 4,
+                    "message": {
+                        "text": "String literal in setText can not be translated. Use Android resources instead.",
+                        "markdown": "String literal in `setText` can not be translated. Use Android resources instead."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 166,
+                                    "startColumn": 30,
+                                    "endLine": 166,
+                                    "endColumn": 52,
+                                    "charOffset": 6537,
+                                    "charLength": 22,
+                                    "snippet": {
+                                        "text": "\"  >   PROGRAM OUTPUT\""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 164,
+                                    "endLine": 169,
+                                    "snippet": {
+                                        "text": "        outputScreen.setBackgroundColor(Color.rgb(8, 7, 11));\n        TextView outputHeader = new TextView(this);\n        outputHeader.setText(\"  >   PROGRAM OUTPUT\");\n        outputHeader.setTextColor(Color.rgb(194, 180, 214));\n        outputHeader.setTextSize(11);\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "55a131b2c3b06ea8"
+                    }
+                },
+                {
+                    "ruleId": "SetTextI18n",
+                    "ruleIndex": 4,
+                    "message": {
+                        "text": "String literal in setText can not be translated. Use Android resources instead.",
+                        "markdown": "String literal in `setText` can not be translated. Use Android resources instead."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 191,
+                                    "startColumn": 24,
+                                    "endLine": 191,
+                                    "endColumn": 55,
+                                    "charOffset": 7804,
+                                    "charLength": 31,
+                                    "snippet": {
+                                        "text": "\"Ready  |  TRG C++ interpreter\""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 189,
+                                    "endLine": 194,
+                                    "snippet": {
+                                        "text": "        status.setTextSize(11);\n        status.setPadding(dp(10), dp(3), dp(10), dp(3));\n        status.setText(\"Ready  |  TRG C++ interpreter\");\n        root.addView(status, new LinearLayout.LayoutParams(-1, dp(24)));\n\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "545676923e8c26c1"
+                    }
+                },
+                {
+                    "ruleId": "SetTextI18n",
+                    "ruleIndex": 4,
+                    "message": {
+                        "text": "String literal in setText can not be translated. Use Android resources instead.",
+                        "markdown": "String literal in `setText` can not be translated. Use Android resources instead."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 223,
+                                    "startColumn": 24,
+                                    "endLine": 223,
+                                    "endColumn": 49,
+                                    "charOffset": 9083,
+                                    "charLength": 25,
+                                    "snippet": {
+                                        "text": "\"Running  |  program.trg\""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 221,
+                                    "endLine": 226,
+                                    "snippet": {
+                                        "text": "        outputScreen.setVisibility(View.VISIBLE);\n        output.setText(\"Running...\\n\");\n        status.setText(\"Running  |  program.trg\");\n        executor.execute(() -> {\n            String result = nativeRun(source);\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "01f25de220663515"
+                    }
+                },
+                {
+                    "ruleId": "SetTextI18n",
+                    "ruleIndex": 4,
+                    "message": {
+                        "text": "String literal in setText can not be translated. Use Android resources instead.",
+                        "markdown": "String literal in `setText` can not be translated. Use Android resources instead."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 248,
+                                    "startColumn": 36,
+                                    "endLine": 248,
+                                    "endColumn": 68,
+                                    "charOffset": 9954,
+                                    "charLength": 32,
+                                    "snippet": {
+                                        "text": "\"Example loaded  |  program.trg\""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 246,
+                                    "endLine": 251,
+                                    "snippet": {
+                                        "text": "                        editor.setSelection(0);\n                    }\n                    status.setText(\"Example loaded  |  program.trg\");\n                    break;\n                case \"import\":\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "077d71c46ec28e84"
+                    }
+                },
+                {
+                    "ruleId": "SetTextI18n",
+                    "ruleIndex": 4,
+                    "message": {
+                        "text": "String literal in setText can not be translated. Use Android resources instead.",
+                        "markdown": "String literal in `setText` can not be translated. Use Android resources instead."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 289,
+                                    "startColumn": 36,
+                                    "endLine": 289,
+                                    "endColumn": 68,
+                                    "charOffset": 11674,
+                                    "charLength": 32,
+                                    "snippet": {
+                                        "text": "\"Example loaded  |  program.trg\""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 287,
+                                    "endLine": 292,
+                                    "snippet": {
+                                        "text": "                    editor.setSelection(0);\n                    showCodeScreen();\n                    status.setText(\"Example loaded  |  program.trg\");\n                    return true;\n                case MENU_IMPORT:\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "b1a83a8dd9d6f605"
+                    }
+                },
+                {
+                    "ruleId": "SetTextI18n",
+                    "ruleIndex": 4,
+                    "message": {
+                        "text": "String literal in setText can not be translated. Use Android resources instead.",
+                        "markdown": "String literal in `setText` can not be translated. Use Android resources instead."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 315,
+                                    "startColumn": 24,
+                                    "endLine": 315,
+                                    "endColumn": 54,
+                                    "charOffset": 12551,
+                                    "charLength": 30,
+                                    "snippet": {
+                                        "text": "\"Editor ready  |  program.trg\""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 313,
+                                    "endLine": 318,
+                                    "snippet": {
+                                        "text": "        outputScreen.setVisibility(View.GONE);\n        editorScreen.setVisibility(View.VISIBLE);\n        status.setText(\"Editor ready  |  program.trg\");\n    }\n\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "00bbf81615be1ce6"
+                    }
+                },
+                {
+                    "ruleId": "SetTextI18n",
+                    "ruleIndex": 4,
+                    "message": {
+                        "text": "Do not concatenate text displayed with setText. Use resource string with placeholders.",
+                        "markdown": "Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 368,
+                                    "startColumn": 32,
+                                    "endLine": 368,
+                                    "endColumn": 88,
+                                    "charOffset": 14304,
+                                    "charLength": 56,
+                                    "snippet": {
+                                        "text": "\"Finished with \" + state.optInt(\"errors\") + \" error(s).\""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 366,
+                                    "endLine": 371,
+                                    "snippet": {
+                                        "text": "            output.setText(state.optString(\"output\"));\n            if (state.optInt(\"errors\") > 0) {\n                status.setText(\"Finished with \" + state.optInt(\"errors\") + \" error(s).\");\n            } else if (!showingOutput) {\n                status.setText(\"Ready  |  TRG C++ interpreter\");\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "db6d06d25f6abe5c"
+                    }
+                },
+                {
+                    "ruleId": "SetTextI18n",
+                    "ruleIndex": 4,
+                    "message": {
+                        "text": "String literal in setText can not be translated. Use Android resources instead.",
+                        "markdown": "String literal in `setText` can not be translated. Use Android resources instead."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 368,
+                                    "startColumn": 32,
+                                    "endLine": 368,
+                                    "endColumn": 48,
+                                    "charOffset": 14304,
+                                    "charLength": 16,
+                                    "snippet": {
+                                        "text": "\"Finished with \""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 366,
+                                    "endLine": 371,
+                                    "snippet": {
+                                        "text": "            output.setText(state.optString(\"output\"));\n            if (state.optInt(\"errors\") > 0) {\n                status.setText(\"Finished with \" + state.optInt(\"errors\") + \" error(s).\");\n            } else if (!showingOutput) {\n                status.setText(\"Ready  |  TRG C++ interpreter\");\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "db6d06d25f6abe5c"
+                    }
+                },
+                {
+                    "ruleId": "SetTextI18n",
+                    "ruleIndex": 4,
+                    "message": {
+                        "text": "String literal in setText can not be translated. Use Android resources instead.",
+                        "markdown": "String literal in `setText` can not be translated. Use Android resources instead."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 368,
+                                    "startColumn": 76,
+                                    "endLine": 368,
+                                    "endColumn": 88,
+                                    "charOffset": 14348,
+                                    "charLength": 12,
+                                    "snippet": {
+                                        "text": "\" error(s).\""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 366,
+                                    "endLine": 371,
+                                    "snippet": {
+                                        "text": "            output.setText(state.optString(\"output\"));\n            if (state.optInt(\"errors\") > 0) {\n                status.setText(\"Finished with \" + state.optInt(\"errors\") + \" error(s).\");\n            } else if (!showingOutput) {\n                status.setText(\"Ready  |  TRG C++ interpreter\");\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "db6d06d25f6abe5c"
+                    }
+                },
+                {
+                    "ruleId": "SetTextI18n",
+                    "ruleIndex": 4,
+                    "message": {
+                        "text": "String literal in setText can not be translated. Use Android resources instead.",
+                        "markdown": "String literal in `setText` can not be translated. Use Android resources instead."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 370,
+                                    "startColumn": 32,
+                                    "endLine": 370,
+                                    "endColumn": 63,
+                                    "charOffset": 14435,
+                                    "charLength": 31,
+                                    "snippet": {
+                                        "text": "\"Ready  |  TRG C++ interpreter\""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 368,
+                                    "endLine": 373,
+                                    "snippet": {
+                                        "text": "                status.setText(\"Finished with \" + state.optInt(\"errors\") + \" error(s).\");\n            } else if (!showingOutput) {\n                status.setText(\"Ready  |  TRG C++ interpreter\");\n            } else {\n                status.setText(\"Finished  |  use MENU to return to code\");\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "e06e03bc3ba830fe"
+                    }
+                },
+                {
+                    "ruleId": "SetTextI18n",
+                    "ruleIndex": 4,
+                    "message": {
+                        "text": "String literal in setText can not be translated. Use Android resources instead.",
+                        "markdown": "String literal in `setText` can not be translated. Use Android resources instead."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 372,
+                                    "startColumn": 32,
+                                    "endLine": 372,
+                                    "endColumn": 73,
+                                    "charOffset": 14521,
+                                    "charLength": 41,
+                                    "snippet": {
+                                        "text": "\"Finished  |  use MENU to return to code\""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 370,
+                                    "endLine": 375,
+                                    "snippet": {
+                                        "text": "                status.setText(\"Ready  |  TRG C++ interpreter\");\n            } else {\n                status.setText(\"Finished  |  use MENU to return to code\");\n            }\n            if (!toolbarInitialized) {\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "9a1d08cb2e6b627e"
+                    }
+                },
+                {
+                    "ruleId": "SetTextI18n",
+                    "ruleIndex": 4,
+                    "message": {
+                        "text": "String literal in setText can not be translated. Use Android resources instead.",
+                        "markdown": "String literal in `setText` can not be translated. Use Android resources instead."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 379,
+                                    "startColumn": 28,
+                                    "endLine": 379,
+                                    "endColumn": 68,
+                                    "charOffset": 14787,
+                                    "charLength": 40,
+                                    "snippet": {
+                                        "text": "\"Could not read the interpreter result.\""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 377,
+                                    "endLine": 382,
+                                    "snippet": {
+                                        "text": "            }\n        } catch (JSONException exception) {\n            status.setText(\"Could not read the interpreter result.\");\n            output.setText(\"Interpreter response error: \" + exception.getMessage());\n        }\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "c3387840d2c270a9"
+                    }
+                },
+                {
+                    "ruleId": "SetTextI18n",
+                    "ruleIndex": 4,
+                    "message": {
+                        "text": "Do not concatenate text displayed with setText. Use resource string with placeholders.",
+                        "markdown": "Do not concatenate text displayed with `setText`. Use resource string with placeholders."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 380,
+                                    "startColumn": 28,
+                                    "endLine": 380,
+                                    "endColumn": 83,
+                                    "charOffset": 14857,
+                                    "charLength": 55,
+                                    "snippet": {
+                                        "text": "\"Interpreter response error: \" + exception.getMessage()"
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 378,
+                                    "endLine": 383,
+                                    "snippet": {
+                                        "text": "        } catch (JSONException exception) {\n            status.setText(\"Could not read the interpreter result.\");\n            output.setText(\"Interpreter response error: \" + exception.getMessage());\n        }\n    }\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "0f0efd891ad0f1ed"
+                    }
+                },
+                {
+                    "ruleId": "SetTextI18n",
+                    "ruleIndex": 4,
+                    "message": {
+                        "text": "String literal in setText can not be translated. Use Android resources instead.",
+                        "markdown": "String literal in `setText` can not be translated. Use Android resources instead."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 380,
+                                    "startColumn": 28,
+                                    "endLine": 380,
+                                    "endColumn": 58,
+                                    "charOffset": 14857,
+                                    "charLength": 30,
+                                    "snippet": {
+                                        "text": "\"Interpreter response error: \""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 378,
+                                    "endLine": 383,
+                                    "snippet": {
+                                        "text": "        } catch (JSONException exception) {\n            status.setText(\"Could not read the interpreter result.\");\n            output.setText(\"Interpreter response error: \" + exception.getMessage());\n        }\n    }\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "0f0efd891ad0f1ed"
+                    }
+                },
+                {
+                    "ruleId": "SetTextI18n",
+                    "ruleIndex": 4,
+                    "message": {
+                        "text": "String literal in setText can not be translated. Use Android resources instead.",
+                        "markdown": "String literal in `setText` can not be translated. Use Android resources instead."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 453,
+                                    "startColumn": 28,
+                                    "endLine": 453,
+                                    "endColumn": 46,
+                                    "charOffset": 18126,
+                                    "charLength": 18,
+                                    "snippet": {
+                                        "text": "\"Source imported.\""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 451,
+                                    "endLine": 456,
+                                    "snippet": {
+                                        "text": "            editor.setSelection(0);\n            showCodeScreen();\n            status.setText(\"Source imported.\");\n        } catch (Exception exception) {\n            showError(\"Import failed\", exception);\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "ddd6176c8dedac64"
+                    }
+                },
+                {
+                    "ruleId": "SetTextI18n",
+                    "ruleIndex": 4,
+                    "message": {
+                        "text": "String literal in setText can not be translated. Use Android resources instead.",
+                        "markdown": "String literal in `setText` can not be translated. Use Android resources instead."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 483,
+                                    "startColumn": 28,
+                                    "endLine": 483,
+                                    "endColumn": 50,
+                                    "charOffset": 19507,
+                                    "charLength": 22,
+                                    "snippet": {
+                                        "text": "\"TRG source exported.\""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 481,
+                                    "endLine": 486,
+                                    "snippet": {
+                                        "text": "            if (editor != null) sourceText = editor.getText().toString();\n            outputStream.write(sourceText.getBytes(StandardCharsets.UTF_8));\n            status.setText(\"TRG source exported.\");\n        } catch (Exception exception) {\n            showError(\"Export failed\", exception);\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "345e2106e89bc14b"
+                    }
+                },
+                {
+                    "ruleId": "SetTextI18n",
+                    "ruleIndex": 4,
+                    "message": {
+                        "text": "String literal in setText can not be translated. Use Android resources instead.",
+                        "markdown": "String literal in `setText` can not be translated. Use Android resources instead."
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 503,
+                                    "startColumn": 28,
+                                    "endLine": 503,
+                                    "endColumn": 100,
+                                    "charOffset": 20603,
+                                    "charLength": 72,
+                                    "snippet": {
+                                        "text": "\"Importable .trgpack created. It is not a standalone native executable.\""
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 501,
+                                    "endLine": 506,
+                                    "snippet": {
+                                        "text": "                zip.closeEntry();\n            }\n            status.setText(\"Importable .trgpack created. It is not a standalone native executable.\");\n        } catch (Exception exception) {\n            showError(\"Packaging failed\", exception);\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "1d2038ecf374defc"
+                    }
+                },
+                {
+                    "ruleId": "RtlHardcoded",
+                    "ruleIndex": 3,
+                    "message": {
+                        "text": "Use \"Gravity.END\" instead of \"Gravity.RIGHT\" to ensure correct behavior in right-to-left locales",
+                        "markdown": "Use \"`Gravity.END`\" instead of \"`Gravity.RIGHT`\" to ensure correct behavior in right-to-left locales"
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uriBaseId": "%SRCROOT%",
+                                    "uri": "app/src/main/java/com/trg/studio/MainActivity.java"
+                                },
+                                "region": {
+                                    "startLine": 141,
+                                    "startColumn": 54,
+                                    "endLine": 141,
+                                    "endColumn": 59,
+                                    "charOffset": 5185,
+                                    "charLength": 5,
+                                    "snippet": {
+                                        "text": "RIGHT"
+                                    }
+                                },
+                                "contextRegion": {
+                                    "startLine": 139,
+                                    "endLine": 144,
+                                    "snippet": {
+                                        "text": "        lineNumbers.setTextSize(13);\n        lineNumbers.setTypeface(android.graphics.Typeface.MONOSPACE);\n        lineNumbers.setGravity(Gravity.TOP | Gravity.RIGHT);\n        lineNumbers.setPadding(dp(8), dp(9), dp(8), dp(8));\n        lineNumbers.setBackgroundColor(Color.rgb(20, 18, 27));\n"
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "partialFingerprints": {
+                        "sourceContext/v1": "00614d0ac327cd53"
+                    }
+                }
+            ]
+        }
+    ]
+}
