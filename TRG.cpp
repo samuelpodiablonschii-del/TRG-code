@@ -416,6 +416,7 @@ HMODULE richEditModule = nullptr;
 bool inputFinished = false;
 bool inputAccepted = false;
 bool loadingEditorText = false;
+bool highlightingEditor = false;
 bool editorDirty = false;
 bool previewMode = false;
 std::string inputResult;
@@ -4259,7 +4260,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         return 0;
     }
     if (message == WM_COMMAND && LOWORD(wParam) == codeEditorId && HIWORD(wParam) == EN_CHANGE) {
-        if (!loadingEditorText) {
+        if (!loadingEditorText && !highlightingEditor) {
             editorDirty = true;
             updateEditorWindowTitle();
             applyEditorSyntaxHighlighting();
@@ -4888,12 +4889,13 @@ void executeProgram(const std::vector<std::string>& program) {
 #ifdef _WIN32
 
 void applyEditorSyntaxHighlighting() {
-    if (!codeEditor || !richEditModule) return;
+    if (!codeEditor || !richEditModule || highlightingEditor) return;
     const int length = GetWindowTextLengthW(codeEditor);
     if (length <= 0) return;
     std::wstring source(static_cast<std::size_t>(length) + 1, L'\0');
     GetWindowTextW(codeEditor, source.data(), length + 1);
     source.resize(static_cast<std::size_t>(length));
+    highlightingEditor = true;
     DWORD selectionStart = 0, selectionEnd = 0;
     SendMessageW(codeEditor, EM_GETSEL, reinterpret_cast<WPARAM>(&selectionStart),
                  reinterpret_cast<LPARAM>(&selectionEnd));
@@ -4956,6 +4958,7 @@ void applyEditorSyntaxHighlighting() {
         } else ++i;
     }
     SendMessageW(codeEditor, EM_SETSEL, selectionStart, selectionEnd);
+    highlightingEditor = false;
 }
 
 bool loadSourceFile(const std::filesystem::path& path) {
