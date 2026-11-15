@@ -30,6 +30,7 @@
 #include <memory>
 #include <array>
 #include <deque>
+#include <regex>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -299,6 +300,9 @@ bool webEnabled = false;
 bool collisionEnabled = false;
 bool aiEnabled = false;
 bool mathEnabled = false;
+bool binaryEnabled = false;
+bool regexEnabled = false;
+bool compressionEnabled = false;
 std::string webPageHtml;
 std::vector<std::string> readProgram(std::istream& source);
 std::size_t errorCount = 0;
@@ -660,6 +664,47 @@ std::string base64Encode(const std::string& input) {
     return output;
 }
 
+std::string base64Decode(const std::string& input, bool& valid) {
+    static const std::string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string output; unsigned value = 0; int bits = -8; bool padding = false; valid = true;
+    for (unsigned char c : input) {
+        if (std::isspace(c)) continue;
+        if (c == '=') { padding = true; continue; }
+        if (padding) { valid = false; return {}; }
+        const std::size_t index = alphabet.find(static_cast<char>(c));
+        if (index == std::string::npos) { valid = false; return {}; }
+        value = (value << 6) | static_cast<unsigned>(index); bits += 6;
+        if (bits >= 0) { output.push_back(static_cast<char>((value >> bits) & 0xff)); bits -= 8; }
+    }
+    if (bits >= 0) valid = false;
+    return valid ? output : std::string();
+}
+std::string hexEncode(const std::string& input) {
+    static const char digits[] = "0123456789ABCDEF"; std::string output; output.reserve(input.size()*2);
+    for (unsigned char byte : input) { output.push_back(digits[byte >> 4]); output.push_back(digits[byte & 15]); }
+    return output;
+}
+bool hexDecode(const std::string& input, std::string& output) {
+    auto digit=[](char c)->int { if(c>='0'&&c<='9')return c-'0'; c=static_cast<char>(std::toupper(static_cast<unsigned char>(c))); return c>='A'&&c<='F'?c-'A'+10:-1; };
+    std::string clean; for(unsigned char c:input)if(!std::isspace(c))clean.push_back(static_cast<char>(c));
+    if(clean.size()%2)return false; output.clear();
+    for(std::size_t i=0;i<clean.size();i+=2){int h=digit(clean[i]),l=digit(clean[i+1]);if(h<0||l<0)return false;output.push_back(static_cast<char>((h<<4)|l));}
+    return true;
+}
+std::uint32_t trgCrc32(const std::string& input) {
+    std::uint32_t crc=0xffffffffu; for(unsigned char byte:input){crc^=byte;for(int bit=0;bit<8;++bit)crc=(crc>>1)^(0xedb88320u&(0u-(crc&1u)));} return ~crc;
+}
+std::string rleEncode(const std::string& input) {
+    std::string out; for(std::size_t i=0;i<input.size();){std::size_t n=1;while(i+n<input.size()&&input[i+n]==input[i]&&n<255)++n;if(!out.empty())out.push_back(';');out+=std::to_string(n)+":"+hexEncode(input.substr(i,1));i+=n;}return out;
+}
+bool rleDecode(const std::string& input,std::string& output) {
+    output.clear();if(input.empty())return true;std::stringstream stream(input);std::string part;
+    while(std::getline(stream,part,';')){auto colon=part.find(':');if(colon==std::string::npos)return false;unsigned n=0;
+        try{auto countText=part.substr(0,colon);std::size_t used=0;n=static_cast<unsigned>(std::stoul(countText,&used));if(used!=countText.size()||n==0||n>255)return false;}catch(...){return false;}
+        std::string byte;if(!hexDecode(part.substr(colon+1),byte)||byte.size()!=1||output.size()+n>16*1024*1024)return false;output.append(n,byte[0]);}
+    return true;
+}
+
 std::string lower(std::string s) {
     for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     return s;
@@ -674,7 +719,8 @@ std::string suggestedCommand(const std::string& input) {
         "divide", "write_file", "append_file", "read_file", "delete_file", "file_exists",
         "upper", "lower", "length", "contains", "replace", "push", "get", "remove", "pop", "insert", "index_of", "split", "join", "trim", "substring", "set", "increase", "decrease",
         "play_audio", "show_image", "play_video", "run_wasm", "web_page", "web_heading",
-        "web_text", "web_color", "web_button", "web_image", "web_show"
+        "web_text", "web_color", "web_button", "web_image", "web_show",
+        "binary", "bit", "checksum", "regex", "compress"
     };
     const std::string word = lower(input);
     std::size_t bestDistance = word.size();
@@ -1758,6 +1804,9 @@ struct LibraryState {
     bool network = false;
     bool ai = false;
     bool math = false;
+    bool binary = false;
+    bool regex = false;
+    bool compression = false;
 };
 
 std::string parenContent(const std::string& line) {
@@ -1850,6 +1899,7 @@ void scanLibraries(const std::vector<std::string>& program, LibraryState& librar
         if (name == "all") {
             libraries.files = libraries.json = libraries.web = libraries.collision = true;
             libraries.manual = libraries.ui = libraries.controls = libraries.network = libraries.ai = libraries.math = true;
+            libraries.binary = libraries.regex = libraries.compression = true;
         } else if (name == "files") libraries.files = true;
         else if (name == "json") libraries.json = true;
         else if (name == "web") libraries.web = true;
@@ -1860,6 +1910,9 @@ void scanLibraries(const std::vector<std::string>& program, LibraryState& librar
         else if (name == "network") libraries.network = true;
         else if (name == "ai") libraries.ai = true;
         else if (name == "math") libraries.math = true;
+        else if (name == "binary") libraries.binary = true;
+        else if (name == "regex") libraries.regex = true;
+        else if (name == "compression") libraries.compression = true;
     }
 }
 
@@ -2759,6 +2812,9 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 collisionEnabled = collisionEnabled || connectedLibraries.collision;
                 aiEnabled = aiEnabled || connectedLibraries.ai;
                 mathEnabled = mathEnabled || connectedLibraries.math;
+            binaryEnabled = binaryEnabled || connectedLibraries.binary;
+            regexEnabled = regexEnabled || connectedLibraries.regex;
+            compressionEnabled = compressionEnabled || connectedLibraries.compression;
                 if (connectedLibraries.controls) initializeControls(variables, types);
                 registerFunctions(connectedProgram, false);
                 ++connectDepth;
@@ -2792,6 +2848,9 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     collisionEnabled = collisionEnabled || moduleLibraries.collision;
                     aiEnabled = aiEnabled || moduleLibraries.ai;
                     mathEnabled = mathEnabled || moduleLibraries.math;
+                    binaryEnabled = binaryEnabled || moduleLibraries.binary;
+                    regexEnabled = regexEnabled || moduleLibraries.regex;
+                    compressionEnabled = compressionEnabled || moduleLibraries.compression;
                     if (moduleLibraries.controls) initializeControls(variables, types);
                     registerFunctions(moduleProgram, false);
                     ++includeDepth;
@@ -2818,8 +2877,12 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 if (library == "(network)") { networkEnabled = true; appendOutput("TRG network library enabled.\\r\\n"); continue; }
                 if (library == "(ai)") { aiEnabled = true; appendOutput("TRG AI library enabled.\\r\\n"); continue; }
                 if (library == "(math)") { mathEnabled = true; appendOutput("TRG math library enabled.\\r\\n"); continue; }
+                if (library == "(binary)") { binaryEnabled = true; appendOutput("TRG binary library enabled.\\r\\n"); continue; }
+                if (library == "(regex)") { regexEnabled = true; appendOutput("TRG regex library enabled.\\r\\n"); continue; }
+                if (library == "(compression)") { compressionEnabled = true; appendOutput("TRG compression library enabled.\\r\\n"); continue; }
                 if (library == "(all)") {
                     filesEnabled = jsonEnabled = webEnabled = collisionEnabled = networkEnabled = aiEnabled = mathEnabled = true;
+                    binaryEnabled = regexEnabled = compressionEnabled = true;
                     initializeControls(variables, types);
                     manualMode = true;
                     uiMode = true;
@@ -3089,6 +3152,58 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             }
             reportError(i + 1, "unknown AI action; use create, teach, train, predict, or classify", action);
             continue;
+        }
+
+        if (cmd == "binary") {
+            if (!binaryEnabled) { reportError(i + 1, "binary commands need add (binary)"); continue; }
+            if (tokens.size()!=4) { reportError(i+1,"use binary to_bin|from_bin|to_hex|from_hex|base64_encode|base64_decode VALUE RESULT"); continue; }
+            const std::string action=lower(tokens[1]), source=valueFor(tokens[2],variables);
+            if(!validName(tokens[3])){reportError(i+1,"binary needs a valid result variable");continue;}
+            if(action=="to_bin"){double n=0;if(!parseNumber(source,n)||n<0||n>9007199254740991.0||std::floor(n)!=n){reportError(i+1,"to_bin needs a whole number from 0 to 9007199254740991");continue;}std::uint64_t v=static_cast<std::uint64_t>(n);std::string out;do{out.insert(out.begin(),(v&1u)?'1':'0');v>>=1;}while(v);variables[tokens[3]]=out;types[tokens[3]]="word";}
+            else if(action=="from_bin"){if(source.empty()||source.size()>53||source.find_first_not_of("01")!=std::string::npos){reportError(i+1,"from_bin needs 1 to 53 binary digits");continue;}std::uint64_t v=0;for(char b:source)v=(v<<1)|static_cast<unsigned>(b-'0');variables[tokens[3]]=static_cast<double>(v);types[tokens[3]]="num";}
+            else if(action=="to_hex"){variables[tokens[3]]=hexEncode(source);types[tokens[3]]="word";}
+            else if(action=="from_hex"){std::string out;if(!hexDecode(source,out)){reportError(i+1,"from_hex needs pairs of hexadecimal digits");continue;}variables[tokens[3]]=out;types[tokens[3]]="word";}
+            else if(action=="base64_encode"){variables[tokens[3]]=base64Encode(source);types[tokens[3]]="word";}
+            else if(action=="base64_decode"){bool ok=false;std::string out=base64Decode(source,ok);if(!ok){reportError(i+1,"invalid Base64 input");continue;}variables[tokens[3]]=out;types[tokens[3]]="word";}
+            else reportError(i+1,"unknown binary action",action);
+            continue;
+        }
+        if (cmd == "bit") {
+            if(!binaryEnabled){reportError(i+1,"bit commands need add (binary)");continue;}
+            if(tokens.size()<4||tokens.size()>5){reportError(i+1,"use bit and|or|xor|not|shift_left|shift_right A [B] RESULT");continue;}
+            const std::string action=lower(tokens[1]);const bool unary=action=="not";
+            if(tokens.size()!=(unary?4u:5u)||!validName(tokens.back())){reportError(i+1,"invalid bit operation arguments");continue;}
+            auto read=[&](const std::string& t,std::uint32_t& v){double n=0;if(!parseNumber(valueFor(t,variables),n)||n<0||n>4294967295.0||std::floor(n)!=n)return false;v=static_cast<std::uint32_t>(n);return true;};
+            std::uint32_t a=0,b=0;if(!read(tokens[2],a)||(!unary&&!read(tokens[3],b))){reportError(i+1,"bit operations need unsigned 32-bit whole numbers");continue;}
+            std::uint32_t out=0;if(action=="and")out=a&b;else if(action=="or")out=a|b;else if(action=="xor")out=a^b;else if(action=="not")out=~a;
+            else if(action=="shift_left"||action=="shift_right"){if(b>31){reportError(i+1,"shift amount must be 0 to 31");continue;}out=action=="shift_left"?static_cast<std::uint32_t>(a<<b):static_cast<std::uint32_t>(a>>b);}
+            else{reportError(i+1,"unknown bit operation",action);continue;}variables[tokens.back()]=static_cast<double>(out);types[tokens.back()]="num";continue;
+        }
+        if (cmd == "checksum") {
+            if(!binaryEnabled){reportError(i+1,"checksum needs add (binary)");continue;}
+            if(tokens.size()!=4||!validName(tokens[3])){reportError(i+1,"use checksum crc32|fnv1a TEXT RESULT");continue;}
+            const std::string action=lower(tokens[1]),source=valueFor(tokens[2],variables);std::uint32_t h=0;
+            if(action=="crc32")h=trgCrc32(source);else if(action=="fnv1a"){h=2166136261u;for(unsigned char c:source){h^=c;h*=16777619u;}}else{reportError(i+1,"use crc32 or fnv1a",action);continue;}
+            variables[tokens[3]]=static_cast<double>(h);types[tokens[3]]="num";continue;
+        }
+        if (cmd == "regex") {
+            if(!regexEnabled){reportError(i+1,"regex commands need add (regex)");continue;}
+            if(tokens.size()<5||tokens.size()>6||!validName(tokens.back())){reportError(i+1,"use regex match|search TEXT PATTERN RESULT or regex replace TEXT PATTERN REPLACEMENT RESULT");continue;}
+            const std::string action=lower(tokens[1]),source=valueFor(tokens[2],variables),pattern=valueFor(tokens[3],variables);
+            try{const std::regex re(pattern);
+                if(action=="match"&&tokens.size()==5){variables[tokens[4]]=std::regex_search(source,re);types[tokens[4]]="toggle";}
+                else if(action=="search"&&tokens.size()==5){std::smatch m;variables[tokens[4]]=std::regex_search(source,m,re)?static_cast<double>(m.position()):-1.0;types[tokens[4]]="num";}
+                else if(action=="replace"&&tokens.size()==6){variables[tokens[5]]=std::regex_replace(source,re,valueFor(tokens[4],variables));types[tokens[5]]="word";}
+                else reportError(i+1,"invalid regex action or arguments");
+            }catch(const std::regex_error&){reportError(i+1,"invalid regular expression",pattern);}continue;
+        }
+        if (cmd == "compress") {
+            if(!compressionEnabled){reportError(i+1,"compression commands need add (compression)");continue;}
+            if(tokens.size()!=4||!validName(tokens[3])){reportError(i+1,"use compress encode|decode TEXT RESULT");continue;}
+            const std::string action=lower(tokens[1]),source=valueFor(tokens[2],variables);
+            if(action=="encode"){variables[tokens[3]]=rleEncode(source);types[tokens[3]]="word";}
+            else if(action=="decode"){std::string out;if(!rleDecode(source,out)){reportError(i+1,"invalid or oversized RLE data");continue;}variables[tokens[3]]=out;types[tokens[3]]="word";}
+            else reportError(i+1,"unknown compression action",action);continue;
         }
 
         if (cmd == "math") {
@@ -4867,6 +4982,9 @@ void executeProgram(const std::vector<std::string>& program) {
     networkEnabled = libraries.network;
     aiEnabled = libraries.ai;
     mathEnabled = libraries.math;
+    binaryEnabled = libraries.binary;
+    regexEnabled = libraries.regex;
+    compressionEnabled = libraries.compression;
     aiModels.clear();
     if (libraries.controls) initializeControls(uiVariables, uiTypes);
     registerFunctions(uiProgram);
