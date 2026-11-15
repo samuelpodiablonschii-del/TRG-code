@@ -2889,15 +2889,15 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 if (library == "(manual)") { manualMode = true; continue; }
                 if (library == "(ui)" || library == "(animation)") { uiMode = true; continue; }
                 if (library == "(controls)") { initializeControls(variables, types); continue; }
-                if (library == "(network)") { networkEnabled = true; appendOutput("TRG network library enabled.\\r\\n"); continue; }
-                if (library == "(ai)") { aiEnabled = true; appendOutput("TRG AI library enabled.\\r\\n"); continue; }
-                if (library == "(math)") { mathEnabled = true; appendOutput("TRG math library enabled.\\r\\n"); continue; }
-                if (library == "(binary)") { binaryEnabled = true; appendOutput("TRG binary library enabled.\\r\\n"); continue; }
-                if (library == "(regex)") { regexEnabled = true; appendOutput("TRG regex library enabled.\\r\\n"); continue; }
-                if (library == "(compression)") { compressionEnabled = true; appendOutput("TRG compression library enabled.\\r\\n"); continue; }
-                if (library == "(powershell)") { powershellEnabled = true; appendOutput("TRG PowerShell library enabled.\\r\\n"); continue; }
-                if (library == "(raspberry)") { raspberryEnabled = true; appendOutput("TRG Raspberry library enabled.\\r\\n"); continue; }
-                if (library == "(accessibility)") { accessibilityEnabled = true; appendOutput("TRG accessibility library enabled.\\r\\n"); continue; }
+                if (library == "(network)") { networkEnabled = true; appendOutput("TRG network library enabled.\r\n"); continue; }
+                if (library == "(ai)") { aiEnabled = true; appendOutput("TRG AI library enabled.\r\n"); continue; }
+                if (library == "(math)") { mathEnabled = true; appendOutput("TRG math library enabled.\r\n"); continue; }
+                if (library == "(binary)") { binaryEnabled = true; appendOutput("TRG binary library enabled.\r\n"); continue; }
+                if (library == "(regex)") { regexEnabled = true; appendOutput("TRG regex library enabled.\r\n"); continue; }
+                if (library == "(compression)") { compressionEnabled = true; appendOutput("TRG compression library enabled.\r\n"); continue; }
+                if (library == "(powershell)") { powershellEnabled = true; appendOutput("TRG PowerShell library enabled.\r\n"); continue; }
+                if (library == "(raspberry)") { raspberryEnabled = true; appendOutput("TRG Raspberry library enabled.\r\n"); continue; }
+                if (library == "(accessibility)") { accessibilityEnabled = true; appendOutput("TRG accessibility library enabled.\r\n"); continue; }
                 if (library == "(all)") {
                     filesEnabled = jsonEnabled = webEnabled = collisionEnabled = networkEnabled = aiEnabled = mathEnabled = true;
                     binaryEnabled = regexEnabled = compressionEnabled = true;
@@ -4561,12 +4561,14 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         const LONG mouseY = static_cast<short>(HIWORD(lParam));
         for (auto button = uiButtons.rbegin(); button != uiButtons.rend(); ++button) {
             if (!button->visible || !uiGroupIsVisible(button->group)) continue;
+            const double buttonX = button->x - viewportX;
+            const double buttonY = button->y - viewportY;
             RECT area = {
-                static_cast<LONG>(button->x * canvasWidth / 100.0),
-                static_cast<LONG>(layout.headerHeight + button->y * canvasHeight / 100.0),
-                static_cast<LONG>((button->x + button->width) * canvasWidth / 100.0),
+                static_cast<LONG>(buttonX * canvasWidth / 100.0),
+                static_cast<LONG>(layout.headerHeight + buttonY * canvasHeight / 100.0),
+                static_cast<LONG>((buttonX + button->width) * canvasWidth / 100.0),
                 static_cast<LONG>(layout.headerHeight +
-                    (button->y + button->height) * canvasHeight / 100.0)
+                    (buttonY + button->height) * canvasHeight / 100.0)
             };
             if (PtInRect(&area, POINT{mouseX, mouseY})) {
                 outputBuffer.clear();
@@ -4667,6 +4669,26 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 static_cast<LONG>((bx + block->width) * canvasWidth / 100.0),
                 static_cast<LONG>(layout.headerHeight + (by + block->height) * canvasHeight / 100.0)
             };
+            if (block->glowIntensity > 0 && !block->glowColor.empty()) {
+                unsigned gr = 0, gg = 0, gb = 0;
+                if (parseColor(block->glowColor, gr, gg, gb)) {
+                    int glowPad = static_cast<int>(block->glowIntensity * 12.0);
+                    RECT glowArea = { area.left - glowPad, area.top - glowPad, area.right + glowPad, area.bottom + glowPad };
+                    HBRUSH glowBrush = CreateSolidBrush(RGB(gr, gg, gb));
+                    HPEN glowPen = CreatePen(PS_SOLID, 1, RGB(gr, gg, gb));
+                    HGDIOBJ oldPen2 = SelectObject(dc, glowPen);
+                    HGDIOBJ oldBrush2 = SelectObject(dc, glowBrush);
+                    if (block->shape == "circle") {
+                        Ellipse(dc, glowArea.left, glowArea.top, glowArea.right, glowArea.bottom);
+                    } else if (block->shape == "square" || block->shape == "rect") {
+                        RoundRect(dc, glowArea.left, glowArea.top, glowArea.right, glowArea.bottom, glowPad * 2, glowPad * 2);
+                    } else {
+                        Rectangle(dc, glowArea.left, glowArea.top, glowArea.right, glowArea.bottom);
+                    }
+                    SelectObject(dc, oldBrush2); SelectObject(dc, oldPen2);
+                    DeleteObject(glowPen); DeleteObject(glowBrush);
+                }
+            }
             HBRUSH brush = CreateSolidBrush(RGB(red, green, blue));
             HPEN pen = CreatePen(PS_SOLID, 1, RGB(red, green, blue));
             HGDIOBJ oldPen = SelectObject(dc, pen);
@@ -4718,26 +4740,6 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             SelectObject(dc, oldBrush); SelectObject(dc, oldPen);
             DeleteObject(pen); DeleteObject(brush);
             
-            if (block->glowIntensity > 0 && !block->glowColor.empty()) {
-                unsigned gr = 0, gg = 0, gb = 0;
-                if (parseColor(block->glowColor, gr, gg, gb)) {
-                    int glowPad = static_cast<int>(block->glowIntensity * 12.0);
-                    RECT glowArea = { area.left - glowPad, area.top - glowPad, area.right + glowPad, area.bottom + glowPad };
-                    HBRUSH glowBrush = CreateSolidBrush(RGB(gr, gg, gb));
-                    HPEN glowPen = CreatePen(PS_SOLID, 1, RGB(gr, gg, gb));
-                    HGDIOBJ oldPen2 = SelectObject(dc, glowPen);
-                    HGDIOBJ oldBrush2 = SelectObject(dc, glowBrush);
-                    if (block->shape == "circle") {
-                        Ellipse(dc, glowArea.left, glowArea.top, glowArea.right, glowArea.bottom);
-                    } else if (block->shape == "square" || block->shape == "rect") {
-                        RoundRect(dc, glowArea.left, glowArea.top, glowArea.right, glowArea.bottom, glowPad * 2, glowPad * 2);
-                    } else {
-                        Rectangle(dc, glowArea.left, glowArea.top, glowArea.right, glowArea.bottom);
-                    }
-                    SelectObject(dc, oldBrush2); SelectObject(dc, oldPen2);
-                    DeleteObject(glowPen); DeleteObject(glowBrush);
-                }
-            }
             SetBkMode(dc, TRANSPARENT);
             SetTextColor(dc, RGB(255, 255, 255));
             const std::wstring name = wideFromUtf8(block->name);
@@ -4782,12 +4784,14 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         }
         for (const UiButton& button : uiButtons) {
             if (!button.visible || !uiGroupIsVisible(button.group)) continue;
+            const double buttonX = button.x - viewportX;
+            const double buttonY = button.y - viewportY;
             RECT area = {
-                static_cast<LONG>(button.x * canvasWidth / 100.0),
-                static_cast<LONG>(layout.headerHeight + button.y * canvasHeight / 100.0),
-                static_cast<LONG>((button.x + button.width) * canvasWidth / 100.0),
+                static_cast<LONG>(buttonX * canvasWidth / 100.0),
+                static_cast<LONG>(layout.headerHeight + buttonY * canvasHeight / 100.0),
+                static_cast<LONG>((buttonX + button.width) * canvasWidth / 100.0),
                 static_cast<LONG>(layout.headerHeight +
-                    (button.y + button.height) * canvasHeight / 100.0)
+                    (buttonY + button.height) * canvasHeight / 100.0)
             };
             unsigned red = 0, green = 0, blue = 0;
             parseColor(button.color, red, green, blue);
