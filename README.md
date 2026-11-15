@@ -201,8 +201,34 @@ add (json)
 add (all)
 ```
 
-`add (all)` enables every built-in library, including `json`.
+`add (all)` enables every built-in library, including `json` and `ai`.
 
+### AI
+
+`add (ai)` enables TRG's small, beginner-friendly machine-learning library. It uses a trainable logistic model for simple yes/no classification. It is designed for learning and small experiments, not as a replacement for full PyTorch or large language models.
+
+```text
+add (ai)
+
+ai create gate 2
+ai teach gate 0;0 0
+ai teach gate 0;1 1
+ai teach gate 1;0 1
+ai teach gate 1;1 1
+ai train gate 3000 0.1
+
+ai classify gate 1;0 answer
+say "Should turn on:" answer
+
+ai predict gate 1;1 confidence
+say "Confidence:" confidence
+```
+
+- `ai create MODEL INPUT_COUNT` creates a model with 1-64 numeric inputs.
+- `ai teach MODEL INPUTS EXPECTED` adds an example. Separate input values with semicolons; expected output must be `0` or `1`.
+- `ai train MODEL EPOCHS [LEARNING_RATE]` trains from the examples.
+- `ai predict MODEL INPUTS RESULT` stores a probability from 0 to 1.
+- `ai classify MODEL INPUTS RESULT` stores `true` or `false` using a 0.5 threshold.
 ### Files
 
 File commands stay inside the project folder. Windows uses the folder containing the running `.trg` file; Android Studio uses the app's private project folder. Import assets in Android Studio before using them.
