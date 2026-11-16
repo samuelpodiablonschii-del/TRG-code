@@ -305,6 +305,8 @@ bool regexEnabled = false;
 bool compressionEnabled = false;
 bool timeEnabled = false;
 bool convertEnabled = false;
+bool statsEnabled = false;
+bool unitsEnabled = false;
 std::string webPageHtml;
 std::vector<std::string> readProgram(std::istream& source);
 std::size_t errorCount = 0;
@@ -1816,7 +1818,9 @@ struct LibraryState {
     bool accessibility = false;
     bool time = false;
     bool convert = false;
-};
+    bool stats = false;
+    bool units = false;
+
 
 std::string parenContent(const std::string& line) {
     
@@ -1910,6 +1914,7 @@ void scanLibraries(const std::vector<std::string>& program, LibraryState& librar
             libraries.manual = libraries.ui = libraries.controls = libraries.network = libraries.ai = libraries.math = true;
             libraries.binary = libraries.regex = libraries.compression = true;
             libraries.powershell = libraries.raspberry = libraries.accessibility = true;
+            libraries.stats = libraries.units = true;
         } else if (name == "files") libraries.files = true;
         else if (name == "json") libraries.json = true;
         else if (name == "web") libraries.web = true;
@@ -1928,6 +1933,8 @@ void scanLibraries(const std::vector<std::string>& program, LibraryState& librar
         else if (name == "accessibility") libraries.accessibility = true;
         else if (name == "time") libraries.time = true;
         else if (name == "convert") libraries.convert = true;
+        else if (name == "stats") libraries.stats = true;
+        else if (name == "units") libraries.units = true;
     }
 }
 
@@ -2835,6 +2842,8 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 accessibilityEnabled = accessibilityEnabled || connectedLibraries.accessibility;
                 timeEnabled = timeEnabled || connectedLibraries.time;
                 convertEnabled = convertEnabled || connectedLibraries.convert;
+                statsEnabled = statsEnabled || connectedLibraries.stats;
+                unitsEnabled = unitsEnabled || connectedLibraries.units;
                 if (connectedLibraries.controls) initializeControls(variables, types);
                 registerFunctions(connectedProgram, false);
                 ++connectDepth;
@@ -2876,6 +2885,8 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     accessibilityEnabled = accessibilityEnabled || moduleLibraries.accessibility;
                     timeEnabled = timeEnabled || moduleLibraries.time;
                     convertEnabled = convertEnabled || moduleLibraries.convert;
+                    statsEnabled = statsEnabled || moduleLibraries.stats;
+                    unitsEnabled = unitsEnabled || moduleLibraries.units;
                     if (moduleLibraries.controls) initializeControls(variables, types);
                     registerFunctions(moduleProgram, false);
                     ++includeDepth;
@@ -2910,10 +2921,13 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 if (library == "(accessibility)") { accessibilityEnabled = true; appendOutput("TRG accessibility library enabled.\r\n"); continue; }
                 if (library == "(time)") { timeEnabled = true; appendOutput("TRG time library enabled.\r\n"); continue; }
                 if (library == "(convert)") { convertEnabled = true; appendOutput("TRG convert library enabled.\r\n"); continue; }
+                if (library == "(stats)") { statsEnabled = true; appendOutput("TRG stats library enabled.\r\n"); continue; }
+                if (library == "(units)") { unitsEnabled = true; appendOutput("TRG units library enabled.\r\n"); continue; }
                 if (library == "(all)") {
                     filesEnabled = jsonEnabled = webEnabled = collisionEnabled = networkEnabled = aiEnabled = mathEnabled = true;
                     binaryEnabled = regexEnabled = compressionEnabled = true;
                     powershellEnabled = raspberryEnabled = accessibilityEnabled = true;
+                    statsEnabled = unitsEnabled = true;
                     initializeControls(variables, types);
                     manualMode = true;
                     uiMode = true;
@@ -3395,6 +3409,41 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             else if (action == "bool") { const std::string value = lower(trim(source)); if (value == "true" || value == "1" || value == "yes" || value == "on") variables[tokens[3]] = true; else if (value == "false" || value == "0" || value == "no" || value == "off") variables[tokens[3]] = false; else { reportError(i + 1, "value cannot be converted to bool", source); continue; } types[tokens[3]] = "toggle"; }
             else { reportError(i + 1, "unknown conversion", action); }
             continue;
+        }
+        if (cmd == "stats") {
+            if (!statsEnabled) { reportError(i + 1, "stats commands need add (stats)"); continue; }
+            if (tokens.size() != 4 || !validName(tokens[3]) || !variables.count(tokens[2]) || types[tokens[2]] != "list") { reportError(i + 1, "use stats sum|average|min|max|median|range LIST RESULT"); continue; }
+            const auto* items = std::get_if<std::vector<std::string>>(&variables[tokens[2]].value);
+            if (!items || items->empty()) { reportError(i + 1, "stats needs a non-empty list"); continue; }
+            std::vector<double> values; values.reserve(items->size());
+            for (const auto& item : *items) { double number = 0; if (!parseNumber(valueFor(item, variables), number)) { reportError(i + 1, "stats list must contain only numbers", item); values.clear(); break; } values.push_back(number); }
+            if (values.empty()) continue;
+            const std::string action = lower(tokens[1]); double result = 0;
+            if (action == "sum") result = std::accumulate(values.begin(), values.end(), 0.0);
+            else if (action == "average") result = std::accumulate(values.begin(), values.end(), 0.0) / static_cast<double>(values.size());
+            else if (action == "min") result = *std::min_element(values.begin(), values.end());
+            else if (action == "max") result = *std::max_element(values.begin(), values.end());
+            else if (action == "range") result = *std::max_element(values.begin(), values.end()) - *std::min_element(values.begin(), values.end());
+            else if (action == "median") { std::sort(values.begin(), values.end()); const std::size_t middle = values.size() / 2; result = values.size() % 2 ? values[middle] : (values[middle - 1] + values[middle]) / 2.0; }
+            else { reportError(i + 1, "unknown stats operation", action); continue; }
+            variables[tokens[3]] = result; types[tokens[3]] = "num"; continue;
+        }
+
+        if (cmd == "units") {
+            if (!unitsEnabled) { reportError(i + 1, "units commands need add (units)"); continue; }
+            if (tokens.size() != 4 || !validName(tokens[3])) { reportError(i + 1, "use units c_to_f|f_to_c|km_to_mi|mi_to_km|m_to_ft|ft_to_m|kg_to_lb|lb_to_kg VALUE RESULT"); continue; }
+            double value = 0; if (!evaluateExpression(tokens[2], variables, value)) { reportError(i + 1, "units needs a numeric value", tokens[2]); continue; }
+            const std::string action = lower(tokens[1]); double result = 0;
+            if (action == "c_to_f") result = value * 9.0 / 5.0 + 32.0;
+            else if (action == "f_to_c") result = (value - 32.0) * 5.0 / 9.0;
+            else if (action == "km_to_mi") result = value * 0.621371192237334;
+            else if (action == "mi_to_km") result = value / 0.621371192237334;
+            else if (action == "m_to_ft") result = value * 3.28083989501312;
+            else if (action == "ft_to_m") result = value / 3.28083989501312;
+            else if (action == "kg_to_lb") result = value * 2.20462262184878;
+            else if (action == "lb_to_kg") result = value / 2.20462262184878;
+            else { reportError(i + 1, "unknown unit conversion", action); continue; }
+            variables[tokens[3]] = result; types[tokens[3]] = "num"; continue;
         }
         if (cmd == "random") {
             if (tokens.size() != 4 || !validName(tokens[3])) {
@@ -5132,6 +5181,8 @@ void executeProgram(const std::vector<std::string>& program) {
     accessibilityEnabled = libraries.accessibility;
     timeEnabled = libraries.time;
     convertEnabled = libraries.convert;
+    statsEnabled = libraries.stats;
+    unitsEnabled = libraries.units;
     aiModels.clear();
     if (libraries.controls) initializeControls(uiVariables, uiTypes);
     registerFunctions(uiProgram);
