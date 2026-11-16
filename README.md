@@ -559,6 +559,8 @@ Commands:
 - `physics bounce BODY VALUE` sets the restitution multiplier. `1` keeps speed, values below `1` reduce bounce speed, and values above `1` increase it.
 - `physics step SECONDS` advances all dynamic bodies by up to 0.1 seconds. Put it in an `every` block for continuous simulation.
 - `physics position BODY X Y` teleports a registered body to a canvas position.
+- `physics freeze BODY` stops a dynamic body and suspends its movement until unfrozen.
+- `physics unfreeze BODY` resumes a frozen body; set its velocity separately to launch it again.
 - `physics remove OBJECT` unregisters an object.
 
 The first version resolves axis-aligned rectangle collisions against registered solid bodies. It does not yet include rotated-shape collision, frictional contact, joints, or continuous collision detection for very fast objects. For accurate results, use small fixed steps (for example, 0.016 seconds).
