@@ -42,6 +42,7 @@ let game_over = false
 
 button launch "Launch / Restart" x 72 y 5 w 23 h 10 color #7043BE (
     physics position ball 72 85
+    physics unfreeze ball
     physics velocity ball -25 -36
     game_over = false
     say "Ball launched!"
@@ -52,7 +53,7 @@ every 16ms (
 
     if finish_hit = true (
         if game_over = false (
-            physics velocity ball 0 0
+            physics freeze ball
             game_over = true
             say "Level complete!"
         )
@@ -60,7 +61,7 @@ every 16ms (
 
     if death_hit = true (
         if game_over = false (
-            physics velocity ball 0 0
+            physics freeze ball
             game_over = true
             say "Death brick hit. Press Launch / Restart to try again."
         )
@@ -68,7 +69,7 @@ every 16ms (
 
     if frozen_hit = true (
         if game_over = false (
-            physics velocity ball 0 0
+            physics freeze ball
             game_over = true
             say "Freeze pad reached. Press Launch / Restart to try again."
         )
