@@ -201,7 +201,7 @@ add (json)
 add (all)
 ```
 
-`add (all)` enables every built-in library, including `json`, `math`, `ai`, `binary`, `regex`, and `compression`. Everyday text and number commands such as `find`, `replace_text`, `add_numbers`, and `square_root` work without adding a library.
+`add (all)` enables every built-in library, including `json`, `math`, `ai`, `binary`, `regex`, `compression`, `time`, `convert`, `stats`, and `units`. Everyday text and number commands such as `find`, `replace_text`, `add_numbers`, and `square_root` work without adding a library.
 
 The PowerShell, Raspberry, and accessibility libraries are also registered:
 
@@ -230,6 +230,52 @@ Command style:
 **Implementation status:** the three library names are recognised by the library scanner and `add (all)`. Their hardware and operating-system command backends are not implemented yet; the examples above describe the intended syntax, not commands that are ready to run. The existing PowerShell helper is currently a whitelist-checking placeholder and does not launch PowerShell.
 
 
+### Time and conversion
+
+`add (time)` reads the current local date/time or Unix timestamp. `add (convert)` converts simple values between number, text, and boolean types.
+
+```text
+add (time)
+time year current_year
+time month current_month
+time day current_day
+time hour current_hour
+time unix timestamp
+
+add (convert)
+convert number "42.5" amount
+convert text amount label
+convert bool "yes" enabled
+```
+
+### Statistics
+
+`add (stats)` calculates common statistics from a numeric list. The list must contain only values that can be read as numbers.
+
+```text
+list scores = 10, 20, 30, 40
+add (stats)
+stats sum scores total
+stats average scores average_score
+stats median scores middle_score
+stats min scores lowest
+stats max scores highest
+stats range scores spread
+```
+
+### Unit conversions
+
+`add (units)` converts common temperature, distance, and mass units. The result is stored as a number.
+
+```text
+add (units)
+units c_to_f 20 fahrenheit
+units km_to_mi 10 miles
+units m_to_ft 5 feet
+units kg_to_lb 2 pounds
+```
+
+Supported conversions: `c_to_f`, `f_to_c`, `km_to_mi`, `mi_to_km`, `m_to_ft`, `ft_to_m`, `kg_to_lb`, and `lb_to_kg`.
 ### Math
 
 `add (math)` enables beginner-friendly math commands. Angles for `sin`, `cos`, and `tan` are in radians.
