@@ -190,6 +190,7 @@ struct PhysicsBody {
     bool dynamic = true;
     bool solid = true;
     bool trigger = false;
+    bool frozen = false;
 };
 
 struct AiSample { std::vector<double> inputs; double expected = 0; };
@@ -3321,7 +3322,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
 
         if (cmd == "physics") {
             if (!physicsEnabled) { reportError(i + 1, "physics commands need add (physics)"); continue; }
-            if (tokens.size() < 2) { reportError(i + 1, "use physics body|solid|trigger|velocity|gravity|drag|bounce|position|remove|step"); continue; }
+            if (tokens.size() < 2) { reportError(i + 1, "use physics body|solid|trigger|velocity|gravity|drag|bounce|position|freeze|unfreeze|remove|step"); continue; }
             const std::string action = lower(tokens[1]);
             if (action == "body" || action == "solid" || action == "trigger") {
                 if (tokens.size() != 3 || !validName(tokens[2])) {
@@ -3339,6 +3340,16 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 body.solid = action == "solid" || action == "body";
                 body.trigger = action == "trigger";
                 physicsBodies[body.name] = body;
+                continue;
+            }
+            if (action == "freeze" || action == "unfreeze") {
+                if (tokens.size() != 3 || !physicsBodies.count(tokens[2])) {
+                    reportError(i + 1, "use physics freeze|unfreeze BODY");
+                    continue;
+                }
+                PhysicsBody& body = physicsBodies[tokens[2]];
+                body.frozen = action == "freeze";
+                if (body.frozen) body.vx = body.vy = 0;
                 continue;
             }
             if (action == "remove") {
@@ -4336,6 +4347,7 @@ void physicsStep(double seconds, Vars& variables, Types& currentTypes) {
         PhysicsBody& body = found->second;
         double x = 0, y = 0, width = 0, height = 0;
         if (!uiEntityBounds(name, x, y, width, height)) continue;
+        if (body.frozen) continue;
 
         body.vy += body.gravity * dt;
         if (body.drag > 0) {
