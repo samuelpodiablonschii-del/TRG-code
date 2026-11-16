@@ -303,6 +303,9 @@ bool mathEnabled = false;
 bool binaryEnabled = false;
 bool regexEnabled = false;
 bool compressionEnabled = false;
+bool stringEnabled = false;
+bool timeEnabled = false;
+bool convertEnabled = false;
 std::string webPageHtml;
 std::vector<std::string> readProgram(std::istream& source);
 std::size_t errorCount = 0;
@@ -1812,6 +1815,9 @@ struct LibraryState {
     bool powershell = false;
     bool raspberry = false;
     bool accessibility = false;
+    bool string = false;
+    bool time = false;
+    bool convert = false;
 };
 
 std::string parenContent(const std::string& line) {
@@ -1906,6 +1912,7 @@ void scanLibraries(const std::vector<std::string>& program, LibraryState& librar
             libraries.manual = libraries.ui = libraries.controls = libraries.network = libraries.ai = libraries.math = true;
             libraries.binary = libraries.regex = libraries.compression = true;
             libraries.powershell = libraries.raspberry = libraries.accessibility = true;
+            libraries.string = libraries.time = libraries.convert = true;
         } else if (name == "files") libraries.files = true;
         else if (name == "json") libraries.json = true;
         else if (name == "web") libraries.web = true;
@@ -1922,6 +1929,9 @@ void scanLibraries(const std::vector<std::string>& program, LibraryState& librar
         else if (name == "powershell") libraries.powershell = true;
         else if (name == "raspberry") libraries.raspberry = true;
         else if (name == "accessibility") libraries.accessibility = true;
+        else if (name == "string") libraries.string = true;
+        else if (name == "time") libraries.time = true;
+        else if (name == "convert") libraries.convert = true;
     }
 }
 
@@ -2827,6 +2837,9 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 powershellEnabled = powershellEnabled || connectedLibraries.powershell;
                 raspberryEnabled = raspberryEnabled || connectedLibraries.raspberry;
                 accessibilityEnabled = accessibilityEnabled || connectedLibraries.accessibility;
+                stringEnabled = stringEnabled || connectedLibraries.string;
+                timeEnabled = timeEnabled || connectedLibraries.time;
+                convertEnabled = convertEnabled || connectedLibraries.convert;
                 if (connectedLibraries.controls) initializeControls(variables, types);
                 registerFunctions(connectedProgram, false);
                 ++connectDepth;
@@ -2866,6 +2879,9 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     powershellEnabled = powershellEnabled || moduleLibraries.powershell;
                     raspberryEnabled = raspberryEnabled || moduleLibraries.raspberry;
                     accessibilityEnabled = accessibilityEnabled || moduleLibraries.accessibility;
+                    stringEnabled = stringEnabled || moduleLibraries.string;
+                    timeEnabled = timeEnabled || moduleLibraries.time;
+                    convertEnabled = convertEnabled || moduleLibraries.convert;
                     if (moduleLibraries.controls) initializeControls(variables, types);
                     registerFunctions(moduleProgram, false);
                     ++includeDepth;
@@ -2898,10 +2914,14 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 if (library == "(powershell)") { powershellEnabled = true; appendOutput("TRG PowerShell library enabled.\r\n"); continue; }
                 if (library == "(raspberry)") { raspberryEnabled = true; appendOutput("TRG Raspberry library enabled.\r\n"); continue; }
                 if (library == "(accessibility)") { accessibilityEnabled = true; appendOutput("TRG accessibility library enabled.\r\n"); continue; }
+                if (library == "(string)") { stringEnabled = true; appendOutput("TRG string library enabled.\r\n"); continue; }
+                if (library == "(time)") { timeEnabled = true; appendOutput("TRG time library enabled.\r\n"); continue; }
+                if (library == "(convert)") { convertEnabled = true; appendOutput("TRG convert library enabled.\r\n"); continue; }
                 if (library == "(all)") {
                     filesEnabled = jsonEnabled = webEnabled = collisionEnabled = networkEnabled = aiEnabled = mathEnabled = true;
                     binaryEnabled = regexEnabled = compressionEnabled = true;
                     powershellEnabled = raspberryEnabled = accessibilityEnabled = true;
+                    stringEnabled = timeEnabled = convertEnabled = true;
                     initializeControls(variables, types);
                     manualMode = true;
                     uiMode = true;
@@ -3350,6 +3370,62 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             continue;
         }
 
+        if (cmd == "string") {
+            if (!stringEnabled) { reportError(i + 1, "string commands need add (string)"); continue; }
+            if (tokens.size() < 4 || !validName(tokens.back())) { reportError(i + 1, "use string upper|lower|trim|reverse|length|contains TEXT RESULT or string replace TEXT OLD NEW RESULT"); continue; }
+            const std::string action = lower(tokens[1]), source = valueFor(tokens[2], variables);
+            if (action == "replace") {
+                if (tokens.size() != 6) { reportError(i + 1, "use string replace TEXT OLD NEW RESULT"); continue; }
+                const std::string oldText = valueFor(tokens[3], variables), newText = valueFor(tokens[4], variables);
+                if (oldText.empty()) { reportError(i + 1, "string replace needs a non-empty search value"); continue; }
+                std::string output = source; std::size_t at = 0;
+                while ((at = output.find(oldText, at)) != std::string::npos) { output.replace(at, oldText.size(), newText); at += newText.size(); }
+                variables[tokens[5]] = output; types[tokens[5]] = "word"; continue;
+            }
+            if (tokens.size() != 4) { reportError(i + 1, "string command needs one input and one result variable"); continue; }
+            if (action == "upper" || action == "lower") { std::string output = source; std::transform(output.begin(), output.end(), output.begin(), [&](unsigned char c) { return static_cast<char>(action == "upper" ? std::toupper(c) : std::tolower(c)); }); variables[tokens[3]] = output; types[tokens[3]] = "word"; }
+            else if (action == "trim") { variables[tokens[3]] = trim(source); types[tokens[3]] = "word"; }
+            else if (action == "reverse") { std::string output = source; std::reverse(output.begin(), output.end()); variables[tokens[3]] = output; types[tokens[3]] = "word"; }
+            else if (action == "length") { variables[tokens[3]] = static_cast<double>(source.size()); types[tokens[3]] = "num"; }
+            else if (action == "contains") { variables[tokens[3]] = source.find(valueFor(tokens[2], variables)) != std::string::npos; types[tokens[3]] = "toggle"; }
+            else { reportError(i + 1, "unknown string action", action); }
+            continue;
+        }
+
+        if (cmd == "time") {
+            if (!timeEnabled) { reportError(i + 1, "time commands need add (time)"); continue; }
+            if (tokens.size() != 3 || !validName(tokens[2])) { reportError(i + 1, "use time unix|milliseconds|year|month|day|hour|minute|second RESULT"); continue; }
+            const auto now = std::chrono::system_clock::now();
+            const auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+            const std::time_t rawTime = std::chrono::system_clock::to_time_t(now); std::tm parts{};
+            #ifdef _WIN32
+            localtime_s(&parts, &rawTime);
+            #else
+            localtime_r(&rawTime, &parts);
+            #endif
+            const std::string action = lower(tokens[1]);
+            if (action == "unix") variables[tokens[2]] = static_cast<double>(milliseconds / 1000);
+            else if (action == "milliseconds") variables[tokens[2]] = static_cast<double>(milliseconds);
+            else if (action == "year") variables[tokens[2]] = static_cast<double>(parts.tm_year + 1900);
+            else if (action == "month") variables[tokens[2]] = static_cast<double>(parts.tm_mon + 1);
+            else if (action == "day") variables[tokens[2]] = static_cast<double>(parts.tm_mday);
+            else if (action == "hour") variables[tokens[2]] = static_cast<double>(parts.tm_hour);
+            else if (action == "minute") variables[tokens[2]] = static_cast<double>(parts.tm_min);
+            else if (action == "second") variables[tokens[2]] = static_cast<double>(parts.tm_sec);
+            else { reportError(i + 1, "unknown time action", action); continue; }
+            types[tokens[2]] = "num"; continue;
+        }
+
+        if (cmd == "convert") {
+            if (!convertEnabled) { reportError(i + 1, "convert commands need add (convert)"); continue; }
+            if (tokens.size() != 4 || !validName(tokens[3])) { reportError(i + 1, "use convert number|text|bool VALUE RESULT"); continue; }
+            const std::string action = lower(tokens[1]), source = valueFor(tokens[2], variables);
+            if (action == "number") { double number = 0; if (!parseNumber(source, number)) { reportError(i + 1, "value cannot be converted to a number", source); continue; } variables[tokens[3]] = number; types[tokens[3]] = "num"; }
+            else if (action == "text") { variables[tokens[3]] = source; types[tokens[3]] = "word"; }
+            else if (action == "bool") { const std::string value = lower(trim(source)); if (value == "true" || value == "1" || value == "yes" || value == "on") variables[tokens[3]] = true; else if (value == "false" || value == "0" || value == "no" || value == "off") variables[tokens[3]] = false; else { reportError(i + 1, "value cannot be converted to bool", source); continue; } types[tokens[3]] = "toggle"; }
+            else { reportError(i + 1, "unknown conversion", action); }
+            continue;
+        }
         if (cmd == "random") {
             if (tokens.size() != 4 || !validName(tokens[3])) {
                 reportError(i + 1, "use random MIN MAX RESULT");
@@ -5084,6 +5160,9 @@ void executeProgram(const std::vector<std::string>& program) {
     powershellEnabled = libraries.powershell;
     raspberryEnabled = libraries.raspberry;
     accessibilityEnabled = libraries.accessibility;
+    stringEnabled = libraries.string;
+    timeEnabled = libraries.time;
+    convertEnabled = libraries.convert;
     aiModels.clear();
     if (libraries.controls) initializeControls(uiVariables, uiTypes);
     registerFunctions(uiProgram);
