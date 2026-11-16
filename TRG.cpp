@@ -4376,6 +4376,12 @@ bool setUiEntityPosition(const std::string& name, double x, double y) {
 }
 
 void physicsStep(double seconds, Vars& variables, Types& currentTypes) {
+#ifdef __ANDROID__
+    if (controlsEnabled) {
+        std::lock_guard<std::mutex> lock(androidInputMutex);
+        for (const auto& control : androidMobileInputs) variables[control.first] = control.second;
+    }
+#endif
     const double dt = std::clamp(seconds, 0.0, 0.1);
     if (dt <= 0) return;
     std::unordered_set<std::string> contactPairs;
