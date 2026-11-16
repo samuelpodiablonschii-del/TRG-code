@@ -191,6 +191,12 @@ struct PhysicsBody {
     bool solid = true;
     bool trigger = false;
     bool frozen = false;
+    bool dragLaunch = false;
+    bool dragLaunching = false;
+    bool launched = false;
+    double launchSpeedLimit = 70.0;
+    double dragStartX = 0;
+    double dragStartY = 0;
 };
 
 struct AiSample { std::vector<double> inputs; double expected = 0; };
@@ -1220,6 +1226,12 @@ void initializeControls(Vars& variables, Types& types) {
         variables[key.first] = "released";
         types[key.first] = "word";
     }
+    variables["pointer_x"] = 0.0;
+    variables["pointer_y"] = 0.0;
+    variables["pointer_down"] = "released";
+    types["pointer_x"] = "num";
+    types["pointer_y"] = "num";
+    types["pointer_down"] = "word";
     const char* mobileControls[] = {
         "mobile_tap", "mobile_hold", "mobile_swipe_left", "mobile_swipe_right",
         "mobile_swipe_up", "mobile_swipe_down", "mobile_button_1", "mobile_button_2",
@@ -1241,6 +1253,9 @@ void initializeControls(Vars& variables, Types& types) {
         std::lock_guard<std::mutex> lock(androidInputMutex);
         androidMobileInputs.clear();
         for (const char* control : mobileControls) androidMobileInputs[control] = "released";
+        androidMobileInputs["pointer_x"] = "0";
+        androidMobileInputs["pointer_y"] = "0";
+        androidMobileInputs["pointer_down"] = "released";
     }
 #endif
     const char* controllerAxes[] = {
@@ -3322,7 +3337,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
 
         if (cmd == "physics") {
             if (!physicsEnabled) { reportError(i + 1, "physics commands need add (physics)"); continue; }
-            if (tokens.size() < 2) { reportError(i + 1, "use physics body|solid|trigger|velocity|gravity|drag|bounce|position|freeze|unfreeze|remove|step"); continue; }
+            if (tokens.size() < 2) { reportError(i + 1, "use physics body|solid|trigger|velocity|gravity|drag|bounce|position|drag_launch|reset|freeze|unfreeze|remove|step"); continue; }
             const std::string action = lower(tokens[1]);
             if (action == "body" || action == "solid" || action == "trigger") {
                 if (tokens.size() != 3 || !validName(tokens[2])) {
@@ -3340,6 +3355,36 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 body.solid = action == "solid" || action == "body";
                 body.trigger = action == "trigger";
                 physicsBodies[body.name] = body;
+                continue;
+            }
+            if (action == "reset") {
+                if (tokens.size() != 3 || !physicsBodies.count(tokens[2])) {
+                    reportError(i + 1, "use physics reset BODY");
+                    continue;
+                }
+                PhysicsBody& body = physicsBodies[tokens[2]];
+                body.vx = body.vy = 0;
+                body.frozen = false;
+                body.dragLaunching = false;
+                body.launched = false;
+                continue;
+            }
+            if (action == "drag_launch") {
+                if (tokens.size() != 4 || !physicsBodies.count(tokens[2]) || !physicsBodies[tokens[2]].dynamic) {
+                    reportError(i + 1, "use physics drag_launch BODY MAX_SPEED");
+                    continue;
+                }
+                double limit = 0;
+                if (!evaluateExpression(tokens[3], variables, limit) || !std::isfinite(limit) || limit <= 0) {
+                    reportError(i + 1, "drag launch speed limit must be greater than zero");
+                    continue;
+                }
+                PhysicsBody& body = physicsBodies[tokens[2]];
+                body.dragLaunch = true;
+                body.launchSpeedLimit = limit;
+                body.launched = false;
+                body.dragLaunching = false;
+                body.vx = body.vy = 0;
                 continue;
             }
             if (action == "freeze" || action == "unfreeze") {
@@ -4347,7 +4392,34 @@ void physicsStep(double seconds, Vars& variables, Types& currentTypes) {
         PhysicsBody& body = found->second;
         double x = 0, y = 0, width = 0, height = 0;
         if (!uiEntityBounds(name, x, y, width, height)) continue;
-        if (body.frozen) continue;
+        if (body.dragLaunch && !body.launched) {
+            double pointerX = 0, pointerY = 0;
+            const std::string pointerDown = valueFor("pointer_down", variables);
+            const bool isDown = lower(pointerDown) == "press" || lower(pointerDown) == "true";
+            if (isDown && !body.dragLaunching &&
+                evaluateExpression("pointer_x", variables, pointerX) &&
+                evaluateExpression("pointer_y", variables, pointerY) &&
+                pointerX >= x && pointerX <= x + width && pointerY >= y && pointerY <= y + height) {
+                body.dragLaunching = true;
+                body.dragStartX = pointerX;
+                body.dragStartY = pointerY;
+            } else if (!isDown && body.dragLaunching) {
+                if (evaluateExpression("pointer_x", variables, pointerX) &&
+                    evaluateExpression("pointer_y", variables, pointerY)) {
+                    double launchX = body.dragStartX - pointerX;
+                    double launchY = body.dragStartY - pointerY;
+                    const double magnitude = std::hypot(launchX, launchY);
+                    if (magnitude > 0.5) {
+                        const double speed = std::min(body.launchSpeedLimit, magnitude * 4.0);
+                        body.vx = launchX / magnitude * speed;
+                        body.vy = launchY / magnitude * speed;
+                        body.launched = true;
+                    }
+                }
+                body.dragLaunching = false;
+            }
+        }
+        if (body.frozen || (body.dragLaunch && !body.launched)) continue;
 
         body.vy += body.gravity * dt;
         if (body.drag > 0) {
