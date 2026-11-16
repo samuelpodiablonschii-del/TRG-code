@@ -6,7 +6,7 @@ add (collision)
 add (physics)
 
 text "BOUNCY BALLS" x 6 y 6 size 6 color #FFFFFF
-text "Press Launch to send the ball toward the green finish." x 6 y 12 size 2.4 color #CCCCCC
+text "Launch the ball and reach the green finish." x 6 y 12 size 2.4 color #CCCCCC
 
 // Arena borders
 block z 10 x -1 y -3 w 10 h 108 color #555555 name wall_left
@@ -26,9 +26,9 @@ physics solid wall_left
 physics solid wall_right
 physics solid wall_top
 physics solid wall_bottom
-physics solid finish
-physics solid death_brick
-physics solid freeze_pad
+physics trigger finish
+physics trigger death_brick
+physics trigger freeze_pad
 
 physics gravity ball 0
 physics drag ball 0
