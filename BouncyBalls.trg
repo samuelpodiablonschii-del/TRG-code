@@ -42,7 +42,7 @@ let game_over = false
 
 button launch "Launch / Restart" x 72 y 5 w 23 h 10 color #7043BE (
     physics position ball 72 85
-    physics velocity ball -25 -32
+    physics velocity ball -25 -36
     game_over = false
     say "Ball launched!"
 )
