@@ -176,6 +176,17 @@ struct EveryTask {
 
 struct CollisionWatch { std::string first; std::string second; std::string result; };
 
+struct PhysicsBody {
+    std::string name;
+    double vx = 0;
+    double vy = 0;
+    double gravity = 0;
+    double drag = 0;
+    double restitution = 1.0;
+    bool dynamic = true;
+    bool solid = true;
+};
+
 struct AiSample { std::vector<double> inputs; double expected = 0; };
 struct AiModel { std::vector<double> weights; double bias = 0; std::vector<AiSample> samples; };
 
@@ -272,6 +283,7 @@ std::vector<UiSprite> uiSprites;
 std::vector<UiAnimation> uiAnimations;
 std::vector<EveryTask> everyTasks;
 std::vector<CollisionWatch> collisionWatches;
+std::unordered_map<std::string, PhysicsBody> physicsBodies;
 std::unordered_map<std::string, AiModel> aiModels;
 std::vector<UiButton> uiButtons;
 std::vector<UiText> uiTexts;
@@ -295,6 +307,7 @@ std::unordered_map<std::string, unsigned> controllerControls;
 bool controlsEnabled = false;
 bool webEnabled = false;
 bool collisionEnabled = false;
+bool physicsEnabled = false;
 bool aiEnabled = false;
 bool mathEnabled = false;
 bool binaryEnabled = false;
@@ -311,6 +324,8 @@ std::chrono::steady_clock::time_point uiStart;
 std::mt19937 trgRandomEngine(std::random_device{}());
 bool uiEntityBounds(const std::string& name, double& x, double& y, double& width, double& height);
 void refreshCollisionWatches(Vars& variables, Types& types);
+void physicsStep(double seconds, Vars& variables, Types& types);
+bool setUiEntityPosition(const std::string& name, double x, double y);
 
 // ---------------------------------------------------------
 // New features: particles, viewport, network, shapes, glows
@@ -1778,7 +1793,8 @@ struct LibraryState {
     bool convert = false;
     bool stats = false;
     bool units = false;
-
+    bool physics = false;
+};
 
 std::string parenContent(const std::string& line) {
     
@@ -1873,10 +1889,12 @@ void scanLibraries(const std::vector<std::string>& program, LibraryState& librar
             libraries.binary = libraries.regex = libraries.compression = true;
             libraries.powershell = libraries.raspberry = libraries.accessibility = true;
             libraries.stats = libraries.units = true;
+            libraries.physics = true;
         } else if (name == "files") libraries.files = true;
         else if (name == "json") libraries.json = true;
         else if (name == "web") libraries.web = true;
         else if (name == "collision") libraries.collision = true;
+        else if (name == "physics") libraries.physics = true;
         else if (name == "manual") libraries.manual = true;
         else if (name == "ui" || name == "animation") libraries.ui = true;
         else if (name == "controls") libraries.controls = true;
@@ -2602,6 +2620,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 jsonEnabled = jsonEnabled || connectedLibraries.json;
                 webEnabled = webEnabled || connectedLibraries.web;
                 collisionEnabled = collisionEnabled || connectedLibraries.collision;
+                physicsEnabled = physicsEnabled || connectedLibraries.physics;
                 aiEnabled = aiEnabled || connectedLibraries.ai;
                 mathEnabled = mathEnabled || connectedLibraries.math;
             binaryEnabled = binaryEnabled || connectedLibraries.binary;
@@ -2645,6 +2664,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     jsonEnabled = jsonEnabled || moduleLibraries.json;
                     webEnabled = webEnabled || moduleLibraries.web;
                     collisionEnabled = collisionEnabled || moduleLibraries.collision;
+                    physicsEnabled = physicsEnabled || moduleLibraries.physics;
                     aiEnabled = aiEnabled || moduleLibraries.ai;
                     mathEnabled = mathEnabled || moduleLibraries.math;
                     binaryEnabled = binaryEnabled || moduleLibraries.binary;
@@ -2677,6 +2697,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 if (library == "(json)") { jsonEnabled = true; appendOutput("TRG JSON library enabled.\r\n"); continue; }
                 if (library == "(web)") { webEnabled = true; appendOutput("TRG WebAssembly commands enabled.\r\n"); continue; }
                 if (library == "(collision)") { collisionEnabled = true; appendOutput("TRG collision helpers enabled.\r\n"); continue; }
+                if (library == "(physics)") { physicsEnabled = true; appendOutput("TRG physics library enabled.\r\n"); continue; }
                 if (library == "(manual)") { manualMode = true; continue; }
                 if (library == "(ui)" || library == "(animation)") { uiMode = true; continue; }
                 if (library == "(controls)") { initializeControls(variables, types); continue; }
@@ -2694,7 +2715,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 if (library == "(stats)") { statsEnabled = true; appendOutput("TRG stats library enabled.\r\n"); continue; }
                 if (library == "(units)") { unitsEnabled = true; appendOutput("TRG units library enabled.\r\n"); continue; }
                 if (library == "(all)") {
-                    filesEnabled = jsonEnabled = webEnabled = collisionEnabled = networkEnabled = aiEnabled = mathEnabled = true;
+                    filesEnabled = jsonEnabled = webEnabled = collisionEnabled = physicsEnabled = networkEnabled = aiEnabled = mathEnabled = true;
                     binaryEnabled = regexEnabled = compressionEnabled = true;
                     powershellEnabled = raspberryEnabled = accessibilityEnabled = true;
                     statsEnabled = unitsEnabled = true;
@@ -3290,6 +3311,68 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             else if (button != uiButtons.end()) { button->x += dx; button->y += dy; }
             else { reportError(i + 1, "unknown game object", tokens[1]); continue; }
             refreshCollisionWatches(variables, types);
+            continue;
+        }
+
+        if (cmd == "physics") {
+            if (!physicsEnabled) { reportError(i + 1, "physics commands need add (physics)"); continue; }
+            if (tokens.size() < 2) { reportError(i + 1, "use physics body|solid|velocity|gravity|drag|bounce|remove|step"); continue; }
+            const std::string action = lower(tokens[1]);
+            if (action == "body" || action == "solid") {
+                if (tokens.size() != 3 || !validName(tokens[2])) {
+                    reportError(i + 1, action == "body" ? "use physics body OBJECT" : "use physics solid OBJECT");
+                    continue;
+                }
+                double x = 0, y = 0, w = 0, h = 0;
+                if (!uiEntityBounds(tokens[2], x, y, w, h)) {
+                    reportError(i + 1, "physics needs an existing named UI block, button, or sprite", tokens[2]);
+                    continue;
+                }
+                PhysicsBody body;
+                body.name = tokens[2];
+                body.dynamic = action == "body";
+                body.solid = true;
+                physicsBodies[body.name] = body;
+                continue;
+            }
+            if (action == "remove") {
+                if (tokens.size() != 3) { reportError(i + 1, "use physics remove OBJECT"); continue; }
+                physicsBodies.erase(tokens[2]);
+                continue;
+            }
+            if (action == "step" || action == "update") {
+                if (tokens.size() != 3) { reportError(i + 1, "use physics step SECONDS"); continue; }
+                double seconds = 0;
+                if (!evaluateExpression(tokens[2], variables, seconds) || !std::isfinite(seconds) || seconds <= 0 || seconds > 0.1) {
+                    reportError(i + 1, "physics step needs a time greater than 0 and no more than 0.1 seconds");
+                    continue;
+                }
+                physicsStep(seconds, variables, types);
+                continue;
+            }
+            if (tokens.size() < 4 || !physicsBodies.count(tokens[2])) {
+                reportError(i + 1, "physics setting needs a registered body; use physics body or physics solid first", tokens.size() > 2 ? tokens[2] : "");
+                continue;
+            }
+            PhysicsBody& body = physicsBodies[tokens[2]];
+            if (action == "velocity") {
+                if (tokens.size() != 5 || !body.dynamic) { reportError(i + 1, "use physics velocity BODY VX VY on a dynamic body"); continue; }
+                if (!evaluateExpression(tokens[3], variables, body.vx) || !evaluateExpression(tokens[4], variables, body.vy)) {
+                    reportError(i + 1, "physics velocity needs numeric VX and VY"); continue;
+                }
+            } else if (action == "gravity" || action == "drag" || action == "bounce") {
+                if (tokens.size() != 4) { reportError(i + 1, "use physics gravity|drag|bounce BODY VALUE"); continue; }
+                double value = 0;
+                if (!evaluateExpression(tokens[3], variables, value) || !std::isfinite(value)) {
+                    reportError(i + 1, "physics setting needs a finite number"); continue;
+                }
+                if (action == "gravity") body.gravity = value;
+                else if (action == "drag" && value >= 0) body.drag = value;
+                else if (action == "bounce" && value >= 0) body.restitution = value;
+                else { reportError(i + 1, "physics drag and bounce must be zero or greater"); continue; }
+            } else {
+                reportError(i + 1, "unknown physics operation", action);
+            }
             continue;
         }
 
@@ -4213,6 +4296,62 @@ void refreshCollisionWatches(Vars& variables, Types& currentTypes) {
     }
 }
 
+bool setUiEntityPosition(const std::string& name, double x, double y) {
+    for (UiBlock& item : uiBlocks) if (item.name == name) { item.x = x; item.y = y; return true; }
+    for (UiSprite& item : uiSprites) if (item.name == name) { item.x = x; item.y = y; return true; }
+    for (UiButton& item : uiButtons) if (item.name == name) { item.x = x; item.y = y; return true; }
+    return false;
+}
+
+void physicsStep(double seconds, Vars& variables, Types& currentTypes) {
+    const double dt = std::clamp(seconds, 0.0, 0.1);
+    if (dt <= 0) return;
+    std::vector<std::string> names;
+    names.reserve(physicsBodies.size());
+    for (const auto& entry : physicsBodies) if (entry.second.dynamic) names.push_back(entry.first);
+    for (const std::string& name : names) {
+        auto found = physicsBodies.find(name);
+        if (found == physicsBodies.end()) continue;
+        PhysicsBody& body = found->second;
+        double x = 0, y = 0, width = 0, height = 0;
+        if (!uiEntityBounds(name, x, y, width, height)) continue;
+
+        body.vy += body.gravity * dt;
+        if (body.drag > 0) {
+            const double damping = std::exp(-body.drag * dt);
+            body.vx *= damping;
+            body.vy *= damping;
+        }
+
+        const auto overlapsSolid = [&](double testX, double testY) {
+            for (const auto& otherEntry : physicsBodies) {
+                const PhysicsBody& other = otherEntry.second;
+                if (other.name == name || !other.solid) continue;
+                double ox = 0, oy = 0, ow = 0, oh = 0;
+                if (!uiEntityBounds(other.name, ox, oy, ow, oh)) continue;
+                if (testX < ox + ow && testX + width > ox &&
+                    testY < oy + oh && testY + height > oy) return true;
+            }
+            return false;
+        };
+
+        const double nextX = x + body.vx * dt;
+        if (setUiEntityPosition(name, nextX, y) && overlapsSolid(nextX, y)) {
+            setUiEntityPosition(name, x, y);
+            body.vx = -body.vx * body.restitution;
+        }
+
+        double currentX = 0, currentY = 0, currentW = 0, currentH = 0;
+        if (!uiEntityBounds(name, currentX, currentY, currentW, currentH)) continue;
+        const double nextY = currentY + body.vy * dt;
+        if (setUiEntityPosition(name, currentX, nextY) && overlapsSolid(currentX, nextY)) {
+            setUiEntityPosition(name, currentX, currentY);
+            body.vy = -body.vy * body.restitution;
+        }
+    }
+    refreshCollisionWatches(variables, currentTypes);
+}
+
 #ifdef _WIN32
 std::pair<double, double> animatedPosition(const UiBlock& block, double elapsed) {
     double x = block.x;
@@ -4908,6 +5047,8 @@ void executeProgram(const std::vector<std::string>& program) {
     jsonEnabled = false;
     webEnabled = false;
     collisionEnabled = false;
+    physicsEnabled = false;
+    physicsBodies.clear();
     collisionWatches.clear();
     webPageHtml.clear();
     Flow flow;
@@ -4940,6 +5081,7 @@ void executeProgram(const std::vector<std::string>& program) {
     jsonEnabled = libraries.json;
     webEnabled = libraries.web;
     collisionEnabled = libraries.collision;
+    physicsEnabled = libraries.physics;
     networkEnabled = libraries.network;
     aiEnabled = libraries.ai;
     mathEnabled = libraries.math;
