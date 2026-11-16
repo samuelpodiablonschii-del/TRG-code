@@ -279,6 +279,14 @@ Java_com_trg_studio_MainActivity_nativeSetMobileInput(JNIEnv* env, jclass, jstri
 }
 
 extern "C" JNIEXPORT void JNICALL
+Java_com_trg_studio_MainActivity_nativeSetPointer(JNIEnv*, jclass, jfloat x, jfloat y, jboolean down) {
+    std::lock_guard<std::mutex> lock(androidInputMutex);
+    androidMobileInputs["pointer_x"] = std::to_string(std::clamp(static_cast<double>(x), 0.0, 100.0));
+    androidMobileInputs["pointer_y"] = std::to_string(std::clamp(static_cast<double>(y), 0.0, 100.0));
+    androidMobileInputs["pointer_down"] = down == JNI_TRUE ? "press" : "released";
+}
+
+extern "C" JNIEXPORT void JNICALL
 Java_com_trg_studio_MainActivity_nativeStop(JNIEnv*, jclass) {
     androidStopRequested.store(true);
 }
