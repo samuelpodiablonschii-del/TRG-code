@@ -4,9 +4,10 @@
 add (ui)
 add (collision)
 add (physics)
+add (controls)
 
 text "BOUNCY BALLS" x 6 y 6 size 6 color #FFFFFF
-text "Launch the ball and reach the green finish." x 6 y 12 size 2.4 color #CCCCCC
+text "Drag from the ball to aim, then release to launch." x 6 y 12 size 2.4 color #CCCCCC
 
 // Arena borders
 block z 10 x -1 y -3 w 10 h 108 color #555555 name wall_left
@@ -33,6 +34,7 @@ physics trigger freeze_pad
 physics gravity ball 0
 physics drag ball 0
 physics bounce ball 1
+physics drag_launch ball 70
 
 watch_collision ball finish finish_hit
 watch_collision ball death_brick death_hit
@@ -40,12 +42,11 @@ watch_collision ball freeze_pad frozen_hit
 
 let game_over = false
 
-button launch "Launch / Restart" x 72 y 5 w 23 h 10 color #7043BE (
+button launch "Restart" x 72 y 5 w 23 h 10 color #7043BE (
     physics position ball 72 85
-    physics unfreeze ball
-    physics velocity ball -25 -36
+    physics reset ball
     game_over = false
-    say "Ball launched!"
+    say "Drag from the ball and release to launch."
 )
 
 every 16ms (
