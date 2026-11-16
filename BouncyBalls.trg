@@ -6,7 +6,7 @@ add (collision)
 add (physics)
 
 text "BOUNCY BALLS" x 6 y 6 size 6 color #FFFFFF
-text "Press Launch, then guide the ball to the green finish." x 6 y 12 size 2.4 color #CCCCCC
+text "Press Launch to send the ball toward the green finish." x 6 y 12 size 2.4 color #CCCCCC
 
 // Arena borders
 block z 10 x -1 y -3 w 10 h 108 color #555555 name wall_left
