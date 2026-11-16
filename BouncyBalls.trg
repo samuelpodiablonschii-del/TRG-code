@@ -19,7 +19,7 @@ block z 10 x 9 y 96 w 81 h 4 color #555555 name wall_bottom
 block z 2 x 72 y 85 w 5 h 5 color #39A7FF shape circle name ball
 block z 1 x 12 y 5 w 14 h 5 color #38D878 name finish
 block z 1 x 9 y 72 w 48 h 3 color #F04444 name death_brick
-block z 1 x 50 y 30 w 3 h 20 color #37DCE8 name freeze_pad
+block z 1 x 55 y 30 w 3 h 20 color #37DCE8 name freeze_pad
 
 // Register the ball as movable and the level objects as solid.
 physics body ball
