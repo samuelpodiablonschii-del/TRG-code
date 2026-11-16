@@ -185,6 +185,7 @@ struct PhysicsBody {
     double restitution = 1.0;
     bool dynamic = true;
     bool solid = true;
+    bool trigger = false;
 };
 
 struct AiSample { std::vector<double> inputs; double expected = 0; };
@@ -3316,11 +3317,11 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
 
         if (cmd == "physics") {
             if (!physicsEnabled) { reportError(i + 1, "physics commands need add (physics)"); continue; }
-            if (tokens.size() < 2) { reportError(i + 1, "use physics body|solid|velocity|gravity|drag|bounce|position|remove|step"); continue; }
+            if (tokens.size() < 2) { reportError(i + 1, "use physics body|solid|trigger|velocity|gravity|drag|bounce|position|remove|step"); continue; }
             const std::string action = lower(tokens[1]);
-            if (action == "body" || action == "solid") {
+            if (action == "body" || action == "solid" || action == "trigger") {
                 if (tokens.size() != 3 || !validName(tokens[2])) {
-                    reportError(i + 1, action == "body" ? "use physics body OBJECT" : "use physics solid OBJECT");
+                    reportError(i + 1, "use physics body|solid|trigger OBJECT");
                     continue;
                 }
                 double x = 0, y = 0, w = 0, h = 0;
@@ -3331,7 +3332,8 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 PhysicsBody body;
                 body.name = tokens[2];
                 body.dynamic = action == "body";
-                body.solid = true;
+                body.solid = action == "solid" || action == "body";
+                body.trigger = action == "trigger";
                 physicsBodies[body.name] = body;
                 continue;
             }
@@ -4341,7 +4343,7 @@ void physicsStep(double seconds, Vars& variables, Types& currentTypes) {
         const auto overlapsSolid = [&](double testX, double testY, std::string& hitName) {
             for (const auto& otherEntry : physicsBodies) {
                 const PhysicsBody& other = otherEntry.second;
-                if (other.name == name || !other.solid) continue;
+                if (other.name == name || !other.solid || other.trigger) continue;
                 double ox = 0, oy = 0, ow = 0, oh = 0;
                 if (!uiEntityBounds(other.name, ox, oy, ow, oh)) continue;
                 if (testX < ox + ow && testX + width > ox &&
