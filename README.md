@@ -523,6 +523,44 @@ animate style x +10 y +10 fps 60 time 2s
 
 The name declared on a block, button, or sprite is a handle you can use on later lines. For example, `style y +10` moves the named UI item down by 10 percentage points; `style x 25` sets its x position. Use `edges round` or `edges square` on blocks and buttons. A sprite file must be in the project folder; Android users can import the image into TRG Studio first.
 
+### Physics
+
+`add (physics)` adds reusable 2D physics bodies to named TRG UI blocks, sprites, and buttons. Physics coordinates use the same percentage-based canvas units as the UI. Gravity, drag, and bounce are configurable per body.
+
+```text
+add (ui)
+add (physics)
+
+block x 10 y 10 w 5 h 5 color #44AAFF shape circle name ball
+block x 0 y 90 w 100 h 5 color #888888 name floor
+block x 0 y 0 w 5 h 100 color #888888 name left_wall
+block x 95 y 0 w 5 h 100 color #888888 name right_wall
+
+physics body ball
+physics solid floor
+physics solid left_wall
+physics solid right_wall
+physics velocity ball 35 -10
+physics gravity ball 0
+physics bounce ball 1
+
+every 16ms (
+    physics step 0.016
+)
+```
+
+Commands:
+- `physics body OBJECT` registers a moving body.
+- `physics solid OBJECT` registers a stationary collider.
+- `physics velocity BODY VX VY` sets velocity in canvas units per second.
+- `physics gravity BODY VALUE` sets vertical acceleration; zero means no gravity.
+- `physics drag BODY VALUE` applies exponential velocity damping; zero means no drag.
+- `physics bounce BODY VALUE` sets the restitution multiplier. `1` keeps speed, values below `1` reduce bounce speed, and values above `1` increase it.
+- `physics step SECONDS` advances all dynamic bodies by up to 0.1 seconds. Put it in an `every` block for continuous simulation.
+- `physics remove OBJECT` unregisters an object.
+
+The first version resolves axis-aligned rectangle collisions against registered solid bodies. It does not yet include rotated-shape collision, frictional contact, joints, or continuous collision detection for very fast objects. For accurate results, use small fixed steps (for example, 0.016 seconds).
+
 For simple games, `add (collision)` enables automatic rectangle overlap checks and movement helpers. `watch_collision A B hit` keeps `hit` updated every scheduled tick, `collides A B hit` checks immediately, and `move_ui player x +1 y 0` moves a named item:
 
 ```text
