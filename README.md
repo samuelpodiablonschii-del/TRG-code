@@ -551,7 +551,8 @@ every 16ms (
 
 Commands:
 - `physics body OBJECT` registers a moving body.
-- `physics solid OBJECT` registers a stationary collider.
+- `physics solid OBJECT` registers a stationary collider that reflects moving bodies.
+- `physics trigger OBJECT` registers a non-solid overlap target. Triggers never bounce bodies; use `watch_collision` to react when a body overlaps one.
 - `physics velocity BODY VX VY` sets velocity in canvas units per second.
 - `physics gravity BODY VALUE` sets vertical acceleration; zero means no gravity.
 - `physics drag BODY VALUE` applies exponential velocity damping; zero means no drag.
