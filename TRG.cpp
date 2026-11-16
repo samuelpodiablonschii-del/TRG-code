@@ -4408,8 +4408,8 @@ void physicsStep(double seconds, Vars& variables, Types& currentTypes) {
             } else if (!isDown && body.dragLaunching) {
                 if (evaluateExpression("pointer_x", variables, pointerX) &&
                     evaluateExpression("pointer_y", variables, pointerY)) {
-                    double launchX = body.dragStartX - pointerX;
-                    double launchY = body.dragStartY - pointerY;
+                    double launchX = pointerX - body.dragStartX;
+                    double launchY = pointerY - body.dragStartY;
                     const double magnitude = std::hypot(launchX, launchY);
                     if (magnitude > 0.5) {
                         const double speed = std::min(body.launchSpeedLimit, magnitude * 4.0);
