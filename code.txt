@@ -3320,7 +3320,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
 
         if (cmd == "physics") {
             if (!physicsEnabled) { reportError(i + 1, "physics commands need add (physics)"); continue; }
-            if (tokens.size() < 2) { reportError(i + 1, "use physics body|solid|velocity|gravity|drag|bounce|remove|step"); continue; }
+            if (tokens.size() < 2) { reportError(i + 1, "use physics body|solid|velocity|gravity|drag|bounce|position|remove|step"); continue; }
             const std::string action = lower(tokens[1]);
             if (action == "body" || action == "solid") {
                 if (tokens.size() != 3 || !validName(tokens[2])) {
@@ -3342,6 +3342,20 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             if (action == "remove") {
                 if (tokens.size() != 3) { reportError(i + 1, "use physics remove OBJECT"); continue; }
                 physicsBodies.erase(tokens[2]);
+                continue;
+            }
+            if (action == "position") {
+                if (tokens.size() != 5 || !physicsBodies.count(tokens[2])) {
+                    reportError(i + 1, "use physics position BODY X Y");
+                    continue;
+                }
+                double x = 0, y = 0;
+                if (!evaluateExpression(tokens[3], variables, x) || !evaluateExpression(tokens[4], variables, y) ||
+                    !setUiEntityPosition(tokens[2], x, y)) {
+                    reportError(i + 1, "physics position needs a registered UI body and numeric coordinates");
+                    continue;
+                }
+                refreshCollisionWatches(variables, types);
                 continue;
             }
             if (action == "step" || action == "update") {
