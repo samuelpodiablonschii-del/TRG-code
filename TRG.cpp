@@ -4670,6 +4670,24 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         }
         return 0;
     }
+    if (message == WM_MOUSEMOVE || message == WM_LBUTTONDOWN || message == WM_LBUTTONUP) {
+        RECT client = {};
+        GetClientRect(window, &client);
+        const DesktopLayout layout = desktopLayout(window, client);
+        const double canvasWidth = static_cast<double>(std::max<LONG>(1, layout.width));
+        const double canvasHeight = static_cast<double>(std::max<LONG>(1, layout.canvasHeight));
+        const double mouseX = static_cast<double>(static_cast<short>(LOWORD(lParam)));
+        const double mouseY = static_cast<double>(static_cast<short>(HIWORD(lParam)));
+        uiVariables["pointer_x"] = mouseX * 100.0 / canvasWidth + viewportX;
+        uiVariables["pointer_y"] = (mouseY - layout.headerHeight) * 100.0 / canvasHeight + viewportY;
+        uiVariables["pointer_down"] = (message == WM_LBUTTONDOWN ||
+            (message == WM_MOUSEMOVE && (GetKeyState(VK_LBUTTON) & 0x8000))) ? "press" : "released";
+        uiTypes["pointer_x"] = "num";
+        uiTypes["pointer_y"] = "num";
+        uiTypes["pointer_down"] = "word";
+        if (message == WM_LBUTTONDOWN) SetCapture(window);
+        if (message == WM_LBUTTONUP && GetCapture() == window) ReleaseCapture();
+    }
     if (message == WM_LBUTTONUP && !uiButtons.empty()) {
         RECT client = {};
         GetClientRect(window, &client);
