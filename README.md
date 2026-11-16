@@ -561,6 +561,8 @@ Commands:
 - `physics position BODY X Y` teleports a registered body to a canvas position.
 - `physics freeze BODY` stops a dynamic body and suspends its movement until unfrozen.
 - `physics unfreeze BODY` resumes a frozen body; set its velocity separately to launch it again.
+- `physics drag_launch BODY MAX_SPEED` waits for a pointer drag that starts inside the body, then launches it in the opposite direction when released. The speed is scaled from drag distance and capped by `MAX_SPEED`.
+- `physics reset BODY` stops the body and resets its one-shot drag-launch state for another attempt.
 - `physics remove OBJECT` unregisters an object.
 
 The first version resolves axis-aligned rectangle collisions against registered solid bodies. It does not yet include rotated-shape collision, frictional contact, joints, or continuous collision detection for very fast objects. For accurate results, use small fixed steps (for example, 0.016 seconds).
