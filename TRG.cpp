@@ -4320,6 +4320,7 @@ bool setUiEntityPosition(const std::string& name, double x, double y) {
 void physicsStep(double seconds, Vars& variables, Types& currentTypes) {
     const double dt = std::clamp(seconds, 0.0, 0.1);
     if (dt <= 0) return;
+    std::unordered_set<std::string> contactPairs;
     std::vector<std::string> names;
     names.reserve(physicsBodies.size());
     for (const auto& entry : physicsBodies) if (entry.second.dynamic) names.push_back(entry.first);
@@ -4337,20 +4338,25 @@ void physicsStep(double seconds, Vars& variables, Types& currentTypes) {
             body.vy *= damping;
         }
 
-        const auto overlapsSolid = [&](double testX, double testY) {
+        const auto overlapsSolid = [&](double testX, double testY, std::string& hitName) {
             for (const auto& otherEntry : physicsBodies) {
                 const PhysicsBody& other = otherEntry.second;
                 if (other.name == name || !other.solid) continue;
                 double ox = 0, oy = 0, ow = 0, oh = 0;
                 if (!uiEntityBounds(other.name, ox, oy, ow, oh)) continue;
                 if (testX < ox + ow && testX + width > ox &&
-                    testY < oy + oh && testY + height > oy) return true;
+                    testY < oy + oh && testY + height > oy) {
+                    hitName = other.name;
+                    return true;
+                }
             }
             return false;
         };
 
         const double nextX = x + body.vx * dt;
-        if (setUiEntityPosition(name, nextX, y) && overlapsSolid(nextX, y)) {
+        std::string hitX;
+        if (setUiEntityPosition(name, nextX, y) && overlapsSolid(nextX, y, hitX)) {
+            contactPairs.insert(name + "\n" + hitX);
             setUiEntityPosition(name, x, y);
             body.vx = -body.vx * body.restitution;
         }
@@ -4358,12 +4364,21 @@ void physicsStep(double seconds, Vars& variables, Types& currentTypes) {
         double currentX = 0, currentY = 0, currentW = 0, currentH = 0;
         if (!uiEntityBounds(name, currentX, currentY, currentW, currentH)) continue;
         const double nextY = currentY + body.vy * dt;
-        if (setUiEntityPosition(name, currentX, nextY) && overlapsSolid(currentX, nextY)) {
+        std::string hitY;
+        if (setUiEntityPosition(name, currentX, nextY) && overlapsSolid(currentX, nextY, hitY)) {
+            contactPairs.insert(name + "\n" + hitY);
             setUiEntityPosition(name, currentX, currentY);
             body.vy = -body.vy * body.restitution;
         }
     }
     refreshCollisionWatches(variables, currentTypes);
+    for (const CollisionWatch& watch : collisionWatches) {
+        if (contactPairs.count(watch.first + "\n" + watch.second) ||
+            contactPairs.count(watch.second + "\n" + watch.first)) {
+            variables[watch.result] = true;
+            if (!currentTypes.count(watch.result)) currentTypes[watch.result] = "toggle";
+        }
+    }
 }
 
 #ifdef _WIN32
