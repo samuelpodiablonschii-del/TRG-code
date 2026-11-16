@@ -64,7 +64,7 @@ every 16ms (
         if game_over = false (
             physics freeze ball
             game_over = true
-            say "Death brick hit. Press Launch / Restart to try again."
+            say "Death brick hit. Press Restart to try again."
         )
     )
 
@@ -72,7 +72,7 @@ every 16ms (
         if game_over = false (
             physics freeze ball
             game_over = true
-            say "Freeze pad reached. Press Launch / Restart to try again."
+            say "Freeze pad reached. Press Restart to try again."
         )
     )
 )
