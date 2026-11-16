@@ -16,6 +16,8 @@
 #include <filesystem>
 #include <limits>
 #include <map>
+#include <numeric>
+#include <ctime>
 #include <system_error>
 #include <cstring>
 #include <cstdio>
