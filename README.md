@@ -562,6 +562,7 @@ Commands:
 - `physics freeze BODY` stops a dynamic body and suspends its movement until unfrozen.
 - `physics unfreeze BODY` resumes a frozen body; set its velocity separately to launch it again.
 - `physics drag_launch BODY MAX_SPEED` waits for a pointer drag that starts inside the body, then launches it in the direction of the drag when released. The speed is scaled from drag distance and capped by `MAX_SPEED`.
+- Add `(controls)` to expose `pointer_x` and `pointer_y` as 0–100 canvas coordinates and `pointer_down` as `press` or `released`. Pointer input is supported by the desktop mouse and Android touch screen.
 - `physics reset BODY` stops the body and resets its one-shot drag-launch state for another attempt.
 - `physics remove OBJECT` unregisters an object.
 
