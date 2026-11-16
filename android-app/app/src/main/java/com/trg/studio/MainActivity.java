@@ -101,6 +101,7 @@ public final class MainActivity extends Activity {
     private static native String nativeRunEvery(int index);
     private static native String nativeClickButton(int index);
     private static native void nativeSetMobileInput(String name, String state);
+    private static native void nativeSetPointer(float x, float y, boolean down);
     private static native void nativeStop();
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
@@ -1383,9 +1384,14 @@ public final class MainActivity extends Activity {
                 releaseSwipes();
                 nativeSetMobileInput("mobile_tap", "press");
                 nativeSetMobileInput("mobile_hold", "press");
+                nativeSetPointer(getWidth() == 0 ? 0 : event.getX() * 100f / getWidth(),
+                        getHeight() == 0 ? 0 : event.getY() * 100f / getHeight(), true);
                 return true;
             }
-            if (event.getAction() == MotionEvent.ACTION_MOVE && !swipeDetected) {
+            if (event.getAction() == MotionEvent.ACTION_MOVE) {
+                nativeSetPointer(getWidth() == 0 ? 0 : event.getX() * 100f / getWidth(),
+                        getHeight() == 0 ? 0 : event.getY() * 100f / getHeight(), true);
+                if (swipeDetected) return true;
                 float deltaX = event.getX() - touchStartX;
                 float deltaY = event.getY() - touchStartY;
                 if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) >= dp(32)) {
@@ -1399,6 +1405,8 @@ public final class MainActivity extends Activity {
                 return true;
             }
             if (event.getAction() == MotionEvent.ACTION_UP) {
+                nativeSetPointer(getWidth() == 0 ? 0 : event.getX() * 100f / getWidth(),
+                        getHeight() == 0 ? 0 : event.getY() * 100f / getHeight(), false);
                 if (menuToolbar) {
                     if (hitButton(event.getX(), event.getY()) == 0) {
                         onTrgStudioAction("menu");
@@ -1426,6 +1434,8 @@ public final class MainActivity extends Activity {
                 return true;
             }
             if (event.getAction() == MotionEvent.ACTION_CANCEL) {
+                nativeSetPointer(getWidth() == 0 ? 0 : event.getX() * 100f / getWidth(),
+                        getHeight() == 0 ? 0 : event.getY() * 100f / getHeight(), false);
                 touchSequence++;
                 nativeSetMobileInput("mobile_hold", "released");
                 nativeSetMobileInput("mobile_tap", "released");
