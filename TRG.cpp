@@ -162,6 +162,8 @@ using Types = std::unordered_map<std::string, std::string>;
 #ifdef TRG_ANDROID_BRIDGE
 bool trgBouncyBallsLoadLevel(int level, Vars& variables, Types& types);
 bool trgBouncyBallsLoadHtmlLevel(int extraLevel, bool basketball, Vars& variables, Types& types);
+void trgBouncyBallsSaveState(const Vars& variables, const Types& types);
+void trgBouncyBallsRestoreState(Vars& variables, Types& types);
 #endif
 
 struct Flow {
@@ -3373,6 +3375,10 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             if (tokens.size() < 2) { reportError(i + 1, "use bouncyballs load_level NUMBER or bouncyballs retry"); continue; }
             const std::string action = lower(tokens[1]);
             int level = 1;
+            if (action == "save") {
+                trgBouncyBallsSaveState(variables, types);
+                continue;
+            }
             if (action == "buy" && tokens.size() == 5) {
                 const std::string itemType = lower(tokens[2]);
                 double itemIdValue = 0, cost = 0, coinBalance = 0, wins = 0;
@@ -3399,6 +3405,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     purchased = true;
                 }
                 variables["bb_purchase_ok"] = purchased; types["bb_purchase_ok"] = "toggle";
+                trgBouncyBallsSaveState(variables, types);
                 continue;
             }
             if (action == "equip" && tokens.size() == 4) {
@@ -3439,6 +3446,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     for (UiBlock& block : uiBlocks)
                         if (block.name == "ball" || block.name == "menu_ball") block.color = "#FF8C00";
                 }
+                trgBouncyBallsSaveState(variables, types);
                 continue;
             }
             if (action == "retry") {
