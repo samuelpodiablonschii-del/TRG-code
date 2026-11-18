@@ -3387,12 +3387,13 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 const int itemId = static_cast<int>(itemIdValue);
                 const std::string unlockedName = "bb_unlocked_" + itemType + "_" + std::to_string(itemId);
                 bool alreadyUnlocked = lower(valueFor(unlockedName, variables)) == "true";
+                bool eligible = true;
                 if (itemType == "special") {
                     evaluateExpression("basketball_wins", variables, wins);
-                    if (wins < 109) alreadyUnlocked = false;
+                    eligible = wins >= 109;
                 }
                 bool purchased = alreadyUnlocked;
-                if (!purchased && coinBalance >= cost) {
+                if (!purchased && eligible && coinBalance >= cost) {
                     variables["coins"] = coinBalance - cost; types["coins"] = "num";
                     variables[unlockedName] = true; types[unlockedName] = "toggle";
                     purchased = true;
