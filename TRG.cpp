@@ -197,9 +197,18 @@ struct PhysicsBody {
     double dragStartX = 0;
     double dragStartY = 0;
     std::string triggerKind;
+    std::string gravityDirection = "none";
     double speedMultiplier = 1.0;
     double launchPowerMultiplier = 1.0;
+    double ballSizeMultiplier = 1.0;
     bool midAirLaunch = false;
+    bool immortal = false;
+    int lives = 1;
+    double spawnX = 0;
+    double spawnY = 0;
+    bool triggerStarts = false;
+    bool triggerRepeats = false;
+    bool triggerHasActivated = false;
     int bounceCount = 0;
 };
 
@@ -3414,6 +3423,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 body.frozen = false;
                 body.dragLaunching = false;
                 body.launched = false;
+                body.bounceCount = 0;
                 continue;
             }
             if (action == "drag_launch") {
@@ -4474,7 +4484,10 @@ void physicsStep(double seconds, Vars& variables, Types& currentTypes) {
         }
         if (body.frozen || (body.dragLaunch && !body.launched)) continue;
 
-        body.vy += body.gravity * dt;
+        if (body.gravityDirection == "top") body.vy -= body.gravity * dt;
+        else if (body.gravityDirection == "bottom") body.vy += body.gravity * dt;
+        else if (body.gravityDirection == "left") body.vx -= body.gravity * dt;
+        else if (body.gravityDirection == "right") body.vx += body.gravity * dt;
         if (body.drag > 0) {
             const double damping = std::exp(-body.drag * dt);
             body.vx *= damping;
@@ -4521,7 +4534,7 @@ void physicsStep(double seconds, Vars& variables, Types& currentTypes) {
     double ballX = 0, ballY = 0, ballW = 0, ballH = 0;
     if (uiEntityBounds("ball", ballX, ballY, ballW, ballH)) {
         for (const auto& entry : physicsBodies) {
-            const PhysicsBody& triggerBody = entry.second;
+            PhysicsBody& triggerBody = entry.second;
             if (!triggerBody.trigger) continue;
             double tx = 0, ty = 0, tw = 0, th = 0;
             if (!uiEntityBounds(triggerBody.name, tx, ty, tw, th)) continue;
@@ -4530,8 +4543,46 @@ void physicsStep(double seconds, Vars& variables, Types& currentTypes) {
                     variables["bb_finish_hit"] = true; currentTypes["bb_finish_hit"] = "toggle";
                     if (physicsBodies.count("ball")) physicsBodies["ball"].frozen = true;
                 } else if (triggerBody.triggerKind == "death-brick") {
-                    variables["bb_death_hit"] = true; currentTypes["bb_death_hit"] = "toggle";
-                    if (physicsBodies.count("ball")) physicsBodies["ball"].frozen = true;
+                    auto ballBody = physicsBodies.find("ball");
+                    if (ballBody != physicsBodies.end() && !ballBody->second.immortal) {
+                        if (ballBody->second.lives > 1) {
+                            --ballBody->second.lives;
+                            setUiEntityPosition("ball", ballBody->second.spawnX, ballBody->second.spawnY);
+                            ballBody->second.vx = ballBody->second.vy = 0;
+                            ballBody->second.frozen = false;
+                            ballBody->second.launched = false;
+                            variables["bb_lives"] = static_cast<double>(ballBody->second.lives);
+                            currentTypes["bb_lives"] = "num";
+                        } else {
+                            variables["bb_death_hit"] = true; currentTypes["bb_death_hit"] = "toggle";
+                            ballBody->second.frozen = true;
+                        }
+                    }
+                } else if (triggerBody.triggerKind == "trigger-block" &&
+                           (!triggerBody.triggerHasActivated || triggerBody.triggerRepeats)) {
+                    auto ballBody = physicsBodies.find("ball");
+                    if (ballBody != physicsBodies.end()) {
+                        ballBody->second.gravityDirection = triggerBody.gravityDirection;
+                        ballBody->second.gravity = triggerBody.gravity;
+                        ballBody->second.speedMultiplier = triggerBody.speedMultiplier;
+                        ballBody->second.launchPowerMultiplier = triggerBody.launchPowerMultiplier;
+                        ballBody->second.drag = triggerBody.drag;
+                        ballBody->second.restitution = triggerBody.restitution;
+                        ballBody->second.midAirLaunch = triggerBody.midAirLaunch;
+                        ballBody->second.lives = triggerBody.lives;
+                        triggerBody.triggerHasActivated = true;
+                        if (triggerBody.ballSizeMultiplier > 0) {
+                            double bx=0, by=0, bw=0, bh=0;
+                            if (uiEntityBounds("ball", bx, by, bw, bh)) {
+                                const double cx=bx+bw/2, cy=by+bh/2;
+                                for (UiBlock& ballBlock : uiBlocks) if (ballBlock.name=="ball") {
+                                    ballBlock.width=5*triggerBody.ballSizeMultiplier;
+                                    ballBlock.height=5*triggerBody.ballSizeMultiplier;
+                                    ballBlock.x=cx-ballBlock.width/2; ballBlock.y=cy-ballBlock.height/2;
+                                }
+                            }
+                        }
+                    }
                 } else if (triggerBody.triggerKind == "freeze-pad") {
                     variables["bb_freeze_hit"] = true; currentTypes["bb_freeze_hit"] = "toggle";
                     if (physicsBodies.count("ball")) physicsBodies["ball"].frozen = true;
