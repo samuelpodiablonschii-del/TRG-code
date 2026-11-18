@@ -159,6 +159,9 @@ struct VariableValue {
 };
 using Vars = std::unordered_map<std::string, VariableValue>;
 using Types = std::unordered_map<std::string, std::string>;
+#ifdef TRG_ANDROID_BRIDGE
+bool trgBouncyBallsLoadLevel(int level, Vars& variables, Types& types);
+#endif
 
 struct Flow {
     bool broke = false;
@@ -193,6 +196,11 @@ struct PhysicsBody {
     double launchSpeedLimit = 70.0;
     double dragStartX = 0;
     double dragStartY = 0;
+    std::string triggerKind;
+    double speedMultiplier = 1.0;
+    double launchPowerMultiplier = 1.0;
+    bool midAirLaunch = false;
+    int bounceCount = 0;
 };
 
 struct AiSample { std::vector<double> inputs; double expected = 0; };
@@ -1811,6 +1819,7 @@ struct LibraryState {
     bool stats = false;
     bool units = false;
     bool physics = false;
+    bool bouncyballs = false;
 };
 
 std::string parenContent(const std::string& line) {
@@ -1907,11 +1916,13 @@ void scanLibraries(const std::vector<std::string>& program, LibraryState& librar
             libraries.powershell = libraries.raspberry = libraries.accessibility = true;
             libraries.stats = libraries.units = true;
             libraries.physics = true;
+            libraries.bouncyballs = true;
         } else if (name == "files") libraries.files = true;
         else if (name == "json") libraries.json = true;
         else if (name == "web") libraries.web = true;
         else if (name == "collision") libraries.collision = true;
         else if (name == "physics") libraries.physics = true;
+        else if (name == "bouncyballs") libraries.bouncyballs = true;
         else if (name == "manual") libraries.manual = true;
         else if (name == "ui" || name == "animation") libraries.ui = true;
         else if (name == "controls") libraries.controls = true;
@@ -3331,6 +3342,46 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             continue;
         }
 
+        if (cmd == "set_text" || cmd == "set_color") {
+            if (!uiMode || tokens.size() != 3) { reportError(i + 1, "use set_text NAME VALUE or set_color NAME #RRGGBB"); continue; }
+            const std::string value = valueFor(tokens[2], variables);
+            bool changed = false;
+            if (cmd == "set_text") {
+                for (UiText& item : uiTexts) if (item.name == tokens[1]) { item.value = value; changed = true; }
+                for (UiButton& item : uiButtons) if (item.name == tokens[1]) { item.label = value; changed = true; }
+            } else {
+                unsigned red = 0, green = 0, blue = 0;
+                if (!parseColor(value, red, green, blue)) { reportError(i + 1, "set_color needs a valid color", value); continue; }
+                for (UiBlock& item : uiBlocks) if (item.name == tokens[1]) { item.color = value; changed = true; }
+                for (UiButton& item : uiButtons) if (item.name == tokens[1]) { item.color = value; changed = true; }
+            }
+            if (!changed) reportError(i + 1, "unknown UI element", tokens[1]);
+            continue;
+        }
+#ifdef TRG_ANDROID_BRIDGE
+        if (cmd == "bouncyballs") {
+            if (tokens.size() < 2) { reportError(i + 1, "use bouncyballs load_level NUMBER or bouncyballs retry"); continue; }
+            const std::string action = lower(tokens[1]);
+            int level = 1;
+            if (action == "retry") {
+                double current = 1;
+                if (evaluateExpression("current_level", variables, current)) level = static_cast<int>(current);
+            } else if (action == "load_level" && tokens.size() == 3) {
+                double parsed = 0;
+                if (!evaluateExpression(tokens[2], variables, parsed) || parsed < 1 || parsed > 100 || std::floor(parsed) != parsed) {
+                    reportError(i + 1, "level number must be a whole number from 1 to 100", tokens[2]); continue;
+                }
+                level = static_cast<int>(parsed);
+            } else { reportError(i + 1, "use bouncyballs load_level NUMBER or bouncyballs retry"); continue; }
+            if (!trgBouncyBallsLoadLevel(level, variables, types)) {
+                reportError(i + 1, "could not load Bouncy Balls level", std::to_string(level)); continue;
+            }
+            variables["current_level"] = static_cast<double>(level);
+            types["current_level"] = "num";
+            continue;
+        }
+#endif
+
         if (cmd == "physics") {
             if (!physicsEnabled) { reportError(i + 1, "physics commands need add (physics)"); continue; }
             if (tokens.size() < 2) { reportError(i + 1, "use physics body|solid|trigger|velocity|gravity|drag|bounce|position|drag_launch|reset|freeze|unfreeze|remove|step"); continue; }
@@ -4394,7 +4445,7 @@ void physicsStep(double seconds, Vars& variables, Types& currentTypes) {
         PhysicsBody& body = found->second;
         double x = 0, y = 0, width = 0, height = 0;
         if (!uiEntityBounds(name, x, y, width, height)) continue;
-        if (body.dragLaunch && !body.launched) {
+        if (body.dragLaunch && (!body.launched || body.midAirLaunch)) {
             double pointerX = 0, pointerY = 0;
             const std::string pointerDown = valueFor("pointer_down", variables);
             const bool isDown = lower(pointerDown) == "press" || lower(pointerDown) == "true";
@@ -4412,7 +4463,7 @@ void physicsStep(double seconds, Vars& variables, Types& currentTypes) {
                     double launchY = pointerY - body.dragStartY;
                     const double magnitude = std::hypot(launchX, launchY);
                     if (magnitude > 0.5) {
-                        const double speed = std::min(body.launchSpeedLimit, magnitude * 4.0);
+                        const double speed = std::min(body.launchSpeedLimit, magnitude * 4.0 * body.launchPowerMultiplier);
                         body.vx = launchX / magnitude * speed;
                         body.vy = launchY / magnitude * speed;
                         body.launched = true;
@@ -4445,22 +4496,47 @@ void physicsStep(double seconds, Vars& variables, Types& currentTypes) {
             return false;
         };
 
-        const double nextX = x + body.vx * dt;
+        const double nextX = x + body.vx * body.speedMultiplier * dt;
         std::string hitX;
         if (setUiEntityPosition(name, nextX, y) && overlapsSolid(nextX, y, hitX)) {
             contactPairs.insert(name + "\n" + hitX);
             setUiEntityPosition(name, x, y);
             body.vx = -body.vx * body.restitution;
+            ++body.bounceCount;
+            variables["bb_bounces"] = static_cast<double>(body.bounceCount);
         }
 
         double currentX = 0, currentY = 0, currentW = 0, currentH = 0;
         if (!uiEntityBounds(name, currentX, currentY, currentW, currentH)) continue;
-        const double nextY = currentY + body.vy * dt;
+        const double nextY = currentY + body.vy * body.speedMultiplier * dt;
         std::string hitY;
         if (setUiEntityPosition(name, currentX, nextY) && overlapsSolid(currentX, nextY, hitY)) {
             contactPairs.insert(name + "\n" + hitY);
             setUiEntityPosition(name, currentX, currentY);
             body.vy = -body.vy * body.restitution;
+            ++body.bounceCount;
+            variables["bb_bounces"] = static_cast<double>(body.bounceCount);
+        }
+    }
+    double ballX = 0, ballY = 0, ballW = 0, ballH = 0;
+    if (uiEntityBounds("ball", ballX, ballY, ballW, ballH)) {
+        for (const auto& entry : physicsBodies) {
+            const PhysicsBody& triggerBody = entry.second;
+            if (!triggerBody.trigger) continue;
+            double tx = 0, ty = 0, tw = 0, th = 0;
+            if (!uiEntityBounds(triggerBody.name, tx, ty, tw, th)) continue;
+            if (ballX < tx + tw && ballX + ballW > tx && ballY < ty + th && ballY + ballH > ty) {
+                if (triggerBody.triggerKind == "finish-line") {
+                    variables["bb_finish_hit"] = true; currentTypes["bb_finish_hit"] = "toggle";
+                    if (physicsBodies.count("ball")) physicsBodies["ball"].frozen = true;
+                } else if (triggerBody.triggerKind == "death-brick") {
+                    variables["bb_death_hit"] = true; currentTypes["bb_death_hit"] = "toggle";
+                    if (physicsBodies.count("ball")) physicsBodies["ball"].frozen = true;
+                } else if (triggerBody.triggerKind == "freeze-pad") {
+                    variables["bb_freeze_hit"] = true; currentTypes["bb_freeze_hit"] = "toggle";
+                    if (physicsBodies.count("ball")) physicsBodies["ball"].frozen = true;
+                }
+            }
         }
     }
     refreshCollisionWatches(variables, currentTypes);
