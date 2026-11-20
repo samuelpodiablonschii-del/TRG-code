@@ -300,6 +300,68 @@ Java_com_trg_studio_MainActivity_nativeSetPointer(JNIEnv*, jclass, jfloat x, jfl
     androidMobileInputs["pointer_down"] = down == JNI_TRUE ? "press" : "released";
 }
 
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_trg_studio_MainActivity_nativeTransformEditorObject(JNIEnv* env, jclass, jstring kindValue,
+                                                              jstring nameValue, jfloat dx, jfloat dy, jfloat dz) {
+    const std::string kind = fromJavaString(env, kindValue);
+    const std::string name = fromJavaString(env, nameValue);
+    bool changed = false;
+    if (kind == "3d") {
+        for (Ui3DObject& item : ui3DObjects) if (item.name == name) {
+            item.x += dx; item.y += dy; item.z += dz; changed = true; break;
+        }
+    } else {
+        for (UiBlock& item : uiBlocks) if (item.name == name) {
+            item.x += dx; item.y += dy; changed = true; break;
+        }
+        if (!changed) for (UiSprite& item : uiSprites) if (item.name == name) {
+            item.x += dx; item.y += dy; changed = true; break;
+        }
+        if (!changed) for (UiButton& item : uiButtons) if (item.name == name) {
+            item.x += dx; item.y += dy; changed = true; break;
+        }
+        if (!changed) for (UiText& item : uiTexts) if (item.name == name) {
+            item.x += dx; item.y += dy; changed = true; break;
+        }
+    }
+    if (changed) refreshCollisionWatches(uiVariables, uiTypes);
+    return toJavaString(env, serializeState());
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_trg_studio_MainActivity_nativeScaleEditorObject(JNIEnv* env, jclass, jstring kindValue,
+                                                          jstring nameValue, jfloat factor) {
+    const std::string kind = fromJavaString(env, kindValue);
+    const std::string name = fromJavaString(env, nameValue);
+    const double scale = std::clamp(static_cast<double>(factor), 0.1, 10.0);
+    if (kind == "3d") {
+        for (Ui3DObject& item : ui3DObjects) if (item.name == name) {
+            item.width = std::max(0.1, item.width * scale);
+            item.height = std::max(0.1, item.height * scale);
+            item.depth = std::max(0.1, item.depth * scale);
+            break;
+        }
+    } else {
+        for (UiBlock& item : uiBlocks) if (item.name == name) {
+            item.width = std::max(0.5, item.width * scale);
+            item.height = std::max(0.5, item.height * scale);
+            break;
+        }
+        for (UiSprite& item : uiSprites) if (item.name == name) {
+            item.width = std::max(0.5, item.width * scale);
+            item.height = std::max(0.5, item.height * scale);
+            break;
+        }
+        for (UiButton& item : uiButtons) if (item.name == name) {
+            item.width = std::max(0.5, item.width * scale);
+            item.height = std::max(0.5, item.height * scale);
+            break;
+        }
+        for (UiText& item : uiTexts) if (item.name == name) item.size = std::max(0.5, item.size * scale);
+    }
+    return toJavaString(env, serializeState());
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_trg_studio_MainActivity_nativeStop(JNIEnv*, jclass) {
     androidStopRequested.store(true);
