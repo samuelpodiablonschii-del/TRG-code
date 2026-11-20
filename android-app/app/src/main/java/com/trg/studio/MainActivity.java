@@ -263,7 +263,7 @@ public final class MainActivity extends Activity {
         lineNumbers.setText("1");
         lineNumbers.setTextColor(Color.rgb(135, 124, 158));
         lineNumbers.setTextSize(editorFontSize);
-        lineNumbers.setTypeface(fixedUiFont);
+        lineNumbers.setTypeface(fixedUiFontBold);
         lineNumbers.setMaxLines(Integer.MAX_VALUE);
         lineNumbers.setIncludeFontPadding(false);
         lineNumbers.setGravity(Gravity.TOP | Gravity.RIGHT);
@@ -277,7 +277,7 @@ public final class MainActivity extends Activity {
         editor.setHintTextColor(Color.GRAY);
         editor.setHint("Write TRG source here");
         editor.setTextSize(editorFontSize);
-        editor.setTypeface(fixedUiFont);
+        editor.setTypeface(fixedUiFontBold);
         editor.setMaxLines(Integer.MAX_VALUE);
         editor.setIncludeFontPadding(false);
         editor.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE
@@ -308,7 +308,7 @@ public final class MainActivity extends Activity {
         output = new TextView(this);
         output.setTextColor(Color.rgb(219, 213, 230));
         output.setTextSize(14);
-        output.setTypeface(fixedUiFont);
+        output.setTypeface(fixedUiFontBold);
         output.setPadding(dp(14), dp(12), dp(12), dp(12));
         output.setText("Run a TRG program to see its output here.\n");
         outputScroll.addView(output);
@@ -317,7 +317,7 @@ public final class MainActivity extends Activity {
         outputScreen.setVisibility(View.GONE);
 
         status = new TextView(this);
-        status.setTypeface(fixedUiFont);
+        status.setTypeface(fixedUiFontBold);
         status.setTextColor(Color.rgb(200, 190, 218));
         status.setTextSize(11);
         status.setPadding(dp(12), dp(4), dp(10), dp(4));
@@ -642,13 +642,25 @@ public final class MainActivity extends Activity {
         TextView text = new TextView(this);
         text.setText(guide);
         text.setTextSize(14);
-        text.setTypeface(android.graphics.Typeface.MONOSPACE);
-        text.setTextColor(Color.rgb(235, 230, 244));
+        text.setTypeface(android.graphics.Typeface.create("monospace", android.graphics.Typeface.BOLD));
+        text.setTextColor(Color.WHITE);
         text.setPadding(dp(16), dp(12), dp(16), dp(12));
+        android.graphics.drawable.GradientDrawable dictionaryPanel = new android.graphics.drawable.GradientDrawable();
+        dictionaryPanel.setColor(Color.rgb(7, 7, 12));
+        dictionaryPanel.setCornerRadius(dp(12));
+        dictionaryPanel.setStroke(dp(2), Color.rgb(139, 92, 246));
+        text.setBackground(dictionaryPanel);
         ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(Color.rgb(7, 7, 12));
         scroll.addView(text);
-        new AlertDialog.Builder(this).setTitle("TRG language guide")
-                .setView(scroll).setPositiveButton("Close", null).show();
+        AlertDialog dictionaryDialog = new AlertDialog.Builder(this).setTitle("TRG language guide")
+                .setView(scroll).setPositiveButton("Close", null).create();
+        dictionaryDialog.setOnShowListener(ignored -> {
+            if (dictionaryDialog.getWindow() != null)
+                dictionaryDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.rgb(7, 7, 12)));
+            dictionaryDialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.rgb(190, 160, 255));
+        });
+        dictionaryDialog.show();
     }
 
     private void showEditorSettings() {
@@ -792,7 +804,7 @@ public final class MainActivity extends Activity {
         fileTabs.removeAllViews();
         for (String name : openDocuments.keySet()) {
             TextView tab = new TextView(this);
-            tab.setTypeface(fixedUiFont);
+            tab.setTypeface(fixedUiFontBold);
             tab.setText("  " + name + "  ");
             tab.setTextSize(12);
             tab.setGravity(Gravity.CENTER_VERTICAL);
@@ -878,6 +890,17 @@ public final class MainActivity extends Activity {
         menuLayout.setMargins(0, dp(16), dp(16), 0);
         fullScreen.addView(menuButton, menuLayout);
         menuButton.setOnClickListener(view -> showStudioMenu(menuButton));
+        TextView closeButton = new TextView(this);
+        closeButton.setTypeface(fixedUiFontBold);
+        closeButton.setText("×");
+        closeButton.setTextColor(Color.WHITE);
+        closeButton.setTextSize(25);
+        closeButton.setGravity(Gravity.CENTER);
+        closeButton.setBackgroundColor(Color.rgb(38, 25, 56));
+        FrameLayout.LayoutParams closeLayout = new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.TOP | Gravity.START);
+        closeLayout.setMargins(dp(14), dp(14), 0, 0);
+        fullScreen.addView(closeButton, closeLayout);
+        closeButton.setOnClickListener(view -> { dialog.dismiss(); showCodeScreen(); });
         dialog.setContentView(fullScreen);
         dialog.show();
         makeImmersive(dialog);
@@ -1573,7 +1596,7 @@ public final class MainActivity extends Activity {
                 }
             }
             paint.setColor(Color.rgb(178, 165, 204));
-            paint.setTypeface(fixedUiFont);
+            paint.setTypeface(fixedUiFontBold);
             paint.setTextSize(dp(10));
             paint.setTextAlign(Paint.Align.LEFT);
             canvas.drawText("DRAG OBJECT  •  TWO FINGERS: ORBIT + ZOOM", dp(12), height - dp(14), paint);
@@ -1703,7 +1726,7 @@ public final class MainActivity extends Activity {
                         Color.green(textColor), Color.blue(textColor)));
                 paint.setTextAlign("center".equals(text.optString("align")) ? Paint.Align.CENTER :
                         "right".equals(text.optString("align")) ? Paint.Align.RIGHT : Paint.Align.LEFT);
-                paint.setTypeface(text.optBoolean("bold", false) ? fixedUiFontBold : fixedUiFont);
+                paint.setTypeface(text.optBoolean("bold", true) ? fixedUiFontBold : fixedUiFont);
                 paint.setTextSize((float) (height * text.optDouble("size") / 100));
                 float[] textPosition = animatedPosition(text.optString("name"),
                         (float) text.optDouble("x"), (float) text.optDouble("y"), elapsed, animations);

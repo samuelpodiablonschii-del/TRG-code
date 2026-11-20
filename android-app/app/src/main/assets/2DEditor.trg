@@ -4,9 +4,10 @@ add (ui)
 
 color accent = #9B6BFF
 color panel = #171421
-color canvas = #0E0B16
+color canvas = #FFFFFF
 word selectedName = ""
 word currentColor = #8B5CF6
+word backgroundColor = "#FFFFFF"
 word currentShape = "square"
 word renameInput = ""
 word addLabel = ""
@@ -19,7 +20,7 @@ list objects
 num objectCount = 0
 num selectedIndex = 0
 
-block z 0 x 0 y 0 w 100 h 100 color #0D0B12 name EDITOR_BACKGROUND
+block z 0 x 0 y 0 w 100 h 100 color #FFFFFF name EDITOR_BACKGROUND
 block z 1 x 0 y 0 w 100 h 1 color accent name EDITOR_ACCENT
 block z 1 x 3 y 13 w 94 h 49 color panel edges round name CANVAS_FRAME
 block z 2 x 4 y 14 w 92 h 47 color canvas edges round name CANVAS
@@ -39,11 +40,11 @@ block z 3 x 4 y 34 w 92 h 0.2 color #211B30 name GRID_H2
 block z 3 x 4 y 44 w 92 h 0.2 color #211B30 name GRID_H3
 block z 3 x 4 y 54 w 92 h 0.2 color #211B30 name GRID_H4
 
-text "TRG / DESIGN" x 4 y 7 size 4 color #FFFFFF bold true
-text "2D CANVAS" x 4 y 11 size 1.8 color #B9B2CA
-text "TAP TO SELECT  •  DRAG TO MOVE" x 95 y 11 size 1.55 color #9D91B4 align right
-text object_label "No object selected" x 4 y 65 size 2.7 color #FFFFFF bold true
-text object_count "0 OBJECTS" x 95 y 65 size 1.7 color #A69CB8 align right
+text "TRG / DESIGN" x 4 y 7 size 3.3 color #211A30 bold true
+text "2D CANVAS" x 4 y 11 size 1.5 color #514963
+text "TAP TO SELECT  •  DRAG TO MOVE" x 95 y 11 size 1.25 color #514963 align right
+text object_label "No object selected" x 4 y 65 size 2.2 color #211A30 bold true
+text object_count "0 OBJECTS" x 95 y 65 size 1.4 color #514963 align right
 
 ui create block auto x 38 y 30 w 14 h 13 color accent shape square
 push objects last_ui_object
@@ -86,7 +87,7 @@ button add_button "＋ BUTTON" x 51 y 68 w 22 h 7 color #30243F (
 button add_text "＋ TEXT" x 75 y 68 w 22 h 7 color #30243F (
     ask "Text object name:" renameInput
     ask "Text to display:" addLabel
-    text renameInput addLabel x 38 y 35 size 3.2 color #FFFFFF
+    text renameInput addLabel x 38 y 35 size 3.2 color #211A30
     push objects renameInput
     length objects objectCount
     selectedIndex = objectCount - 1
@@ -150,12 +151,12 @@ button color "COLOR" x 62 y 77 w 15 h 7 color #30243F (
 )
 button shape "SHAPE" x 79 y 77 w 18 h 7 color #30243F (
     if objectCount > 0 (
-        if currentShape = "square" (
-            currentShape = "circle"
-        )
-        else (
-            currentShape = "square"
-        )
+        if currentShape = "square" ( currentShape = "circle" )
+        else ( if currentShape = "circle" ( currentShape = "triangle" )
+        else ( if currentShape = "triangle" ( currentShape = "pentagon" )
+        else ( if currentShape = "pentagon" ( currentShape = "hexagon" )
+        else ( if currentShape = "hexagon" ( currentShape = "star" )
+        else ( currentShape = "square" ) ) ) ) )
         ui shape selectedName currentShape
     )
 )
@@ -203,4 +204,4 @@ button animate "ANIMATE" x 70 y 86 w 27 h 7 color #30243F (
     )
 )
 
-text "Move objects by dragging them directly on the canvas." x 4 y 97 size 1.6 color #8F84A5
+button background "BACKGROUND" x 3 y 94 w 25 h 5 color #56368F (\n    ask "Canvas background colour (#RRGGBB):" backgroundColor\n    ui color CANVAS backgroundColor\n)\nbutton exit "EXIT" x 73 y 94 w 24 h 5 color #652A45 (\n    studio code\n)\ntext "Drag objects to move them. SHAPE cycles through six patterns." x 31 y 97 size 1.1 color #514963

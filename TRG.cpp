@@ -303,7 +303,7 @@ struct UiText {
     double y = 0;
     double size = 5;
     double opacity = 1.0;
-    bool bold = false;
+    bool bold = true;
     bool visible = true;
 };
 
@@ -450,6 +450,8 @@ constexpr int previewButtonId = 104;
 constexpr int newButtonId = 105;
 constexpr int buildButtonId = 106;
 constexpr int dictionaryButtonId = 107;
+constexpr int editor2DButtonId = 108;
+constexpr int editor3DButtonId = 109;
 constexpr int codeEditorId = 301;
 HWND openButton = nullptr;
 HWND saveButton = nullptr;
@@ -458,7 +460,13 @@ HWND previewButton = nullptr;
 HWND newButton = nullptr;
 HWND buildButton = nullptr;
 HWND dictionaryButton = nullptr;
+HWND editor2DButton = nullptr;
+HWND editor3DButton = nullptr;
 HWND codeEditor = nullptr;
+std::wstring desktopPreviousSource;
+std::filesystem::path desktopPreviousPath;
+bool desktopPreviousDirty = false;
+bool desktopVisualEditorActive = false;
 std::wstring inputPrompt;
 std::wstring outputBuffer;
 ULONG_PTR gdiplusToken = 0;
@@ -469,6 +477,8 @@ bool loadSourceFile(const std::filesystem::path& path);
 bool saveSourceFile();
 bool runEditorSource();
 void applyEditorSyntaxHighlighting();
+bool launchDesktopVisualEditor(const std::string& fileName);
+bool returnFromDesktopVisualEditor();
 
 int windowDpi(HWND window) {
     using GetDpiForWindowFunction = UINT (WINAPI*)(HWND);
@@ -503,14 +513,14 @@ void enablePerMonitorDpiAwareness() {
 
 void setOpenButtonFont(HWND window) {
     if (openButtonFont) DeleteObject(openButtonFont);
-    openButtonFont = CreateFontW(scaleForDpi(window, 14), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+    openButtonFont = CreateFontW(scaleForDpi(window, 13), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
         DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
-    const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton, buildButton, dictionaryButton};
+    const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton, buildButton, dictionaryButton, editor2DButton, editor3DButton};
     if (openButtonFont) for (HWND button : buttons) if (button)
         SendMessageW(button, WM_SETFONT, reinterpret_cast<WPARAM>(openButtonFont), TRUE);
     if (codeEditorFont) DeleteObject(codeEditorFont);
-    codeEditorFont = CreateFontW(-scaleForDpi(window, 16), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+    codeEditorFont = CreateFontW(-scaleForDpi(window, 15), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
         FIXED_PITCH | FF_MODERN, L"Consolas");
     if (codeEditor && codeEditorFont) SendMessageW(codeEditor, WM_SETFONT,
@@ -561,12 +571,12 @@ void layoutOutputControls(HWND window) {
     const LONG gap = scaleForDpi(window, 5);
     const LONG margin = scaleForDpi(window, 12);
     const LONG desiredWidth = scaleForDpi(window, 88);
-    const LONG available = std::max<LONG>(scaleForDpi(window, 7 * 52 + 6 * 5), width - scaleForDpi(window, 205) - margin * 2);
-    const LONG buttonWidth = std::clamp<LONG>((available - gap * 6) / 7,
-        scaleForDpi(window, 52), desiredWidth);
+    const LONG available = std::max<LONG>(scaleForDpi(window, 9 * 48 + 8 * 5), width - scaleForDpi(window, 170) - margin * 2);
+    const LONG buttonWidth = std::clamp<LONG>((available - gap * 8) / 9,
+        scaleForDpi(window, 48), scaleForDpi(window, 78));
     const LONG buttonHeight = scaleForDpi(window, 34);
     const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton, buildButton, dictionaryButton};
-    LONG x = width - margin - (buttonWidth + gap) * 7 + gap;
+    LONG x = width - margin - (buttonWidth + gap) * 9 + gap;
     const LONG y = std::max<LONG>(0, (headerHeight - buttonHeight) / 2);
     for (HWND button : buttons) {
         if (button) MoveWindow(button, x, y, buttonWidth, buttonHeight, TRUE);
@@ -5014,6 +5024,12 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         dictionaryButton = CreateWindowExW(0, L"BUTTON", L"Dictionary",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(dictionaryButtonId), GetModuleHandleW(nullptr), nullptr);
+        editor2DButton = CreateWindowExW(0, L"BUTTON", L"2D Editor",
+            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            reinterpret_cast<HMENU>(editor2DButtonId), GetModuleHandleW(nullptr), nullptr);
+        editor3DButton = CreateWindowExW(0, L"BUTTON", L"3D Editor",
+            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            reinterpret_cast<HMENU>(editor3DButtonId), GetModuleHandleW(nullptr), nullptr);
         richEditModule = LoadLibraryW(L"Msftedit.dll");
         const wchar_t* editorClass = richEditModule ? MSFTEDIT_CLASS : L"EDIT";
         codeEditor = CreateWindowExW(WS_EX_CLIENTEDGE, editorClass, L"",
@@ -5027,9 +5043,10 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             SendMessageW(codeEditor, EM_SETBKGNDCOLOR, 0, RGB(38, 38, 38));
             CHARFORMAT2W baseFormat = {};
             baseFormat.cbSize = sizeof(baseFormat);
-            baseFormat.dwMask = CFM_COLOR | CFM_FACE | CFM_SIZE;
+            baseFormat.dwMask = CFM_COLOR | CFM_FACE | CFM_SIZE | CFM_BOLD;
             baseFormat.crTextColor = RGB(220, 220, 220);
-            baseFormat.yHeight = 210;
+            baseFormat.yHeight = 195;
+            baseFormat.dwEffects = CFE_BOLD;
             std::wcsncpy(baseFormat.szFaceName, L"Consolas", LF_FACESIZE - 1);
             baseFormat.szFaceName[LF_FACESIZE - 1] = L'\0';
             SendMessageW(codeEditor, EM_SETCHARFORMAT, SCF_ALL, reinterpret_cast<LPARAM>(&baseFormat));
@@ -5080,6 +5097,14 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         runEditorSource();
         return 0;
     }
+    if (message == WM_COMMAND && LOWORD(wParam) == editor2DButtonId) {
+        launchDesktopVisualEditor("2DEditor.trg");
+        return 0;
+    }
+    if (message == WM_COMMAND && LOWORD(wParam) == editor3DButtonId) {
+        launchDesktopVisualEditor("3DEditor.trg");
+        return 0;
+    }
     if (message == WM_COMMAND && LOWORD(wParam) == dictionaryButtonId) {
         const wchar_t* dictionary =
             L"TRG COMMAND DICTIONARY\n\n"
@@ -5118,6 +5143,10 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         return 0;
     }
     if (message == WM_COMMAND && LOWORD(wParam) == previewButtonId) {
+        if (desktopVisualEditorActive && previewMode) {
+            returnFromDesktopVisualEditor();
+            return 0;
+        }
         previewMode = !previewMode;
         SetWindowTextW(previewButton, previewMode ? L"Code" : L"Preview");
         layoutOutputControls(window);
@@ -5248,7 +5277,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         HBRUSH canvasBrush = CreateSolidBrush(RGB(38, 36, 44));
         FillRect(dc, &canvas, canvasBrush);
         DeleteObject(canvasBrush);
-        HFONT bodyFont = CreateFontW(-scaleForDpi(window, 14), 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        HFONT bodyFont = CreateFontW(-scaleForDpi(window, 13), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
             DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
         HGDIOBJ previousBodyFont = bodyFont ? SelectObject(dc, bodyFont) : nullptr;
@@ -5506,7 +5535,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             if (!parseColor(text.color, red, green, blue)) continue;
             const int fontHeight = std::max(1, static_cast<int>(
                 text.size * canvasHeight / 100.0));
-            HFONT font = CreateFontW(-fontHeight, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            HFONT font = CreateFontW(-fontHeight, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
                 DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
                 DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
             HGDIOBJ previousFont = SelectObject(dc, font);
@@ -5545,6 +5574,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         mainWindow = nullptr;
         codeEditor = nullptr;
         openButton = saveButton = runButton = previewButton = newButton = buildButton = dictionaryButton = nullptr;
+        editor2DButton = editor3DButton = nullptr;
         desktopSpriteCache.clear();
         if (gdiplusToken != 0) {
             Gdiplus::GdiplusShutdown(gdiplusToken);
@@ -5815,7 +5845,7 @@ void applyEditorSyntaxHighlighting() {
     base.cbSize = sizeof(base);
     base.dwMask = CFM_COLOR | CFM_BOLD;
     base.crTextColor = RGB(220, 220, 220);
-    base.dwEffects = 0;
+    base.dwEffects = CFE_BOLD;
     SendMessageW(codeEditor, EM_SETSEL, 0, length);
     SendMessageW(codeEditor, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&base));
     static const std::unordered_set<std::wstring> keywords = {
@@ -5927,6 +5957,56 @@ bool saveSourceFile() {
     editorDirty = false;
     updateEditorWindowTitle();
     appendOutput("Saved: " + currentSourcePath.u8string() + "\r\n");
+    return true;
+}
+
+bool launchDesktopVisualEditor(const std::string& fileName) {
+    if (!codeEditor) return false;
+    if (!desktopVisualEditorActive) {
+        const int length = GetWindowTextLengthW(codeEditor);
+        std::wstring current(static_cast<std::size_t>(length) + 1, L'\0');
+        GetWindowTextW(codeEditor, current.data(), length + 1);
+        current.resize(static_cast<std::size_t>(length));
+        desktopPreviousSource = current;
+        desktopPreviousPath = currentSourcePath;
+        desktopPreviousDirty = editorDirty;
+        desktopVisualEditorActive = true;
+    }
+    std::filesystem::path editorPath = std::filesystem::current_path() / fileName;
+    if (!std::filesystem::exists(editorPath)) {
+        wchar_t executable[32768] = {};
+        const DWORD count = GetModuleFileNameW(nullptr, executable, 32768);
+        if (count > 0 && count < 32768)
+            editorPath = std::filesystem::path(executable).parent_path() / fileName;
+    }
+    if (!std::filesystem::exists(editorPath) || !loadSourceFile(editorPath)) {
+        appendOutput("ERROR Could not find the bundled " + fileName + ".\r\n");
+        desktopVisualEditorActive = false;
+        return false;
+    }
+    runEditorSource();
+    previewMode = true;
+    SetWindowTextW(previewButton, L"Code");
+    layoutOutputControls(mainWindow);
+    InvalidateRect(mainWindow, nullptr, TRUE);
+    return true;
+}
+
+bool returnFromDesktopVisualEditor() {
+    if (!desktopVisualEditorActive || !codeEditor) return false;
+    loadingEditorText = true;
+    SetWindowTextW(codeEditor, desktopPreviousSource.c_str());
+    loadingEditorText = false;
+    currentSourcePath = desktopPreviousPath;
+    projectRoot = currentSourcePath.empty() ? std::filesystem::current_path() : currentSourcePath.parent_path();
+    editorDirty = desktopPreviousDirty;
+    desktopVisualEditorActive = false;
+    previewMode = false;
+    SetWindowTextW(previewButton, L"Preview");
+    applyEditorSyntaxHighlighting();
+    updateEditorWindowTitle();
+    layoutOutputControls(mainWindow);
+    InvalidateRect(mainWindow, nullptr, TRUE);
     return true;
 }
 

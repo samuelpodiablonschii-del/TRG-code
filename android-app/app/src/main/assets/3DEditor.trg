@@ -7,6 +7,7 @@ add (3d)
 color accent = #9B6BFF
 word selectedName = ""
 word currentColor = #8B5CF6
+word backgroundColor = "#FFFFFF"
 word renameInput = ""
 word scaleFactor = ""
 word rotateAmount = ""
@@ -14,19 +15,19 @@ list objects
 num objectCount = 0
 num selectedIndex = 0
 
-block z 0 x 0 y 0 w 100 h 100 color #0D0B12 name EDITOR_BACKGROUND
+block z 0 x 0 y 0 w 100 h 100 color #FFFFFF name EDITOR_BACKGROUND
 block z 1 x 0 y 0 w 100 h 1 color accent name EDITOR_ACCENT
 block z 1 x 3 y 13 w 94 h 54 color #171421 edges round name VIEWPORT_FRAME
-block z 2 x 4 y 14 w 92 h 52 color #101019 edges round name VIEWPORT
-block z 3 x 9 y 56 w 82 h 0.2 color #252235 name FLOOR_A
-block z 3 x 15 y 60 w 70 h 0.2 color #252235 name FLOOR_B
-block z 3 x 22 y 64 w 56 h 0.2 color #252235 name FLOOR_C
+block z 2 x 4 y 14 w 92 h 52 color #FFFFFF edges round name VIEWPORT
+block z 3 x 9 y 56 w 82 h 0.2 color #E4E4EA name FLOOR_A
+block z 3 x 15 y 60 w 70 h 0.2 color #E4E4EA name FLOOR_B
+block z 3 x 22 y 64 w 56 h 0.2 color #E4E4EA name FLOOR_C
 
-text "TRG / SCENE" x 4 y 7 size 4 color #FFFFFF bold true
-text "3D VIEWPORT" x 4 y 11 size 1.8 color #B9B2CA
-text "DRAG OBJECT  •  DRAG EMPTY SPACE TO ORBIT" x 95 y 11 size 1.45 color #9D91B4 align right
-text model_label "No model selected" x 4 y 70 size 2.8 color #FFFFFF bold true
-text object_count "0 MODELS" x 95 y 70 size 1.7 color #A69CB8 align right
+text "TRG / SCENE" x 4 y 7 size 3.3 color #211A30 bold true
+text "3D VIEWPORT" x 4 y 11 size 1.5 color #514963
+text "DRAG OBJECT  •  DRAG EMPTY SPACE TO ORBIT" x 95 y 11 size 1.2 color #514963 align right
+text model_label "No model selected" x 4 y 70 size 2.2 color #211A30 bold true
+text object_count "0 MODELS" x 95 y 70 size 1.4 color #514963 align right
 
 3d box auto x 0 y 0 z 0 w 3 h 3 d 3 color accent
 push objects last_3d_object
@@ -152,4 +153,4 @@ button reset_view "RESET VIEW" x 33 y 89 w 28 h 6 color #30243F (
 button info "CONTROLS" x 63 y 89 w 34 h 6 color #30243F (
     say "Drag a model to move it. Drag empty space to look around. Pinch and move two fingers to orbit and zoom."
 )
-text "PINCH TO ZOOM  •  TWO-FINGER DRAG TO LOOK AROUND" x 4 y 98 size 1.55 color #8F84A5
+text "PINCH TO ZOOM  •  TWO-FINGER DRAG TO LOOK AROUND" x 4 y 98 size 1.15 color #514963
