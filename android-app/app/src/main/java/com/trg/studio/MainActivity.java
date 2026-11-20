@@ -434,6 +434,45 @@ public final class MainActivity extends Activity {
         showStudioMenu(preview);
     }
 
+    private void launchTrgTool(String name, String source) {
+        if (source == null || source.trim().isEmpty()) {
+            showError("TRG editor unavailable",
+                    new IllegalStateException(name + " could not be loaded."));
+            return;
+        }
+        cancelEverySchedules();
+        nativeStop();
+        if (editor != null && !showingOutput) {
+            sourceText = editor.getText().toString();
+            openDocuments.put(currentDocumentName, sourceText);
+        }
+        currentDocumentName = name;
+        sourceText = source;
+        openDocuments.put(currentDocumentName, sourceText);
+        if (editor != null) {
+            editor.setText(sourceText);
+            editor.setSelection(0);
+            refreshFileTabs();
+        }
+        InputMethodManager keyboard =
+                (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (keyboard != null && editor != null) {
+            keyboard.hideSoftInputFromWindow(editor.getWindowToken(), 0);
+        }
+        showingOutput = true;
+        editorScreen.setVisibility(View.GONE);
+        outputScreen.setVisibility(View.VISIBLE);
+        output.setText("Opening " + name + "...\\n");
+        status.setText("Opening TRG editor  |  " + name);
+        executor.execute(() -> {
+            String result = nativeRun(source);
+            runOnUiThread(() -> {
+                applyState(result);
+                showProgramPreview();
+            });
+        });
+    }
+
     private void showStudioMenu(View anchor) {
         if (studioMenuDialog != null || studioMenuOpening) return;
         if (studioMenuSource == null || studioMenuSource.trim().isEmpty()) {
