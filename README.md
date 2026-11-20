@@ -37,6 +37,18 @@ The APK is written to `android-app\app\build\outputs\apk\debug\app-debug.apk`. T
 
 **Package .trgpack** saves the current source and a short readme in an importable archive. It is not a standalone native executable, an APK compiler, or machine-code compilation; open the package in TRG Studio to edit or run it. Android keyboard/controller controls and Windows-only features are not available in this mobile runtime.
 
+### TRG-authored mobile workbench
+
+The mobile workspace menu and toolbar are TRG UI programs in `android-app/app/src/main/assets`:
+- `Studio.trg` defines the persistent toolbar.
+- `StudioMenu.trg` defines the workspace menu.
+- `2DEditor.trg` and `3DEditor.trg` define the visual editor screens.
+
+Android hosts these TRG-authored screens in a drawing surface and handles platform actions such as document pickers and text input. The visual layout, buttons, editor controls, and object-editing behavior are TRG programs; they are not separate native Android editor screens. The toolbar provides direct Run, 2D, and 3D actions, and the workspace menu keeps the existing import, export, package, dictionary, settings, and preview actions.
+
+The 2D editor provides a grid workspace with block and circle creation, selection, copy, rename, delete, movement, resizing, shape toggling, and colour changes. The 3D editor provides an isometric scene view with box and sphere primitives, selection, copy, rename, delete, movement, rotation, scaling, and colour changes.
+
+`These screens use the general-purpose UI and 3D libraries documented below. The current 3D renderer displays primitive boxes and spheres in an isometric view; it is not yet a general mesh importer, perspective camera system, shader pipeline, or full 3D physics engine.\n\n
 The Android `studio menu` bridge command opens the native action list from the TRG-defined toolbar button. Android handles platform operations such as document pickers and editor focus; the bundled TRG program defines the toolbar UI, while C++ interprets user programs and returns their output. The editor includes a plain-text command dictionary, syntax colors and typo underlines, new-line indentation, `.trg`/`.txt` tabs, and settings for font size and the color wheel. The program UI preview fills the screen and keeps an on-screen menu button.
 
 UI text labels can be declared inside `add (ui)`:
@@ -201,7 +213,7 @@ add (json)
 add (all)
 ```
 
-`add (all)` enables every built-in library, including `json`, `math`, `ai`, `binary`, `regex`, `compression`, `time`, `convert`, `stats`, and `units`. Everyday text and number commands such as `find`, `replace_text`, `add_numbers`, and `square_root` work without adding a library.
+`add (all)` enables every built-in library, including `json`, `math`, `ai`, `binary`, `regex`, `compression`, `time`, `convert`, `stats`, `units`, and `3d`. Everyday text and number commands such as `find`, `replace_text`, `add_numbers`, and `square_root` work without adding a library.
 
 The PowerShell, Raspberry, and accessibility libraries are also registered:
 
@@ -567,6 +579,46 @@ Commands:
 - `physics remove OBJECT` unregisters an object.
 
 The first version resolves axis-aligned rectangle collisions against registered solid bodies. It does not yet include rotated-shape collision, frictional contact, joints, or continuous collision detection for very fast objects. For accurate results, use small fixed steps (for example, 0.016 seconds).
+
+### Editing 2D UI objects
+
+After `add (ui)`, TRG can create and edit objects at runtime. Coordinates and sizes use the same 0–100 canvas units as the UI library.
+
+```text
+add (ui)
+
+ui create block panel x 10 y 15 w 30 h 20 color #8B5CF6 shape square z 5
+ui duplicate panel panel_copy
+ui move panel_copy 5 0
+ui resize panel_copy 2 2
+ui color panel_copy #22C55E
+ui shape panel_copy circle
+ui rename panel_copy green_circle
+ui delete panel
+```
+
+Supported operations are `ui create block`, `ui duplicate` (or `ui copy`), `ui rename`, `ui move`, `ui resize`, `ui color`, `ui shape`, and `ui delete`. A new object name can be `auto`; the generated name is returned in `last_ui_object`. The current shape choices are square, circle, triangle, pentagon, hexagon, and star.
+
+### 3D primitives
+
+The general-purpose `add (3d)` library creates reusable scene objects in world coordinates. Rotation values are degrees; move and rotate values are increments, while scale is a positive multiplier.
+
+```text
+add (ui)
+add (3d)
+
+3d box platform x 0 y -2 z 0 w 8 h 0.5 d 5 color #8B5CF6
+3d sphere ball x 0 y 1 z 0 size 1.5 color #22C55E
+3d duplicate platform platform_copy
+3d move ball 0 0.5 0
+3d rotate platform 0 15 0
+3d scale platform_copy 1.2
+3d color ball #3B82F6
+3d rename ball player_ball
+3d delete platform_copy
+```
+
+The initial primitive set is box and sphere. Desktop and Android Studio render these using an isometric projection. Arbitrary imported meshes, a perspective camera, shaders, and full 3D physics are not implemented yet.
 
 For simple games, `add (collision)` enables automatic rectangle overlap checks and movement helpers. `watch_collision A B hit` keeps `hit` updated every scheduled tick, `collides A B hit` checks immediately, and `move_ui player x +1 y 0` moves a named item:
 

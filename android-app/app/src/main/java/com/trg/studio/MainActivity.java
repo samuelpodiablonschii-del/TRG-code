@@ -12,6 +12,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.RectF;
 import android.media.MediaPlayer;
 import android.net.Uri;
@@ -89,6 +90,8 @@ public final class MainActivity extends Activity {
     private static final int MENU_DICTIONARY = 8;
     private static final int MENU_SETTINGS = 9;
     private static final int MENU_DEBUG = 10;
+    private static final int MENU_2D = 11;
+    private static final int MENU_3D = 12;
     private static final String[] MOBILE_SWIPES = {
             "mobile_swipe_left", "mobile_swipe_right", "mobile_swipe_up", "mobile_swipe_down"
     };
@@ -115,11 +118,14 @@ public final class MainActivity extends Activity {
     private String sourceText = "";
     private String exampleSource;
     private String studioSource;
+    private String studioMenuSource;
+    private String twoDEditorSource;
+    private String threeDEditorSource;
     private JSONObject lastRunState = new JSONObject();
     private boolean toolbarInitialized;
     private boolean showingOutput;
     private String lastRunError = "";
-    private float editorFontSize = 13;
+    private float editorFontSize = 14;
     private boolean formattingEditor;
     private final LinkedHashMap<String, String> openDocuments = new LinkedHashMap<>();
     private String currentDocumentName = "program.trg";
@@ -127,6 +133,10 @@ public final class MainActivity extends Activity {
     private MediaPlayer activeAudio;
     private Dialog programPreviewDialog;
     private PreviewView activeProgramPreview;
+    private Dialog studioMenuDialog;
+    private PreviewView studioMenuPreview;
+    private boolean studioMenuOpening;
+    private boolean menuReturnShowingOutput;
     private final Handler everyHandler = new Handler(Looper.getMainLooper());
     private final HashMap<Integer, Runnable> scheduledEveryTasks = new HashMap<>();
     private String everyScheduleSignature = "";
@@ -165,12 +175,21 @@ public final class MainActivity extends Activity {
         super.onCreate(state);
         enableImmersiveMode();
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-        editorFontSize = getPreferences(MODE_PRIVATE).getFloat("editor_font_size", 13f);
+        editorFontSize = getPreferences(MODE_PRIVATE).getFloat("editor_font_size", 14f);
         nativeInitialize(this);
         try (InputStream input = getAssets().open("Studio.trg")) {
             studioSource = readText(input);
             try (InputStream example = getAssets().open("Example.trg")) {
                 exampleSource = readText(example);
+            }
+            try (InputStream studioMenu = getAssets().open("StudioMenu.trg")) {
+                studioMenuSource = readText(studioMenu);
+            }
+            try (InputStream twoD = getAssets().open("2DEditor.trg")) {
+                twoDEditorSource = readText(twoD);
+            }
+            try (InputStream threeD = getAssets().open("3DEditor.trg")) {
+                threeDEditorSource = readText(threeD);
             }
             sourceText = exampleSource;
             openDocuments.put("program.trg", sourceText);
@@ -218,32 +237,32 @@ public final class MainActivity extends Activity {
         root.setBackgroundColor(Color.rgb(13, 11, 18));
 
         preview = new PreviewView(true);
-        root.addView(preview, new LinearLayout.LayoutParams(-1, dp(52)));
+        root.addView(preview, new LinearLayout.LayoutParams(-1, dp(62)));
 
         editorScreen = new LinearLayout(this);
         editorScreen.setOrientation(LinearLayout.VERTICAL);
         editorScreen.setBackgroundColor(Color.rgb(13, 11, 18));
         HorizontalScrollView tabScroller = new HorizontalScrollView(this);
         tabScroller.setHorizontalScrollBarEnabled(false);
-        tabScroller.setBackgroundColor(Color.rgb(25, 22, 32));
+        tabScroller.setBackgroundColor(Color.rgb(23, 20, 31));
         fileTabs = new LinearLayout(this);
         fileTabs.setOrientation(LinearLayout.HORIZONTAL);
         tabScroller.addView(fileTabs);
-        editorScreen.addView(tabScroller, new LinearLayout.LayoutParams(-1, dp(34)));
+        editorScreen.addView(tabScroller, new LinearLayout.LayoutParams(-1, dp(38)));
 
         LinearLayout codePane = new LinearLayout(this);
         codePane.setOrientation(LinearLayout.HORIZONTAL);
         codePane.setBackgroundColor(Color.rgb(17, 15, 23));
         lineNumbers = new TextView(this);
         lineNumbers.setText("1");
-        lineNumbers.setTextColor(Color.rgb(111, 101, 127));
+        lineNumbers.setTextColor(Color.rgb(135, 124, 158));
         lineNumbers.setTextSize(editorFontSize);
         lineNumbers.setTypeface(android.graphics.Typeface.MONOSPACE);
         lineNumbers.setMaxLines(Integer.MAX_VALUE);
         lineNumbers.setIncludeFontPadding(false);
         lineNumbers.setGravity(Gravity.TOP | Gravity.RIGHT);
-        lineNumbers.setPadding(dp(8), dp(9), dp(8), dp(8));
-        lineNumbers.setBackgroundColor(Color.rgb(20, 18, 27));
+        lineNumbers.setPadding(dp(10), dp(12), dp(9), dp(10));
+        lineNumbers.setBackgroundColor(Color.rgb(22, 19, 29));
         codePane.addView(lineNumbers, new LinearLayout.LayoutParams(dp(42), -1));
 
         editor = new LineNumberEditText();
@@ -257,7 +276,7 @@ public final class MainActivity extends Activity {
         editor.setIncludeFontPadding(false);
         editor.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE
                 | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        editor.setPadding(dp(9), dp(9), dp(8), dp(8));
+        editor.setPadding(dp(12), dp(12), dp(12), dp(10));
         editor.setBackgroundColor(Color.rgb(17, 15, 23));
         editor.setVerticalScrollBarEnabled(true);
         editor.setFilters(new InputFilter[]{new TrgIndentFilter()});
@@ -293,7 +312,8 @@ public final class MainActivity extends Activity {
         status = new TextView(this);
         status.setTextColor(Color.rgb(200, 190, 218));
         status.setTextSize(11);
-        status.setPadding(dp(10), dp(3), dp(10), dp(3));
+        status.setPadding(dp(12), dp(4), dp(10), dp(4));
+        status.setBackgroundColor(Color.rgb(23, 20, 31));
         status.setText("Ready  |  TRG C++ interpreter");
         root.addView(status, new LinearLayout.LayoutParams(-1, dp(24)));
 
@@ -340,44 +360,74 @@ public final class MainActivity extends Activity {
 
     public void onTrgStudioAction(String action) {
         runOnUiThread(() -> {
-            switch (action.toLowerCase(Locale.ROOT)) {
-                case "menu":
-                    showStudioMenu();
-                    break;
-                case "run":
-                    runSource();
-                    break;
-                case "code":
-                    showCodeScreen();
-                    break;
-                case "example":
-                    currentDocumentName = "Example.trg";
-                    sourceText = exampleSource;
-                    openDocuments.put(currentDocumentName, sourceText);
-                    if (editor != null) {
-                        editor.setText(sourceText);
-                        editor.setSelection(0);
-                        refreshFileTabs();
-                    }
-                    status.setText("Example loaded  |  program.trg");
-                    break;
-                case "import":
-                    openDocument();
-                    break;
-                case "export":
-                    createDocument(currentDocumentName, REQUEST_EXPORT);
-                    break;
-                case "package":
-                    createDocument("program.trgpack", REQUEST_PACKAGE);
-                    break;
-                default:
-                    if (action.regionMatches(true, 0, "media:", 0, 6)) displayTrgMedia(action);
-                    else if (action.regionMatches(true, 0, "wasm:", 0, 5)) displayWebAssembly(action.substring(5));
-                    else if (action.regionMatches(true, 0, "webpage:", 0, 8)) displayWebPage(action.substring(8));
-                    else showError("Unknown TRG Studio action", new IllegalArgumentException(action));
-                    break;
+            String normalized = action == null ? "" : action.toLowerCase(Locale.ROOT);
+            if (studioMenuDialog != null && !normalized.equals("menu")) {
+                closeStudioMenu(() -> dispatchStudioAction(normalized));
+            } else {
+                dispatchStudioAction(normalized);
             }
         });
+    }
+
+    private void dispatchStudioAction(String action) {
+        switch (action) {
+            case "menu":
+                showStudioMenu();
+                break;
+            case "run":
+                runSource();
+                break;
+            case "code":
+                showCodeScreen();
+                break;
+            case "example":
+                currentDocumentName = "Example.trg";
+                sourceText = exampleSource;
+                openDocuments.put(currentDocumentName, sourceText);
+                if (editor != null) {
+                    editor.setText(sourceText);
+                    editor.setSelection(0);
+                    refreshFileTabs();
+                }
+                showCodeScreen();
+                status.setText("Example loaded  |  Example.trg");
+                break;
+            case "open_2d":
+                launchTrgTool("2DEditor.trg", twoDEditorSource);
+                break;
+            case "open_3d":
+                launchTrgTool("3DEditor.trg", threeDEditorSource);
+                break;
+            case "import":
+                openDocument();
+                break;
+            case "export":
+                createDocument(currentDocumentName, REQUEST_EXPORT);
+                break;
+            case "package":
+                createDocument("program.trgpack", REQUEST_PACKAGE);
+                break;
+            case "preview":
+                if (programPreviewDialog == null) showProgramPreview();
+                break;
+            case "dictionary":
+                showCommandDictionary();
+                break;
+            case "settings":
+                showEditorSettings();
+                break;
+            case "debug":
+                showErrorExplanation();
+                break;
+            case "closemenu":
+                break;
+            default:
+                if (action.regionMatches(true, 0, "media:", 0, 6)) displayTrgMedia(action);
+                else if (action.regionMatches(true, 0, "wasm:", 0, 5)) displayWebAssembly(action.substring(5));
+                else if (action.regionMatches(true, 0, "webpage:", 0, 8)) displayWebPage(action.substring(8));
+                else showError("Unknown TRG Studio action", new IllegalArgumentException(action));
+                break;
+        }
     }
 
     private void showStudioMenu() {
@@ -385,65 +435,85 @@ public final class MainActivity extends Activity {
     }
 
     private void showStudioMenu(View anchor) {
-        PopupMenu menu = new PopupMenu(this, anchor);
-        menu.getMenu().add(0, MENU_RUN, 0, "Run");
-        if (showingOutput) menu.getMenu().add(0, MENU_CODE, 1, "Back to code");
-        menu.getMenu().add(0, MENU_EXAMPLE, 2, "Load example");
-        menu.getMenu().add(0, MENU_IMPORT, 3, "Import .trg / .txt / media");
-        menu.getMenu().add(0, MENU_EXPORT, 4, "Export current file");
-        menu.getMenu().add(0, MENU_PACKAGE, 5, "Package .trgpack");
-        menu.getMenu().add(0, MENU_PREVIEW, 6, "Preview program UI");
-        menu.getMenu().add(0, MENU_DICTIONARY, 7, "TRG command dictionary");
-        menu.getMenu().add(0, MENU_SETTINGS, 8, "Editor settings");
-        menu.getMenu().add(0, MENU_DEBUG, 9, "Explain the last error");
-        menu.setOnMenuItemClickListener(item -> {
-            if (anchor != preview && programPreviewDialog != null && item.getItemId() != MENU_PREVIEW) {
-                programPreviewDialog.dismiss();
-                programPreviewDialog = null;
-            }
-            switch (item.getItemId()) {
-                case MENU_RUN:
-                    runSource();
-                    return true;
-                case MENU_CODE:
-                    showCodeScreen();
-                    return true;
-                case MENU_EXAMPLE:
-                    currentDocumentName = "Example.trg";
-                    sourceText = exampleSource;
-                    openDocuments.put(currentDocumentName, sourceText);
-                    editor.setText(sourceText);
-                    editor.setSelection(0);
-                    refreshFileTabs();
-                    showCodeScreen();
-                    status.setText("Example loaded  |  program.trg");
-                    return true;
-                case MENU_IMPORT:
-                    openDocument();
-                    return true;
-                case MENU_EXPORT:
-                    createDocument(currentDocumentName, REQUEST_EXPORT);
-                    return true;
-                case MENU_PACKAGE:
-                    createDocument("program.trgpack", REQUEST_PACKAGE);
-                    return true;
-                case MENU_PREVIEW:
-                    if (programPreviewDialog == null) showProgramPreview();
-                    return true;
-                case MENU_DICTIONARY:
-                    showCommandDictionary();
-                    return true;
-                case MENU_SETTINGS:
-                    showEditorSettings();
-                    return true;
-                case MENU_DEBUG:
-                    showErrorExplanation();
-                    return true;
-                default:
-                    return false;
-            }
+        if (studioMenuDialog != null || studioMenuOpening) return;
+        if (studioMenuSource == null || studioMenuSource.trim().isEmpty()) {
+            showError("TRG menu is unavailable", new IllegalStateException("StudioMenu.trg was not loaded."));
+            return;
+        }
+        if (editor != null && !showingOutput) {
+            sourceText = editor.getText().toString();
+            openDocuments.put(currentDocumentName, sourceText);
+        }
+        menuReturnShowingOutput = showingOutput;
+        studioMenuOpening = true;
+        cancelEverySchedules();
+        nativeStop();
+        status.setText("Opening TRG Studio menu...");
+        executor.execute(() -> {
+            String rawState = nativeRun(studioMenuSource);
+            runOnUiThread(() -> {
+                studioMenuOpening = false;
+                try {
+                    JSONObject menuState = new JSONObject(rawState);
+                    PreviewView menuView = new PreviewView();
+                    menuView.setState(menuState);
+                    Dialog dialog = new Dialog(this);
+                    studioMenuDialog = dialog;
+                    studioMenuPreview = menuView;
+                    FrameLayout surface = new FrameLayout(this);
+                    surface.setBackgroundColor(Color.rgb(13, 11, 18));
+                    surface.addView(menuView, new FrameLayout.LayoutParams(-1, -1));
+                    dialog.setCancelable(true);
+                    dialog.setOnCancelListener(ignored -> {
+                        if (studioMenuDialog == dialog) closeStudioMenu(null);
+                    });
+                    dialog.setOnDismissListener(ignored -> {
+                        if (studioMenuDialog == dialog) {
+                            studioMenuDialog = null;
+                            studioMenuPreview = null;
+                        }
+                    });
+                    dialog.setContentView(surface);
+                    dialog.show();
+                    makeImmersive(dialog);
+                } catch (JSONException exception) {
+                    showError("Could not open TRG Studio menu", exception);
+                }
+            });
         });
-        menu.show();
+    }
+
+    private void closeStudioMenu(Runnable afterClose) {
+        Dialog dialog = studioMenuDialog;
+        studioMenuDialog = null;
+        studioMenuPreview = null;
+        if (dialog != null && dialog.isShowing()) dialog.dismiss();
+        studioMenuOpening = false;
+        final boolean restoreOutput = menuReturnShowingOutput;
+        final String restoreSource = restoreOutput ? sourceText : studioSource;
+        executor.execute(() -> {
+            String restored = nativeRun(restoreSource);
+            runOnUiThread(() -> {
+                try {
+                    JSONObject restoredState = new JSONObject(restored);
+                    lastRunState = restoredState;
+                    updateEverySchedules(restoredState);
+                    if (restoreOutput) {
+                        applyState(restored);
+                    } else {
+                        if (preview != null) {
+                            preview.setState(restoredState);
+                            toolbarInitialized = true;
+                        }
+                        status.setText("Editor ready  |  " + currentDocumentName);
+                    }
+                } catch (JSONException exception) {
+                    status.setText("Menu closed; the previous view could not be restored.");
+                    output.setText("Interpreter response error: " + exception.getMessage());
+                }
+                if (afterClose != null) afterClose.run();
+            });
+        });
     }
 
     private void showCommandDictionary() {
@@ -485,8 +555,8 @@ public final class MainActivity extends Activity {
                 + "LIBRARIES AND FILES\n"
                 + "Libraries are file-wide; do not put a block after a library line.\n"
                 + "add (files) | add (json) | add (web) | add (collision)\n"
-                + "add (manual) | add (ui) | add (animation) | add (controls)\n"
-                + "add (all)  — enable all built-in libraries (including json)\n"
+                + "add (manual) | add (ui) | add (3d) | add (animation) | add (controls)\n"
+                + "add (all)  — enable all built-in libraries (including json and 3d)\n"
                 + "add (plugin.trg)  — load another TRG file from the project folder\n"
                 + "add global ( ... )  — variables and libraries for every .trg in the project\n"
                 + "add connect (file.trg)  — share variables with another project file (transitive)\n"
@@ -511,6 +581,16 @@ public final class MainActivity extends Activity {
                 + "NAME x|y|w|h VALUE  — change a named block, button, or sprite; +VALUE moves it\n"
                 + "Example: style y +10 moves the UI block named style down by 10 percent\n"
                 + "add (controls) | add (animation)\n\n"
+                + "2D OBJECT EDITING (after add (ui))\n"
+                + "ui create block NAME x X y Y w W h H color COLOR [shape SHAPE] [z LAYER]\n"
+                + "ui duplicate SOURCE NAME | ui rename OLD NEW | ui delete NAME\n"
+                + "ui move NAME DX DY | ui resize NAME DW DH | ui color NAME COLOR | ui shape NAME SHAPE\n\n"
+                + "3D SCENE OBJECTS (after add (3d))\n"
+                + "3d box NAME x X y Y z Z w W h H d D color COLOR\n"
+                + "3d sphere NAME x X y Y z Z size SIZE color COLOR\n"
+                + "3d duplicate SOURCE NAME | 3d move NAME DX DY DZ | 3d rotate NAME RX RY RZ\n"
+                + "3d scale NAME FACTOR | 3d color NAME COLOR | 3d rename OLD NEW | 3d delete NAME\n"
+                + "The current 3D renderer is an isometric primitive renderer, not a full mesh/camera engine.\n\n"
                 + "Commands ignore letter case. Colors accept #RRGGBB or 0xRRGGBB.";
         TextView text = new TextView(this);
         text.setText(guide);
@@ -668,9 +748,9 @@ public final class MainActivity extends Activity {
             tab.setText("  " + name + "  ");
             tab.setTextSize(12);
             tab.setGravity(Gravity.CENTER_VERTICAL);
-            tab.setPadding(dp(8), 0, dp(8), 0);
+            tab.setPadding(dp(12), 0, dp(12), 0);
             tab.setTextColor(name.equals(currentDocumentName) ? Color.WHITE : Color.rgb(160, 151, 171));
-            tab.setBackgroundColor(name.equals(currentDocumentName) ? Color.rgb(62, 48, 83) : Color.TRANSPARENT);
+            tab.setBackgroundColor(name.equals(currentDocumentName) ? Color.rgb(72, 48, 112) : Color.TRANSPARENT);
             tab.setOnClickListener(view -> {
                 openDocuments.put(currentDocumentName, editor.getText().toString());
                 currentDocumentName = name;
@@ -895,6 +975,7 @@ public final class MainActivity extends Activity {
                     "wait", "every", "random", "collides", "touching", "watch_collision", "move_ui",
                     "record", "class", "struct", "new", "image", "sprite", "json", "create", "run",
                     "define", "stop", "exit", "break", "continue", "add", "text", "button", "block", "animate",
+                    "ui", "3d", "studio", "set_text", "set_color",
                     "register", "registry", "move", "subtract", "multiply", "divide", "list", "push", "get", "remove",
                     "upper", "lower", "length", "contains", "replace", "read_file", "write_file", "append_file", "delete_file", "file_exists",
                     "play_audio", "show_image", "play_video", "run_wasm", "web_page", "web_heading", "web_text",
@@ -970,6 +1051,10 @@ public final class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
+        if (studioMenuDialog != null) {
+            closeStudioMenu(null);
+            return;
+        }
         if (showingOutput) {
             showCodeScreen();
             return;
@@ -1199,6 +1284,7 @@ public final class MainActivity extends Activity {
         private final List<JSONObject> orderedBlocks = new ArrayList<>();
         private final List<JSONObject> textItems = new ArrayList<>();
         private final List<JSONObject> sprites = new ArrayList<>();
+        private final List<JSONObject> models = new ArrayList<>();
         private final HashMap<String, Bitmap> spriteBitmaps = new HashMap<>();
         private JSONObject state = new JSONObject();
         private long updatedAt;
@@ -1224,7 +1310,15 @@ public final class MainActivity extends Activity {
             orderedBlocks.clear();
             textItems.clear();
             sprites.clear();
+            models.clear();
             spriteBitmaps.clear();
+            JSONArray modelArray = state.optJSONArray("models");
+            if (modelArray != null) {
+                for (int i = 0; i < modelArray.length(); i++) {
+                    JSONObject model = modelArray.optJSONObject(i);
+                    if (model != null) models.add(model);
+                }
+            }
             JSONArray spriteArray = state.optJSONArray("sprites");
             if (spriteArray != null) {
                 for (int i = 0; i < spriteArray.length(); i++) {
@@ -1248,6 +1342,128 @@ public final class MainActivity extends Activity {
                 }
             }
             invalidate();
+        }
+
+        private void drawBlockShape(Canvas canvas, JSONObject block, RectF rect) {
+            String shape = block.optString("shape", "square").toLowerCase(Locale.ROOT);
+            if ("circle".equals(shape)) {
+                canvas.drawOval(rect, paint);
+                return;
+            }
+            if ("triangle".equals(shape) || "pentagon".equals(shape)
+                    || "hexagon".equals(shape) || "star".equals(shape)) {
+                int points = "triangle".equals(shape) ? 3 : "pentagon".equals(shape) ? 5
+                        : "hexagon".equals(shape) ? 6 : 10;
+                Path path = new Path();
+                float cx = rect.centerX(), cy = rect.centerY();
+                float rx = rect.width() * 0.5f, ry = rect.height() * 0.5f;
+                for (int i = 0; i < points; i++) {
+                    double angle = -Math.PI / 2 + i * Math.PI * 2 / points;
+                    float factor = "star".equals(shape) && i % 2 == 1 ? 0.42f : 1f;
+                    float x = cx + (float) Math.cos(angle) * rx * factor;
+                    float y = cy + (float) Math.sin(angle) * ry * factor;
+                    if (i == 0) path.moveTo(x, y); else path.lineTo(x, y);
+                }
+                path.close();
+                canvas.drawPath(path, paint);
+                return;
+            }
+            float radius = (float) (Math.max(0, block.optDouble("radius")) * Math.min(getWidth(), getHeight()) / 100);
+            radius = Math.min(radius, Math.min(rect.width(), rect.height()) / 2f);
+            if (radius > 0) canvas.drawRoundRect(rect, radius, radius, paint);
+            else canvas.drawRect(rect, paint);
+        }
+
+        private void draw3DModels(Canvas canvas, float width, float height) {
+            if (models.isEmpty() || width <= 0 || height <= 0) return;
+            final int[][] faces = {
+                    {0, 1, 2, 3}, {4, 5, 6, 7}, {0, 3, 7, 4},
+                    {1, 2, 6, 5}, {0, 1, 5, 4}, {3, 2, 6, 7}
+            };
+            final float[] shades = {0.58f, 1.0f, 0.68f, 0.78f, 0.52f, 0.90f};
+            float scale = Math.min(width, height) * 0.115f;
+            float centerX = width * 0.5f;
+            float centerY = height * 0.53f;
+            for (JSONObject model : models) {
+                if (!model.optBoolean("visible", true)) continue;
+                int base = parseColor(model.optString("color", "#8B5CF6"));
+                float opacity = Math.max(0f, Math.min(1f, (float) model.optDouble("opacity", 1.0)));
+                double rx = Math.toRadians(model.optDouble("rx"));
+                double ry = Math.toRadians(model.optDouble("ry"));
+                double rz = Math.toRadians(model.optDouble("rz"));
+                double cx = Math.cos(rx), sx = Math.sin(rx);
+                double cy = Math.cos(ry), sy = Math.sin(ry);
+                double cz = Math.cos(rz), sz = Math.sin(rz);
+                float halfW = (float) model.optDouble("w", 2) * 0.5f;
+                float halfH = (float) model.optDouble("h", 2) * 0.5f;
+                float halfD = (float) model.optDouble("d", 2) * 0.5f;
+                double[][] local = {
+                        {-halfW,-halfH,-halfD}, {halfW,-halfH,-halfD},
+                        {halfW,halfH,-halfD}, {-halfW,halfH,-halfD},
+                        {-halfW,-halfH,halfD}, {halfW,-halfH,halfD},
+                        {halfW,halfH,halfD}, {-halfW,halfH,halfD}
+                };
+                double[][] rotated = new double[8][3];
+                float[][] projected = new float[8][2];
+                for (int i = 0; i < 8; i++) {
+                    double x1 = local[i][0];
+                    double y1 = local[i][1] * cx - local[i][2] * sx;
+                    double z1 = local[i][1] * sx + local[i][2] * cx;
+                    double x2 = x1 * cy + z1 * sy;
+                    double y2 = y1;
+                    double z2 = -x1 * sy + z1 * cy;
+                    double x3 = x2 * cz - y2 * sz + model.optDouble("x");
+                    double y3 = x2 * sz + y2 * cz + model.optDouble("y");
+                    double z3 = z2 + model.optDouble("z");
+                    rotated[i][0] = x3; rotated[i][1] = y3; rotated[i][2] = z3;
+                    projected[i][0] = centerX + (float) (x3 - z3 * 0.48) * scale;
+                    projected[i][1] = centerY - (float) (y3 - (x3 + z3) * 0.27) * scale;
+                }
+                if ("sphere".equals(model.optString("shape"))) {
+                    double sphereX = model.optDouble("x"), sphereY = model.optDouble("y");
+                    double sphereZ = model.optDouble("z");
+                    float sphereCenterX = centerX + (float) (sphereX - sphereZ * 0.48) * scale;
+                    float sphereCenterY = centerY - (float) (sphereY - (sphereX + sphereZ) * 0.27) * scale;
+                    RectF sphere = new RectF(
+                            sphereCenterX - halfW * scale,
+                            sphereCenterY - halfH * scale,
+                            sphereCenterX + halfW * scale,
+                            sphereCenterY + halfH * scale);
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(Color.argb(Math.round(255 * opacity), Color.red(base), Color.green(base), Color.blue(base)));
+                    canvas.drawOval(sphere, paint);
+                    paint.setColor(Color.argb(Math.round(75 * opacity), 255, 255, 255));
+                    RectF highlight = new RectF(sphere.left + sphere.width() * 0.18f,
+                            sphere.top + sphere.height() * 0.12f, sphere.centerX(),
+                            sphere.centerY());
+                    canvas.drawOval(highlight, paint);
+                    continue;
+                }
+                Integer[] order = {0, 1, 2, 3, 4, 5};
+                java.util.Arrays.sort(order, (a, b) -> {
+                    double da = 0, db = 0;
+                    for (int vertex : faces[a]) da += rotated[vertex][2];
+                    for (int vertex : faces[b]) db += rotated[vertex][2];
+                    return Double.compare(da, db);
+                });
+                for (int face : order) {
+                    Path path = new Path();
+                    path.moveTo(projected[faces[face][0]][0], projected[faces[face][0]][1]);
+                    for (int corner = 1; corner < 4; corner++)
+                        path.lineTo(projected[faces[face][corner]][0], projected[faces[face][corner]][1]);
+                    path.close();
+                    float shade = shades[face] * opacity;
+                    paint.setStyle(Paint.Style.FILL);
+                    paint.setColor(Color.rgb(Math.round(Color.red(base) * shade),
+                            Math.round(Color.green(base) * shade), Math.round(Color.blue(base) * shade)));
+                    canvas.drawPath(path, paint);
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setStrokeWidth(dp(1));
+                    paint.setColor(Color.rgb(37, 29, 53));
+                    canvas.drawPath(path, paint);
+                }
+                paint.setStyle(Paint.Style.FILL);
+            }
         }
 
         @Override
@@ -1288,12 +1504,10 @@ public final class MainActivity extends Activity {
                     buttonRect.set((float) (bx * width / 100), (float) (by * height / 100),
                             (float) ((bx + block.optDouble("w")) * width / 100),
                             (float) ((by + block.optDouble("h")) * height / 100));
-                    float radius = (float) (Math.max(0, block.optDouble("radius")) * Math.min(width, height) / 100);
-                    radius = Math.min(radius, Math.min(buttonRect.width(), buttonRect.height()) / 2f);
-                    if (radius > 0) canvas.drawRoundRect(buttonRect, radius, radius, paint);
-                    else canvas.drawRect(buttonRect, paint);
+                    drawBlockShape(canvas, block, buttonRect);
                 }
             }
+            draw3DModels(canvas, width, height);
             for (JSONObject sprite : sprites) {
                 if (!sprite.optBoolean("visible", true)) continue;
                 String path = sprite.optString("path");
@@ -1364,7 +1578,7 @@ public final class MainActivity extends Activity {
                 }
             }
             if (animating) postInvalidateDelayed(16);
-            if ((blocks == null || blocks.length() == 0) && sprites.isEmpty()
+            if ((blocks == null || blocks.length() == 0) && sprites.isEmpty() && models.isEmpty()
                     && (buttons == null || buttons.length() == 0)) {
                 paint.setColor(Color.LTGRAY);
                 paint.setTextAlign(Paint.Align.CENTER);
@@ -1408,8 +1622,16 @@ public final class MainActivity extends Activity {
                 nativeSetPointer(getWidth() == 0 ? 0 : event.getX() * 100f / getWidth(),
                         getHeight() == 0 ? 0 : event.getY() * 100f / getHeight(), false);
                 if (menuToolbar) {
-                    if (hitButton(event.getX(), event.getY()) == 0) {
-                        onTrgStudioAction("menu");
+                    int tappedButton = hitButton(event.getX(), event.getY());
+                    JSONArray toolbarButtons = state.optJSONArray("buttons");
+                    if (tappedButton >= 0 && toolbarButtons != null) {
+                        for (int i = 0; i < toolbarButtons.length(); i++) {
+                            JSONObject item = toolbarButtons.optJSONObject(i);
+                            if (item != null && item.optInt("index", i) == tappedButton) {
+                                onTrgStudioAction(item.optString("name", "menu"));
+                                break;
+                            }
+                        }
                     }
                     performClick();
                     return true;
@@ -1417,7 +1639,13 @@ public final class MainActivity extends Activity {
                 nativeSetMobileInput("mobile_hold", "released");
                 int buttonIndex = hitButton(event.getX(), event.getY());
                 int sequence = touchSequence;
-                if (buttonIndex >= 0) {
+                if (buttonIndex >= 0 && studioMenuPreview == this) {
+                    String action = buttonName(buttonIndex);
+                    if (!action.isEmpty()) onTrgStudioAction(action);
+                    postDelayed(() -> {
+                        if (sequence == touchSequence) releaseSwipes();
+                    }, 150);
+                } else if (buttonIndex >= 0) {
                     runButton(buttonIndex);
                     postDelayed(() -> {
                         if (sequence == touchSequence) releaseSwipes();
@@ -1447,6 +1675,17 @@ public final class MainActivity extends Activity {
 
         private void releaseSwipes() {
             for (String swipe : MOBILE_SWIPES) nativeSetMobileInput(swipe, "released");
+        }
+
+        private String buttonName(int index) {
+            JSONArray buttons = state.optJSONArray("buttons");
+            if (buttons == null) return "";
+            for (int i = 0; i < buttons.length(); i++) {
+                JSONObject button = buttons.optJSONObject(i);
+                if (button != null && button.optInt("index", i) == index)
+                    return button.optString("name", "");
+            }
+            return "";
         }
 
         private int hitButton(float x, float y) {

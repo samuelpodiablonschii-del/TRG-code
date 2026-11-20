@@ -63,6 +63,7 @@ std::string serializeState() {
         if (index) result << ',';
         result << "{\"name\":" << jsonString(block.name)
                << ",\"color\":" << jsonString(block.color)
+               << ",\"shape\":" << jsonString(block.shape)
                << ",\"z\":" << block.z
                << ",\"x\":" << block.x << ",\"y\":" << block.y
                << ",\"w\":" << block.width << ",\"h\":" << block.height
@@ -80,6 +81,19 @@ std::string serializeState() {
                << ",\"w\":" << sprite.width << ",\"h\":" << sprite.height
                << ",\"opacity\":" << sprite.opacity
                << ",\"visible\":" << (sprite.visible && uiGroupIsVisible(sprite.group) ? "true" : "false") << '}';
+    }
+    result << "],\"models\":[";
+    for (std::size_t index = 0; index < ui3DObjects.size(); ++index) {
+        const Ui3DObject& model = ui3DObjects[index];
+        if (index) result << ',';
+        result << "{\"name\":" << jsonString(model.name)
+               << ",\"shape\":" << jsonString(model.shape)
+               << ",\"color\":" << jsonString(model.color)
+               << ",\"x\":" << model.x << ",\"y\":" << model.y << ",\"z\":" << model.z
+               << ",\"w\":" << model.width << ",\"h\":" << model.height << ",\"d\":" << model.depth
+               << ",\"rx\":" << model.rotateX << ",\"ry\":" << model.rotateY << ",\"rz\":" << model.rotateZ
+               << ",\"opacity\":" << model.opacity
+               << ",\"visible\":" << (model.visible && uiGroupIsVisible(model.group) ? "true" : "false") << '}';
     }
     result << "],\"animations\":[";
     for (std::size_t index = 0; index < uiAnimations.size(); ++index) {

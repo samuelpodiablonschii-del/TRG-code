@@ -235,6 +235,18 @@ struct UiBlock {
     bool visible = true;
 };
 
+struct Ui3DObject {
+    std::string name;
+    std::string group;
+    std::string shape = "box";
+    std::string color = "#8B5CF6";
+    double x = 0, y = 0, z = 0;
+    double width = 2, height = 2, depth = 2;
+    double rotateX = 0, rotateY = 0, rotateZ = 0;
+    double opacity = 1.0;
+    bool visible = true;
+};
+
 struct UiSprite {
     std::string name;
     std::string group;
@@ -301,6 +313,9 @@ using Defaults = std::unordered_map<std::string, std::string>;
 
 std::unordered_map<std::string, UserFunction> userFunctions;
 std::vector<UiBlock> uiBlocks;
+std::vector<Ui3DObject> ui3DObjects;
+int uiAutoNameCounter = 1;
+int threeDAutoNameCounter = 1;
 std::vector<UiSprite> uiSprites;
 std::vector<UiAnimation> uiAnimations;
 std::vector<EveryTask> everyTasks;
@@ -339,6 +354,7 @@ bool timeEnabled = false;
 bool convertEnabled = false;
 bool statsEnabled = false;
 bool unitsEnabled = false;
+bool threeDEnabled = false;
 std::string webPageHtml;
 std::vector<std::string> readProgram(std::istream& source);
 std::size_t errorCount = 0;
@@ -1825,6 +1841,7 @@ struct LibraryState {
     bool stats = false;
     bool units = false;
     bool physics = false;
+    bool threeD = false;
     bool bouncyballs = false;
 };
 
@@ -1922,12 +1939,14 @@ void scanLibraries(const std::vector<std::string>& program, LibraryState& librar
             libraries.powershell = libraries.raspberry = libraries.accessibility = true;
             libraries.stats = libraries.units = true;
             libraries.physics = true;
+            libraries.threeD = true;
             libraries.bouncyballs = true;
         } else if (name == "files") libraries.files = true;
         else if (name == "json") libraries.json = true;
         else if (name == "web") libraries.web = true;
         else if (name == "collision") libraries.collision = true;
         else if (name == "physics") libraries.physics = true;
+        else if (name == "3d") libraries.threeD = true;
         else if (name == "bouncyballs") libraries.bouncyballs = true;
         else if (name == "manual") libraries.manual = true;
         else if (name == "ui" || name == "animation") libraries.ui = true;
@@ -2417,6 +2436,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             for (UiSprite& item : uiSprites) if (item.name == tokens[1]) { item.visible = visible; found = true; }
             for (UiButton& item : uiButtons) if (item.name == tokens[1]) { item.visible = visible; found = true; }
             for (UiText& item : uiTexts) if (item.name == tokens[1]) { item.visible = visible; found = true; }
+            for (Ui3DObject& item : ui3DObjects) if (item.name == tokens[1]) { item.visible = visible; found = true; }
             if (!found) reportError(i + 1, "unknown UI group or object", tokens[1]);
             continue;
         }
@@ -4069,6 +4089,297 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
         }
 
         
+        if (cmd == "ui") {
+            if (!uiMode) { reportError(i + 1, "UI editing commands need add (ui)"); continue; }
+            if (tokens.size() < 3) { reportError(i + 1, "use ui create|duplicate|delete|rename|move|resize|color|shape"); continue; }
+            const std::string action = lower(tokens[1]);
+            const auto uniqueUiName = [&]() {
+                std::string candidate;
+                do { candidate = "object_" + std::to_string(uiAutoNameCounter++); }
+                while (std::any_of(uiBlocks.begin(), uiBlocks.end(), [&](const UiBlock& item) { return item.name == candidate; }) ||
+                       std::any_of(uiSprites.begin(), uiSprites.end(), [&](const UiSprite& item) { return item.name == candidate; }));
+                return candidate;
+            };
+            if (action == "create") {
+                if (tokens.size() < 14 || lower(tokens[2]) != "block") {
+                    reportError(i + 1, "use ui create block NAME x X y Y w W h H color COLOR [shape SHAPE]");
+                    continue;
+                }
+                UiBlock item;
+                item.group = currentUiGroup;
+                item.name = valueFor(tokens[3], variables);
+                if (lower(item.name) == "auto") item.name = uniqueUiName();
+                bool valid = validName(item.name);
+                bool hasX = false, hasY = false, hasW = false, hasH = false, hasColor = false;
+                for (std::size_t part = 4; valid && part + 1 < tokens.size(); part += 2) {
+                    const std::string key = lower(tokens[part]);
+                    const std::string value = valueFor(tokens[part + 1], variables);
+                    double number = 0;
+                    if (key == "x") { valid = parseNumber(value, item.x); hasX = valid; }
+                    else if (key == "y") { valid = parseNumber(value, item.y); hasY = valid; }
+                    else if (key == "w") { valid = parseNumber(value, item.width) && item.width > 0; hasW = valid; }
+                    else if (key == "h") { valid = parseNumber(value, item.height) && item.height > 0; hasH = valid; }
+                    else if (key == "z") { valid = parseNumber(value, number); if (valid) item.z = static_cast<int>(number); }
+                    else if (key == "color") {
+                        unsigned red = 0, green = 0, blue = 0;
+                        valid = parseColor(value, red, green, blue);
+                        if (valid) { item.color = value; hasColor = true; }
+                    } else if (key == "shape") {
+                        const std::string shape = lower(value);
+                        valid = shape == "square" || shape == "rect" || shape == "circle" ||
+                                shape == "triangle" || shape == "pentagon" || shape == "hexagon" || shape == "star";
+                        if (valid) item.shape = shape == "rect" ? "square" : shape;
+                    } else valid = false;
+                }
+                const bool exists = std::any_of(uiBlocks.begin(), uiBlocks.end(), [&](const UiBlock& other) { return other.name == item.name; });
+                if (!valid || !hasX || !hasY || !hasW || !hasH || !hasColor || exists) {
+                    reportError(i + 1, "ui create needs a unique name, x/y/w/h, a valid color, and an optional supported shape", item.name);
+                    continue;
+                }
+                uiBlocks.push_back(item);
+                variables["last_ui_object"] = item.name;
+                types["last_ui_object"] = "word";
+                continue;
+            }
+            if (action == "duplicate" || action == "copy") {
+                if (tokens.size() != 4) { reportError(i + 1, "use ui duplicate SOURCE NAME"); continue; }
+                const std::string sourceName = valueFor(tokens[2], variables);
+                std::string newName = valueFor(tokens[3], variables);
+                if (lower(newName) == "auto") newName = uniqueUiName();
+                if (!validName(newName)) { reportError(i + 1, "duplicate name must be a valid identifier", newName); continue; }
+                const bool nameUsed = std::any_of(uiBlocks.begin(), uiBlocks.end(), [&](const UiBlock& item) { return item.name == newName; }) ||
+                                      std::any_of(uiSprites.begin(), uiSprites.end(), [&](const UiSprite& item) { return item.name == newName; }) ||
+                                      std::any_of(uiButtons.begin(), uiButtons.end(), [&](const UiButton& item) { return item.name == newName; }) ||
+                                      std::any_of(uiTexts.begin(), uiTexts.end(), [&](const UiText& item) { return item.name == newName; });
+                if (nameUsed) { reportError(i + 1, "ui duplicate name already exists", newName); continue; }
+                bool created = false;
+                for (const UiBlock& source : uiBlocks) if (source.name == sourceName) {
+                    UiBlock copy = source; copy.name = newName; copy.group = currentUiGroup;
+                    copy.x = std::clamp(copy.x + 3.0, 0.0, 100.0 - copy.width);
+                    copy.y = std::clamp(copy.y + 3.0, 0.0, 100.0 - copy.height);
+                    copy.visible = true; uiBlocks.push_back(copy); created = true; break;
+                }
+                if (!created) for (const UiSprite& source : uiSprites) if (source.name == sourceName) {
+                    UiSprite copy = source; copy.name = newName; copy.group = currentUiGroup;
+                    copy.x = std::clamp(copy.x + 3.0, 0.0, 100.0 - copy.width);
+                    copy.y = std::clamp(copy.y + 3.0, 0.0, 100.0 - copy.height);
+                    copy.visible = true; uiSprites.push_back(copy); created = true; break;
+                }
+                if (!created) reportError(i + 1, "ui duplicate needs an existing block or sprite", sourceName);
+                else {
+                    variables["last_ui_object"] = newName;
+                    types["last_ui_object"] = "word";
+                }
+                continue;
+            }
+            if (action == "delete" && tokens.size() == 3) {
+                const std::string name = valueFor(tokens[2], variables);
+                const auto oldBlocks = uiBlocks.size(); const auto oldSprites = uiSprites.size();
+                const auto oldButtons = uiButtons.size(); const auto oldTexts = uiTexts.size();
+                uiBlocks.erase(std::remove_if(uiBlocks.begin(), uiBlocks.end(), [&](const UiBlock& item) { return item.name == name; }), uiBlocks.end());
+                uiSprites.erase(std::remove_if(uiSprites.begin(), uiSprites.end(), [&](const UiSprite& item) { return item.name == name; }), uiSprites.end());
+                uiButtons.erase(std::remove_if(uiButtons.begin(), uiButtons.end(), [&](const UiButton& item) { return item.name == name; }), uiButtons.end());
+                uiTexts.erase(std::remove_if(uiTexts.begin(), uiTexts.end(), [&](const UiText& item) { return item.name == name; }), uiTexts.end());
+                if (uiBlocks.size() == oldBlocks && uiSprites.size() == oldSprites && uiButtons.size() == oldButtons && uiTexts.size() == oldTexts)
+                    reportError(i + 1, "unknown UI object", name);
+                else physicsBodies.erase(name);
+                continue;
+            }
+            if (action == "rename" && tokens.size() == 4) {
+                const std::string oldName = valueFor(tokens[2], variables);
+                const std::string newName = valueFor(tokens[3], variables);
+                if (!validName(newName)) { reportError(i + 1, "new UI name must be a valid identifier", newName); continue; }
+                const bool nameUsed = std::any_of(uiBlocks.begin(), uiBlocks.end(), [&](const UiBlock& item) { return item.name == newName && item.name != oldName; }) ||
+                                      std::any_of(uiSprites.begin(), uiSprites.end(), [&](const UiSprite& item) { return item.name == newName && item.name != oldName; }) ||
+                                      std::any_of(uiButtons.begin(), uiButtons.end(), [&](const UiButton& item) { return item.name == newName && item.name != oldName; }) ||
+                                      std::any_of(uiTexts.begin(), uiTexts.end(), [&](const UiText& item) { return item.name == newName && item.name != oldName; });
+                if (nameUsed) { reportError(i + 1, "UI name already exists", newName); continue; }
+                bool renamed = false;
+                for (UiBlock& item : uiBlocks) if (item.name == oldName) { item.name = newName; renamed = true; break; }
+                if (!renamed) for (UiSprite& item : uiSprites) if (item.name == oldName) { item.name = newName; renamed = true; break; }
+                if (!renamed) for (UiText& item : uiTexts) if (item.name == oldName) { item.name = newName; renamed = true; break; }
+                if (!renamed) reportError(i + 1, "unknown UI object", oldName);
+                else {
+                    auto body = physicsBodies.find(oldName);
+                    if (body != physicsBodies.end()) { PhysicsBody moved = body->second; physicsBodies.erase(body); moved.name = newName; physicsBodies[newName] = moved; }
+                    for (CollisionWatch& watch : collisionWatches) { if (watch.first == oldName) watch.first = newName; if (watch.second == oldName) watch.second = newName; }
+                }
+                continue;
+            }
+            const std::string name = tokens.size() > 2 ? valueFor(tokens[2], variables) : "";
+            auto block = std::find_if(uiBlocks.begin(), uiBlocks.end(), [&](const UiBlock& item) { return item.name == name; });
+            auto sprite = std::find_if(uiSprites.begin(), uiSprites.end(), [&](const UiSprite& item) { return item.name == name; });
+            if (action == "move" && tokens.size() == 5) {
+                double dx = 0, dy = 0;
+                if (!evaluateExpression(tokens[3], variables, dx) || !evaluateExpression(tokens[4], variables, dy)) {
+                    reportError(i + 1, "use ui move NAME DX DY"); continue;
+                }
+                if (block != uiBlocks.end()) { block->x += dx; block->y += dy; }
+                else if (sprite != uiSprites.end()) { sprite->x += dx; sprite->y += dy; }
+                else { reportError(i + 1, "unknown movable UI object", name); continue; }
+                refreshCollisionWatches(variables, types);
+                continue;
+            }
+            if (action == "resize" && tokens.size() == 5) {
+                double dw = 0, dh = 0;
+                if (!evaluateExpression(tokens[3], variables, dw) || !evaluateExpression(tokens[4], variables, dh)) {
+                    reportError(i + 1, "use ui resize NAME WIDTH_CHANGE HEIGHT_CHANGE"); continue;
+                }
+                if (block != uiBlocks.end() && block->width + dw > 0 && block->height + dh > 0) { block->width += dw; block->height += dh; }
+                else if (sprite != uiSprites.end() && sprite->width + dw > 0 && sprite->height + dh > 0) { sprite->width += dw; sprite->height += dh; }
+                else { reportError(i + 1, "resize needs a block or sprite and a positive result", name); continue; }
+                refreshCollisionWatches(variables, types);
+                continue;
+            }
+            if (action == "color" && tokens.size() == 4) {
+                const std::string color = valueFor(tokens[3], variables);
+                unsigned red = 0, green = 0, blue = 0;
+                if (!parseColor(color, red, green, blue)) { reportError(i + 1, "ui color needs #RRGGBB or 0xRRGGBB", color); continue; }
+                bool changed = false;
+                for (UiBlock& item : uiBlocks) if (item.name == name) { item.color = color; changed = true; }
+                for (UiButton& item : uiButtons) if (item.name == name) { item.color = color; changed = true; }
+                if (!changed) reportError(i + 1, "unknown recolorable UI object", name);
+                continue;
+            }
+            if (action == "shape" && tokens.size() == 4) {
+                const std::string shape = lower(valueFor(tokens[3], variables));
+                if (block == uiBlocks.end() || (shape != "square" && shape != "rect" && shape != "circle" &&
+                    shape != "triangle" && shape != "pentagon" && shape != "hexagon" && shape != "star")) {
+                    reportError(i + 1, "ui shape needs a block and a supported shape", name); continue;
+                }
+                block->shape = shape == "rect" ? "square" : shape;
+                block->cornerRadius = 0;
+                continue;
+            }
+            reportError(i + 1, "unknown or invalid ui operation", action);
+            continue;
+        }
+
+        if (cmd == "3d") {
+            if (!threeDEnabled) { reportError(i + 1, "3D commands need add (3d)"); continue; }
+            if (tokens.size() < 2) { reportError(i + 1, "use 3d box|sphere|move|rotate|scale|color|rename|delete|clear"); continue; }
+            const std::string action = lower(tokens[1]);
+            const auto unique3DName = [&]() {
+                std::string candidate;
+                do { candidate = "model_" + std::to_string(threeDAutoNameCounter++); }
+                while (std::any_of(ui3DObjects.begin(), ui3DObjects.end(), [&](const Ui3DObject& item) { return item.name == candidate; }));
+                return candidate;
+            };
+            if (action == "box" || action == "sphere") {
+                Ui3DObject object;
+                object.group = currentUiGroup;
+                object.shape = action;
+                object.name = tokens.size() > 2 ? valueFor(tokens[2], variables) : "";
+                if (lower(object.name) == "auto") object.name = unique3DName();
+                bool valid = validName(object.name);
+                bool hasColor = false;
+                for (std::size_t part = 3; valid && part + 1 < tokens.size(); part += 2) {
+                    const std::string key = lower(tokens[part]);
+                    const std::string value = valueFor(tokens[part + 1], variables);
+                    double number = 0;
+                    if (key == "x") valid = parseNumber(value, object.x);
+                    else if (key == "y") valid = parseNumber(value, object.y);
+                    else if (key == "z") valid = parseNumber(value, object.z);
+                    else if (key == "w") valid = parseNumber(value, object.width) && object.width > 0;
+                    else if (key == "h") valid = parseNumber(value, object.height) && object.height > 0;
+                    else if (key == "d") valid = parseNumber(value, object.depth) && object.depth > 0;
+                    else if (key == "size") {
+                        valid = parseNumber(value, number) && number > 0;
+                        if (valid) object.width = object.height = object.depth = number;
+                    } else if (key == "color") {
+                        unsigned red = 0, green = 0, blue = 0;
+                        valid = parseColor(value, red, green, blue);
+                        if (valid) { object.color = value; hasColor = true; }
+                    } else valid = false;
+                }
+                const bool exists = std::any_of(ui3DObjects.begin(), ui3DObjects.end(), [&](const Ui3DObject& item) { return item.name == object.name; });
+                if (!valid || !hasColor || exists) {
+                    reportError(i + 1, action == "box" ?
+                        "use 3d box NAME x X y Y z Z w WIDTH h HEIGHT d DEPTH color COLOR" :
+                        "use 3d sphere NAME x X y Y z Z size SIZE color COLOR", object.name);
+                    continue;
+                }
+                ui3DObjects.push_back(object);
+                variables["last_3d_object"] = object.name;
+                types["last_3d_object"] = "word";
+                continue;
+            }
+            if ((action == "duplicate" || action == "copy") && tokens.size() == 4) {
+                const std::string sourceName = valueFor(tokens[2], variables);
+                std::string newName = valueFor(tokens[3], variables);
+                if (lower(newName) == "auto") newName = unique3DName();
+                const bool nameUsed = std::any_of(ui3DObjects.begin(), ui3DObjects.end(),
+                    [&](const Ui3DObject& item) { return item.name == newName; });
+                auto source = std::find_if(ui3DObjects.begin(), ui3DObjects.end(),
+                    [&](const Ui3DObject& item) { return item.name == sourceName; });
+                if (source == ui3DObjects.end() || !validName(newName) || nameUsed) {
+                    reportError(i + 1, "use 3d duplicate EXISTING_NAME NEW_UNIQUE_NAME", sourceName);
+                    continue;
+                }
+                Ui3DObject copy = *source;
+                copy.name = newName;
+                copy.group = currentUiGroup;
+                copy.x += 1.0;
+                copy.z += 1.0;
+                copy.visible = true;
+                ui3DObjects.push_back(copy);
+                variables["last_3d_object"] = newName;
+                types["last_3d_object"] = "word";
+                continue;
+            }
+            if (action == "clear" && tokens.size() == 2) { ui3DObjects.clear(); continue; }
+            const std::string name = tokens.size() > 2 ? valueFor(tokens[2], variables) : "";
+            auto object = std::find_if(ui3DObjects.begin(), ui3DObjects.end(), [&](const Ui3DObject& item) { return item.name == name; });
+            if (action == "delete" && tokens.size() == 3) {
+                if (object == ui3DObjects.end()) reportError(i + 1, "unknown 3D object", name);
+                else ui3DObjects.erase(object);
+                continue;
+            }
+            if (action == "rename" && tokens.size() == 4) {
+                const std::string newName = valueFor(tokens[3], variables);
+                const bool nameUsed = std::any_of(ui3DObjects.begin(), ui3DObjects.end(),
+                    [&](const Ui3DObject& item) { return item.name == newName && item.name != name; });
+                if (object == ui3DObjects.end() || !validName(newName) || nameUsed) {
+                    reportError(i + 1, "use 3d rename EXISTING_NAME NEW_UNIQUE_NAME");
+                    continue;
+                }
+                object->name = newName;
+                continue;
+            }
+            if (object == ui3DObjects.end()) { reportError(i + 1, "unknown 3D object", name); continue; }
+            if (action == "move" && tokens.size() == 6) {
+                double dx = 0, dy = 0, dz = 0;
+                if (!evaluateExpression(tokens[3], variables, dx) ||
+                    !evaluateExpression(tokens[4], variables, dy) ||
+                    !evaluateExpression(tokens[5], variables, dz)) { reportError(i + 1, "use 3d move NAME DX DY DZ"); continue; }
+                object->x += dx; object->y += dy; object->z += dz;
+                continue;
+            }
+            if (action == "rotate" && tokens.size() == 6) {
+                double rx = 0, ry = 0, rz = 0;
+                if (!evaluateExpression(tokens[3], variables, rx) ||
+                    !evaluateExpression(tokens[4], variables, ry) ||
+                    !evaluateExpression(tokens[5], variables, rz)) { reportError(i + 1, "use 3d rotate NAME RX RY RZ"); continue; }
+                object->rotateX += rx; object->rotateY += ry; object->rotateZ += rz;
+                continue;
+            }
+            if (action == "scale" && tokens.size() == 4) {
+                double factor = 0;
+                if (!evaluateExpression(tokens[3], variables, factor) || factor <= 0 || factor > 10) { reportError(i + 1, "3d scale must be between 0 and 10"); continue; }
+                object->width *= factor; object->height *= factor; object->depth *= factor;
+                continue;
+            }
+            if (action == "color" && tokens.size() == 4) {
+                const std::string color = valueFor(tokens[3], variables);
+                unsigned red = 0, green = 0, blue = 0;
+                if (!parseColor(color, red, green, blue)) { reportError(i + 1, "3d color needs a valid color", color); continue; }
+                object->color = color;
+                continue;
+            }
+            reportError(i + 1, "unknown or invalid 3D operation", action);
+            continue;
+        }
+
         if (cmd == "text") {
             if (!uiMode || tokens.size() < 10) {
                 reportError(i + 1, "use text NAME VALUE x X y Y size SIZE color COLOR [font sans|serif|mono] [align left|center|right]");
@@ -4769,7 +5080,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             SetWindowTextW(previewButton, L"Preview");
             outputBuffer.clear();
             projectRoot = std::filesystem::current_path();
-            uiBlocks.clear(); uiSprites.clear(); uiAnimations.clear();
+            uiBlocks.clear(); ui3DObjects.clear(); uiSprites.clear(); uiAnimations.clear();
             everyTasks.clear(); uiButtons.clear(); uiTexts.clear();
             collisionWatches.clear();
             updateEditorWindowTitle();
@@ -5025,6 +5336,79 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                     static_cast<Gdiplus::REAL>(sprite.width * canvasWidth / 100.0),
                     static_cast<Gdiplus::REAL>(sprite.height * canvasHeight / 100.0));
                 graphics.DrawImage(image.get(), destination);
+            }
+        }
+        const std::array<std::array<int, 4>, 6> modelFaces = {{
+            {{0, 1, 2, 3}}, {{4, 5, 6, 7}}, {{0, 3, 7, 4}},
+            {{1, 2, 6, 5}}, {{0, 1, 5, 4}}, {{3, 2, 6, 7}}
+        }};
+        const std::array<double, 6> faceLight = {{0.58, 1.0, 0.68, 0.78, 0.52, 0.90}};
+        for (const Ui3DObject& model : ui3DObjects) {
+            if (!model.visible || !uiGroupIsVisible(model.group)) continue;
+            unsigned red = 0, green = 0, blue = 0;
+            if (!parseColor(model.color, red, green, blue)) continue;
+            const double rx = model.rotateX * 3.141592653589793 / 180.0;
+            const double ry = model.rotateY * 3.141592653589793 / 180.0;
+            const double rz = model.rotateZ * 3.141592653589793 / 180.0;
+            const double cosineX = std::cos(rx), sineX = std::sin(rx);
+            const double cosineY = std::cos(ry), sineY = std::sin(ry);
+            const double cosineZ = std::cos(rz), sineZ = std::sin(rz);
+            const double halfW = model.width * 0.5, halfH = model.height * 0.5, halfD = model.depth * 0.5;
+            const std::array<std::array<double, 3>, 8> local = {{
+                {{-halfW,-halfH,-halfD}}, {{halfW,-halfH,-halfD}},
+                {{halfW,halfH,-halfD}}, {{-halfW,halfH,-halfD}},
+                {{-halfW,-halfH,halfD}}, {{halfW,-halfH,halfD}},
+                {{halfW,halfH,halfD}}, {{-halfW,halfH,halfD}}
+            }};
+            std::array<std::array<double, 3>, 8> rotated{};
+            std::array<POINT, 8> projected{};
+            const double modelScale = std::min(canvasWidth, canvasHeight) * 0.115;
+            const double centerX = canvasWidth * 0.5;
+            const double centerY = layout.headerHeight + canvasHeight * 0.53;
+            for (std::size_t vertex = 0; vertex < local.size(); ++vertex) {
+                const double x1 = local[vertex][0];
+                const double y1 = local[vertex][1] * cosineX - local[vertex][2] * sineX;
+                const double z1 = local[vertex][1] * sineX + local[vertex][2] * cosineX;
+                const double x2 = x1 * cosineY + z1 * sineY;
+                const double y2 = y1;
+                const double z2 = -x1 * sineY + z1 * cosineY;
+                const double x3 = x2 * cosineZ - y2 * sineZ + model.x;
+                const double y3 = x2 * sineZ + y2 * cosineZ + model.y;
+                const double z3 = z2 + model.z;
+                rotated[vertex] = {{x3, y3, z3}};
+                projected[vertex].x = static_cast<LONG>(centerX + (x3 - z3 * 0.48) * modelScale);
+                projected[vertex].y = static_cast<LONG>(centerY - (y3 - (x3 + z3) * 0.27) * modelScale);
+            }
+            if (model.shape == "sphere") {
+                const LONG radiusX = static_cast<LONG>(std::max(2.0, halfW * modelScale));
+                const LONG radiusY = static_cast<LONG>(std::max(2.0, halfH * modelScale * 0.82));
+                RECT sphereArea = {static_cast<LONG>(centerX) - radiusX, static_cast<LONG>(centerY) - radiusY,
+                    static_cast<LONG>(centerX) + radiusX, static_cast<LONG>(centerY) + radiusY};
+                HBRUSH sphereBrush = CreateSolidBrush(RGB(red, green, blue));
+                HPEN spherePen = CreatePen(PS_SOLID, 1, RGB(35, 27, 49));
+                HGDIOBJ oldBrush = SelectObject(dc, sphereBrush), oldPen = SelectObject(dc, spherePen);
+                Ellipse(dc, sphereArea.left, sphereArea.top, sphereArea.right, sphereArea.bottom);
+                SelectObject(dc, oldBrush); SelectObject(dc, oldPen); DeleteObject(sphereBrush); DeleteObject(spherePen);
+                continue;
+            }
+            std::array<int, 6> faceOrder = {{0, 1, 2, 3, 4, 5}};
+            std::stable_sort(faceOrder.begin(), faceOrder.end(), [&](int first, int second) {
+                double firstDepth = 0, secondDepth = 0;
+                for (int vertex : modelFaces[first]) firstDepth += rotated[vertex][2];
+                for (int vertex : modelFaces[second]) secondDepth += rotated[vertex][2];
+                return firstDepth < secondDepth;
+            });
+            for (int faceIndex : faceOrder) {
+                POINT polygon[4];
+                for (int corner = 0; corner < 4; ++corner) polygon[corner] = projected[modelFaces[faceIndex][corner]];
+                const double shade = faceLight[faceIndex] * std::clamp(model.opacity, 0.0, 1.0);
+                const COLORREF faceColor = RGB(static_cast<BYTE>(red * shade),
+                    static_cast<BYTE>(green * shade), static_cast<BYTE>(blue * shade));
+                HBRUSH faceBrush = CreateSolidBrush(faceColor);
+                HPEN facePen = CreatePen(PS_SOLID, 1, RGB(28, 22, 40));
+                HGDIOBJ oldBrush = SelectObject(dc, faceBrush), oldPen = SelectObject(dc, facePen);
+                Polygon(dc, polygon, 4);
+                SelectObject(dc, oldBrush); SelectObject(dc, oldPen); DeleteObject(faceBrush); DeleteObject(facePen);
             }
         }
         for (const UiButton& button : uiButtons) {
@@ -5295,6 +5679,9 @@ void executeProgram(const std::vector<std::string>& program) {
     Flow flow;
     errorCount = 0;
     uiBlocks.clear();
+    ui3DObjects.clear();
+    uiAutoNameCounter = 1;
+    threeDAutoNameCounter = 1;
     uiSprites.clear();
     uiGroups.clear();
     currentUiGroup = "default";
@@ -5336,6 +5723,7 @@ void executeProgram(const std::vector<std::string>& program) {
     convertEnabled = libraries.convert;
     statsEnabled = libraries.stats;
     unitsEnabled = libraries.units;
+    threeDEnabled = libraries.threeD;
     aiModels.clear();
     if (libraries.controls) initializeControls(uiVariables, uiTypes);
     registerFunctions(uiProgram);
