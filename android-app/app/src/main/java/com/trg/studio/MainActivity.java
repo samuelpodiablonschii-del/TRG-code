@@ -45,6 +45,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.MediaController;
 import android.widget.TextView;
+import android.widget.Toast;
 import android.widget.Switch;
 import android.widget.VideoView;
 import android.webkit.WebSettings;
@@ -106,6 +107,8 @@ public final class MainActivity extends Activity {
     private static native void nativeSetMobileInput(String name, String state);
     private static native void nativeSetPointer(float x, float y, boolean down);
     private static native void nativeStop();
+    private static native String nativeTransformEditorObject(String kind, String name, float dx, float dy, float dz);
+    private static native String nativeScaleEditorObject(String kind, String name, float factor);
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private EditText editor;
@@ -113,6 +116,8 @@ public final class MainActivity extends Activity {
     private TextView output;
     private TextView status;
     private PreviewView preview;
+    private final android.graphics.Typeface fixedUiFont = android.graphics.Typeface.create("monospace", android.graphics.Typeface.NORMAL);
+    private final android.graphics.Typeface fixedUiFontBold = android.graphics.Typeface.create("monospace", android.graphics.Typeface.BOLD);
     private LinearLayout editorScreen;
     private LinearLayout outputScreen;
     private String sourceText = "";
@@ -257,7 +262,7 @@ public final class MainActivity extends Activity {
         lineNumbers.setText("1");
         lineNumbers.setTextColor(Color.rgb(135, 124, 158));
         lineNumbers.setTextSize(editorFontSize);
-        lineNumbers.setTypeface(android.graphics.Typeface.MONOSPACE);
+        lineNumbers.setTypeface(fixedUiFont);
         lineNumbers.setMaxLines(Integer.MAX_VALUE);
         lineNumbers.setIncludeFontPadding(false);
         lineNumbers.setGravity(Gravity.TOP | Gravity.RIGHT);
@@ -271,7 +276,7 @@ public final class MainActivity extends Activity {
         editor.setHintTextColor(Color.GRAY);
         editor.setHint("Write TRG source here");
         editor.setTextSize(editorFontSize);
-        editor.setTypeface(android.graphics.Typeface.MONOSPACE);
+        editor.setTypeface(fixedUiFont);
         editor.setMaxLines(Integer.MAX_VALUE);
         editor.setIncludeFontPadding(false);
         editor.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE
@@ -289,6 +294,7 @@ public final class MainActivity extends Activity {
         outputScreen.setBackgroundColor(Color.rgb(8, 7, 11));
         TextView outputHeader = new TextView(this);
         outputHeader.setText("  >   PROGRAM OUTPUT");
+        outputHeader.setTypeface(fixedUiFontBold);
         outputHeader.setTextColor(Color.rgb(194, 180, 214));
         outputHeader.setTextSize(11);
         outputHeader.setGravity(Gravity.CENTER_VERTICAL);
@@ -301,7 +307,7 @@ public final class MainActivity extends Activity {
         output = new TextView(this);
         output.setTextColor(Color.rgb(219, 213, 230));
         output.setTextSize(14);
-        output.setTypeface(android.graphics.Typeface.MONOSPACE);
+        output.setTypeface(fixedUiFont);
         output.setPadding(dp(14), dp(12), dp(12), dp(12));
         output.setText("Run a TRG program to see its output here.\n");
         outputScroll.addView(output);
@@ -310,6 +316,7 @@ public final class MainActivity extends Activity {
         outputScreen.setVisibility(View.GONE);
 
         status = new TextView(this);
+        status.setTypeface(fixedUiFont);
         status.setTextColor(Color.rgb(200, 190, 218));
         status.setTextSize(11);
         status.setPadding(dp(12), dp(4), dp(10), dp(4));
@@ -784,6 +791,7 @@ public final class MainActivity extends Activity {
         fileTabs.removeAllViews();
         for (String name : openDocuments.keySet()) {
             TextView tab = new TextView(this);
+            tab.setTypeface(fixedUiFont);
             tab.setText("  " + name + "  ");
             tab.setTextSize(12);
             tab.setGravity(Gravity.CENTER_VERTICAL);
@@ -841,7 +849,9 @@ public final class MainActivity extends Activity {
     }
 
     private void showProgramPreview() {
-        PreviewView programPreview = new PreviewView();
+        boolean editor2D = "2DEditor.trg".equalsIgnoreCase(currentDocumentName);
+        boolean editor3D = "3DEditor.trg".equalsIgnoreCase(currentDocumentName);
+        PreviewView programPreview = new PreviewView(false, editor2D, editor3D);
         JSONObject previewSnapshot;
         try { previewSnapshot = new JSONObject(lastRunState.toString()); }
         catch (JSONException exception) { previewSnapshot = new JSONObject(); }
@@ -856,6 +866,7 @@ public final class MainActivity extends Activity {
         FrameLayout fullScreen = new FrameLayout(this);
         fullScreen.addView(programPreview, new FrameLayout.LayoutParams(-1, -1));
         TextView menuButton = new TextView(this);
+        menuButton.setTypeface(fixedUiFontBold);
         menuButton.setText("MENU");
         menuButton.setTextColor(Color.WHITE);
         menuButton.setTextSize(12);
@@ -1333,14 +1344,38 @@ public final class MainActivity extends Activity {
         private int touchSequence;
         private final boolean menuToolbar;
 
-        PreviewView() {
-            this(false);
+        private final boolean editor2D;
+        private final boolean editor3D;
+        private String selectedEditorName = "";
+        private String selectedEditorKind = "";
+        private boolean editorObjectDragging;
+        private boolean editorMoved;
+        private int editorGestureMode;
+        private float lastEditorX;
+        private float lastEditorY;
+        private float lastPinchSpan;
+        private float lastPinchCenterX;
+        private float lastPinchCenterY;
+        private float cameraYaw = 0.48f;
+        private float cameraPitch = 0.32f;
+        private float cameraZoom = 1.0f;
+
+        private final class EditorHit {
+            final String kind;
+            final String name;
+            EditorHit(String kind, String name) { this.kind = kind; this.name = name; }
         }
 
-        PreviewView(boolean menuToolbar) {
+        PreviewView() { this(false, false, false); }
+        PreviewView(boolean menuToolbar) { this(menuToolbar, false, false); }
+
+        PreviewView(boolean menuToolbar, boolean editor2D, boolean editor3D) {
             super(MainActivity.this);
             this.menuToolbar = menuToolbar;
-            setBackgroundColor(Color.rgb(38, 36, 44));
+            this.editor2D = editor2D;
+            this.editor3D = editor3D;
+            setBackgroundColor(Color.rgb(13, 11, 18));
+            setFocusable(true);
         }
 
         void setState(JSONObject next) {
@@ -1413,6 +1448,19 @@ public final class MainActivity extends Activity {
             else canvas.drawRect(rect, paint);
         }
 
+        private float[] project3DPoint(double x, double y, double z, float width, float height) {
+            double cy = Math.cos(cameraYaw), sy = Math.sin(cameraYaw);
+            double cp = Math.cos(cameraPitch), sp = Math.sin(cameraPitch);
+            double viewX = x * cy - z * sy;
+            double depthAxis = x * sy + z * cy;
+            double viewY = y * cp - depthAxis * sp;
+            double depth = y * sp + depthAxis * cp;
+            double perspective = Math.max(0.42, Math.min(1.85, 28.0 / Math.max(8.0, 28.0 + depth)));
+            float scale = Math.min(width, height) * 0.115f * cameraZoom;
+            return new float[] { width * 0.5f + (float) (viewX * scale * perspective),
+                    height * 0.53f - (float) (viewY * scale * perspective), (float) perspective };
+        }
+
         private void draw3DModels(Canvas canvas, float width, float height) {
             if (models.isEmpty() || width <= 0 || height <= 0) return;
             final int[][] faces = {
@@ -1420,9 +1468,6 @@ public final class MainActivity extends Activity {
                     {1, 2, 6, 5}, {0, 1, 5, 4}, {3, 2, 6, 7}
             };
             final float[] shades = {0.58f, 1.0f, 0.68f, 0.78f, 0.52f, 0.90f};
-            float scale = Math.min(width, height) * 0.115f;
-            float centerX = width * 0.5f;
-            float centerY = height * 0.53f;
             for (JSONObject model : models) {
                 if (!model.optBoolean("visible", true)) continue;
                 int base = parseColor(model.optString("color", "#8B5CF6"));
@@ -1442,7 +1487,6 @@ public final class MainActivity extends Activity {
                         {-halfW,-halfH,halfD}, {halfW,-halfH,halfD},
                         {halfW,halfH,halfD}, {-halfW,halfH,halfD}
                 };
-                double[][] rotated = new double[8][3];
                 float[][] projected = new float[8][2];
                 for (int i = 0; i < 8; i++) {
                     double x1 = local[i][0];
@@ -1454,61 +1498,99 @@ public final class MainActivity extends Activity {
                     double x3 = x2 * cz - y2 * sz + model.optDouble("x");
                     double y3 = x2 * sz + y2 * cz + model.optDouble("y");
                     double z3 = z2 + model.optDouble("z");
-                    rotated[i][0] = x3; rotated[i][1] = y3; rotated[i][2] = z3;
-                    projected[i][0] = centerX + (float) (x3 - z3 * 0.48) * scale;
-                    projected[i][1] = centerY - (float) (y3 - (x3 + z3) * 0.27) * scale;
+                    float[] point = project3DPoint(x3, y3, z3, width, height);
+                    projected[i][0] = point[0];
+                    projected[i][1] = point[1];
                 }
+                float[] center = project3DPoint(model.optDouble("x"), model.optDouble("y"),
+                        model.optDouble("z"), width, height);
                 if ("sphere".equals(model.optString("shape"))) {
-                    double sphereX = model.optDouble("x"), sphereY = model.optDouble("y");
-                    double sphereZ = model.optDouble("z");
-                    float sphereCenterX = centerX + (float) (sphereX - sphereZ * 0.48) * scale;
-                    float sphereCenterY = centerY - (float) (sphereY - (sphereX + sphereZ) * 0.27) * scale;
-                    RectF sphere = new RectF(
-                            sphereCenterX - halfW * scale,
-                            sphereCenterY - halfH * scale,
-                            sphereCenterX + halfW * scale,
-                            sphereCenterY + halfH * scale);
+                    float radiusX = halfW * Math.min(width, height) * 0.115f * cameraZoom * center[2];
+                    float radiusY = halfH * Math.min(width, height) * 0.115f * cameraZoom * center[2];
+                    RectF sphere = new RectF(center[0] - radiusX, center[1] - radiusY,
+                            center[0] + radiusX, center[1] + radiusY);
                     paint.setStyle(Paint.Style.FILL);
                     paint.setColor(Color.argb(Math.round(255 * opacity), Color.red(base), Color.green(base), Color.blue(base)));
                     canvas.drawOval(sphere, paint);
-                    paint.setColor(Color.argb(Math.round(75 * opacity), 255, 255, 255));
-                    RectF highlight = new RectF(sphere.left + sphere.width() * 0.18f,
-                            sphere.top + sphere.height() * 0.12f, sphere.centerX(),
-                            sphere.centerY());
-                    canvas.drawOval(highlight, paint);
-                    continue;
-                }
-                Integer[] order = {0, 1, 2, 3, 4, 5};
-                java.util.Arrays.sort(order, (a, b) -> {
-                    double da = 0, db = 0;
-                    for (int vertex : faces[a]) da += rotated[vertex][2];
-                    for (int vertex : faces[b]) db += rotated[vertex][2];
-                    return Double.compare(da, db);
-                });
-                for (int face : order) {
-                    Path path = new Path();
-                    path.moveTo(projected[faces[face][0]][0], projected[faces[face][0]][1]);
-                    for (int corner = 1; corner < 4; corner++)
-                        path.lineTo(projected[faces[face][corner]][0], projected[faces[face][corner]][1]);
-                    path.close();
-                    float shade = shades[face] * opacity;
+                    paint.setColor(Color.argb(Math.round(70 * opacity), 255, 255, 255));
+                    canvas.drawOval(new RectF(sphere.left + sphere.width() * 0.16f,
+                            sphere.top + sphere.height() * 0.10f, sphere.centerX(),
+                            sphere.centerY()), paint);
+                } else {
+                    Integer[] order = {0, 1, 2, 3, 4, 5};
+                    java.util.Arrays.sort(order, (a, b) -> {
+                        double da = 0, db = 0;
+                        for (int vertex : faces[a]) da += projected[vertex][1];
+                        for (int vertex : faces[b]) db += projected[vertex][1];
+                        return Double.compare(da, db);
+                    });
+                    for (int face : order) {
+                        Path path = new Path();
+                        path.moveTo(projected[faces[face][0]][0], projected[faces[face][0]][1]);
+                        for (int corner = 1; corner < 4; corner++)
+                            path.lineTo(projected[faces[face][corner]][0], projected[faces[face][corner]][1]);
+                        path.close();
+                        float shade = shades[face] * opacity;
+                        paint.setStyle(Paint.Style.FILL);
+                        paint.setColor(Color.rgb(Math.round(Color.red(base) * shade),
+                                Math.round(Color.green(base) * shade), Math.round(Color.blue(base) * shade)));
+                        canvas.drawPath(path, paint);
+                        paint.setStyle(Paint.Style.STROKE);
+                        paint.setStrokeWidth(dp(1));
+                        paint.setColor(Color.rgb(37, 29, 53));
+                        canvas.drawPath(path, paint);
+                    }
                     paint.setStyle(Paint.Style.FILL);
-                    paint.setColor(Color.rgb(Math.round(Color.red(base) * shade),
-                            Math.round(Color.green(base) * shade), Math.round(Color.blue(base) * shade)));
-                    canvas.drawPath(path, paint);
-                    paint.setStyle(Paint.Style.STROKE);
-                    paint.setStrokeWidth(dp(1));
-                    paint.setColor(Color.rgb(37, 29, 53));
-                    canvas.drawPath(path, paint);
                 }
-                paint.setStyle(Paint.Style.FILL);
+                if (model.optString("name").equals(selectedEditorName)) {
+                    float radius = Math.max(dp(18), Math.max(halfW, Math.max(halfH, halfD))
+                            * Math.min(width, height) * 0.115f * cameraZoom * center[2] * 1.35f);
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setStrokeWidth(dp(2));
+                    paint.setColor(Color.rgb(224, 204, 255));
+                    canvas.drawCircle(center[0], center[1], radius, paint);
+                    paint.setStyle(Paint.Style.FILL);
+                }
             }
+            paint.setColor(Color.rgb(178, 165, 204));
+            paint.setTypeface(fixedUiFont);
+            paint.setTextSize(dp(10));
+            paint.setTextAlign(Paint.Align.LEFT);
+            canvas.drawText("DRAG OBJECT  •  TWO FINGERS: ORBIT + ZOOM", dp(12), height - dp(14), paint);
+        }
+
+        private void drawSelected2DOutline(Canvas canvas, float width, float height) {
+            if (selectedEditorName.isEmpty() || editor3D) return;
+            JSONObject match = findJsonObject(state.optJSONArray("blocks"), selectedEditorName);
+            if (match == null) match = findJsonObject(state.optJSONArray("sprites"), selectedEditorName);
+            if (match == null) match = findJsonObject(state.optJSONArray("buttons"), selectedEditorName);
+            if (match == null) match = findJsonObject(state.optJSONArray("texts"), selectedEditorName);
+            if (match == null) return;
+            double x = match.optDouble("x"), y = match.optDouble("y");
+            double w = match.optDouble("w", match.optDouble("size") * 3);
+            double h = match.optDouble("h", match.optDouble("size") * 1.4);
+            buttonRect.set((float) (x * width / 100 - dp(3)), (float) (y * height / 100 - dp(3)),
+                    (float) ((x + w) * width / 100 + dp(3)), (float) ((y + h) * height / 100 + dp(3)));
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(dp(2));
+            paint.setColor(Color.rgb(224, 204, 255));
+            canvas.drawRoundRect(buttonRect, dp(4), dp(4), paint);
+            paint.setStyle(Paint.Style.FILL);
+        }
+
+        private JSONObject findJsonObject(JSONArray array, String name) {
+            if (array == null) return null;
+            for (int i = 0; i < array.length(); i++) {
+                JSONObject item = array.optJSONObject(i);
+                if (item != null && name.equals(item.optString("name"))) return item;
+            }
+            return null;
         }
 
         @Override
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
-            canvas.drawColor(Color.rgb(38, 36, 44));
+            canvas.drawColor(Color.rgb(13, 11, 18));
             float width = getWidth();
             float height = getHeight();
             JSONArray blocks = state.optJSONArray("blocks");
@@ -1572,16 +1654,13 @@ public final class MainActivity extends Activity {
                         Color.green(textColor), Color.blue(textColor)));
                 paint.setTextAlign("center".equals(text.optString("align")) ? Paint.Align.CENTER :
                         "right".equals(text.optString("align")) ? Paint.Align.RIGHT : Paint.Align.LEFT);
-                paint.setTypeface(android.graphics.Typeface.create(
-                        "serif".equals(text.optString("font")) ? android.graphics.Typeface.SERIF :
-                        "mono".equals(text.optString("font")) ? android.graphics.Typeface.MONOSPACE :
-                                android.graphics.Typeface.SANS_SERIF,
-                        text.optBoolean("bold", false) ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL));
+                paint.setTypeface(text.optBoolean("bold", false) ? fixedUiFontBold : fixedUiFont);
                 paint.setTextSize((float) (height * text.optDouble("size") / 100));
                 canvas.drawText(text.optString("value"),
                         (float) (text.optDouble("x") * width / 100),
                         (float) (text.optDouble("y") * height / 100), paint);
             }
+            drawSelected2DOutline(canvas, width, height);
             JSONArray buttons = state.optJSONArray("buttons");
             if (buttons != null) {
                 paint.setTextAlign(Paint.Align.CENTER);
@@ -1606,11 +1685,7 @@ public final class MainActivity extends Activity {
                     paint.setColor(Color.argb(Math.round(Color.alpha(labelColor) * Math.max(0f,
                             Math.min(1f, (float) button.optDouble("opacity", 1.0)))), Color.red(labelColor),
                             Color.green(labelColor), Color.blue(labelColor)));
-                    paint.setTypeface(android.graphics.Typeface.create(
-                            "serif".equals(button.optString("font")) ? android.graphics.Typeface.SERIF :
-                            "mono".equals(button.optString("font")) ? android.graphics.Typeface.MONOSPACE :
-                                    android.graphics.Typeface.SANS_SERIF,
-                            button.optBoolean("bold", true) ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL));
+                    paint.setTypeface(button.optBoolean("bold", true) ? fixedUiFontBold : fixedUiFont);
                     paint.setTextSize((float) (button.optDouble("text_size", 0.34) * buttonRect.height()));
                     canvas.drawText(button.optString("label"), (left + right) / 2,
                             (top + bottom) / 2 - (paint.ascent() + paint.descent()) / 2, paint);
@@ -1628,6 +1703,7 @@ public final class MainActivity extends Activity {
 
         @Override
         public boolean onTouchEvent(MotionEvent event) {
+            if (editor2D || editor3D) return handleEditorTouch(event);
             if (event.getAction() == MotionEvent.ACTION_DOWN) {
                 if (menuToolbar) return true;
                 touchSequence++;
@@ -1711,6 +1787,298 @@ public final class MainActivity extends Activity {
                 return true;
             }
             return true;
+        }
+
+        private EditorHit hitEditorObject(float px, float py) {
+            if (getWidth() <= 0 || getHeight() <= 0) return null;
+            float x = px * 100f / getWidth();
+            float y = py * 100f / getHeight();
+            if (y < 14 || y > 64) return null;
+            if (editor3D) {
+                for (int i = models.size() - 1; i >= 0; i--) {
+                    JSONObject model = models.get(i);
+                    if (!model.optBoolean("visible", true)) continue;
+                    float[] center = project3DPoint(model.optDouble("x"), model.optDouble("y"),
+                            model.optDouble("z"), getWidth(), getHeight());
+                    float radius = Math.max(dp(22), (float) Math.max(model.optDouble("w", 2),
+                            Math.max(model.optDouble("h", 2), model.optDouble("d", 2)))
+                            * Math.min(getWidth(), getHeight()) * 0.115f * cameraZoom * center[2] * 0.85f);
+                    if (Math.hypot(px - center[0], py - center[1]) <= radius)
+                        return new EditorHit("3d", model.optString("name"));
+                }
+                return null;
+            }
+            for (int i = orderedBlocks.size() - 1; i >= 0; i--) {
+                JSONObject item = orderedBlocks.get(i);
+                String name = item.optString("name");
+                if (!item.optBoolean("visible", true) || name.startsWith("EDITOR_")
+                        || name.startsWith("GRID_") || name.equals("CANVAS")
+                        || name.equals("CANVAS_FRAME") || name.equals("VIEWPORT")
+                        || name.equals("VIEWPORT_FRAME") || name.startsWith("FLOOR_")) continue;
+                if (inside(x, y, item.optDouble("x"), item.optDouble("y"),
+                        item.optDouble("w"), item.optDouble("h"))) return new EditorHit("block", name);
+            }
+            for (int i = sprites.size() - 1; i >= 0; i--) {
+                JSONObject item = sprites.get(i);
+                if (item.optBoolean("visible", true) && inside(x, y, item.optDouble("x"),
+                        item.optDouble("y"), item.optDouble("w"), item.optDouble("h")))
+                    return new EditorHit("sprite", item.optString("name"));
+            }
+            JSONArray buttonArray = state.optJSONArray("buttons");
+            if (buttonArray != null) for (int i = buttonArray.length() - 1; i >= 0; i--) {
+                JSONObject item = buttonArray.optJSONObject(i);
+                if (item != null && item.optBoolean("visible", true) && inside(x, y,
+                        item.optDouble("x"), item.optDouble("y"), item.optDouble("w"), item.optDouble("h")))
+                    return new EditorHit("button", item.optString("name"));
+            }
+            JSONArray textArray = state.optJSONArray("texts");
+            if (textArray != null) for (int i = textArray.length() - 1; i >= 0; i--) {
+                JSONObject item = textArray.optJSONObject(i);
+                if (item == null || !item.optBoolean("visible", true)) continue;
+                double size = item.optDouble("size", 4);
+                double textWidth = Math.max(size, item.optString("value").length() * size * 0.58);
+                if (inside(x, y, item.optDouble("x"), item.optDouble("y") - size,
+                        textWidth, size * 1.4)) return new EditorHit("text", item.optString("name"));
+            }
+            return null;
+        }
+
+        private boolean inside(double x, double y, double left, double top, double width, double height) {
+            return x >= left && x <= left + width && y >= top && y <= top + height;
+        }
+
+        private float span(MotionEvent event) {
+            if (event.getPointerCount() < 2) return 0;
+            return (float) Math.hypot(event.getX(0) - event.getX(1), event.getY(0) - event.getY(1));
+        }
+
+        private boolean handleEditorTouch(MotionEvent event) {
+            int action = event.getActionMasked();
+            if (action == MotionEvent.ACTION_DOWN) {
+                touchSequence++;
+                lastEditorX = event.getX();
+                lastEditorY = event.getY();
+                editorMoved = false;
+                editorGestureMode = 0;
+                EditorHit hit = hitEditorObject(lastEditorX, lastEditorY);
+                if (hit != null) {
+                    selectedEditorKind = hit.kind;
+                    selectedEditorName = hit.name;
+                    editorObjectDragging = true;
+                    editorGestureMode = 1;
+                } else {
+                    editorObjectDragging = false;
+                    if (editor3D) editorGestureMode = 2;
+                }
+                invalidate();
+                return true;
+            }
+            if (action == MotionEvent.ACTION_POINTER_DOWN && editor3D && event.getPointerCount() >= 2) {
+                editorGestureMode = 3;
+                editorObjectDragging = false;
+                lastPinchSpan = Math.max(1, span(event));
+                lastPinchCenterX = (event.getX(0) + event.getX(1)) * 0.5f;
+                lastPinchCenterY = (event.getY(0) + event.getY(1)) * 0.5f;
+                return true;
+            }
+            if (action == MotionEvent.ACTION_MOVE) {
+                if (editor3D && event.getPointerCount() >= 2) {
+                    float currentSpan = Math.max(1, span(event));
+                    float centerX = (event.getX(0) + event.getX(1)) * 0.5f;
+                    float centerY = (event.getY(0) + event.getY(1)) * 0.5f;
+                    if (lastPinchSpan > 0) cameraZoom = Math.max(0.3f, Math.min(4.0f,
+                            cameraZoom * currentSpan / lastPinchSpan));
+                    cameraYaw += (centerX - lastPinchCenterX) * 0.006f;
+                    cameraPitch = Math.max(-1.25f, Math.min(1.25f,
+                            cameraPitch + (centerY - lastPinchCenterY) * 0.006f));
+                    lastPinchSpan = currentSpan;
+                    lastPinchCenterX = centerX;
+                    lastPinchCenterY = centerY;
+                    editorMoved = true;
+                    invalidate();
+                    return true;
+                }
+                float x = event.getX();
+                float y = event.getY();
+                float dx = x - lastEditorX;
+                float dy = y - lastEditorY;
+                if (Math.abs(dx) + Math.abs(dy) > dp(2)) editorMoved = true;
+                if (editorGestureMode == 1 && !selectedEditorName.isEmpty()) {
+                    if (editor2D) {
+                        String result = nativeTransformEditorObject("2d", selectedEditorName,
+                                dx * 100f / Math.max(1, getWidth()),
+                                dy * 100f / Math.max(1, getHeight()), 0);
+                        applyEditorTransform(result);
+                    } else if (editor3D) {
+                        float unit = 1f / Math.max(1f, Math.min(getWidth(), getHeight()) * 0.115f * cameraZoom);
+                        float worldX = dx * unit * (float) Math.cos(cameraYaw);
+                        float worldZ = -dx * unit * (float) Math.sin(cameraYaw);
+                        float worldY = -dy * unit;
+                        String result = nativeTransformEditorObject("3d", selectedEditorName, worldX, worldY, worldZ);
+                        applyEditorTransform(result);
+                    }
+                } else if (editor3D && editorGestureMode == 2) {
+                    cameraYaw += dx * 0.008f;
+                    cameraPitch = Math.max(-1.25f, Math.min(1.25f, cameraPitch + dy * 0.008f));
+                    invalidate();
+                }
+                lastEditorX = x;
+                lastEditorY = y;
+                return true;
+            }
+            if (action == MotionEvent.ACTION_POINTER_UP) {
+                if (editor3D) {
+                    editorGestureMode = 2;
+                    if (event.getPointerCount() > 1) {
+                        int remaining = event.getActionIndex() == 0 ? 1 : 0;
+                        lastEditorX = event.getX(remaining);
+                        lastEditorY = event.getY(remaining);
+                    }
+                }
+                return true;
+            }
+            if (action == MotionEvent.ACTION_UP) {
+                int tappedButton = hitButton(event.getX(), event.getY());
+                if (!editorMoved && tappedButton >= 0) {
+                    String actionName = buttonName(tappedButton);
+                    if ("copy_code".equalsIgnoreCase(actionName)) copySelectedObjectCode();
+                    else runButton(tappedButton);
+                } else if (!editorMoved && selectedEditorName.isEmpty()) {
+                    EditorHit hit = hitEditorObject(event.getX(), event.getY());
+                    if (hit != null) {
+                        selectedEditorKind = hit.kind;
+                        selectedEditorName = hit.name;
+                        invalidate();
+                    }
+                }
+                editorObjectDragging = false;
+                editorGestureMode = 0;
+                performClick();
+                return true;
+            }
+            if (action == MotionEvent.ACTION_CANCEL) {
+                editorObjectDragging = false;
+                editorGestureMode = 0;
+                return true;
+            }
+            return true;
+        }
+
+        private void applyEditorTransform(String rawState) {
+            try {
+                JSONObject next = new JSONObject(rawState);
+                lastRunState = next;
+                state = next;
+                updatedAt = SystemClock.uptimeMillis();
+                orderedBlocks.clear();
+                textItems.clear();
+                sprites.clear();
+                models.clear();
+                JSONArray modelArray = state.optJSONArray("models");
+                if (modelArray != null) for (int i = 0; i < modelArray.length(); i++) {
+                    JSONObject item = modelArray.optJSONObject(i);
+                    if (item != null) models.add(item);
+                }
+                JSONArray spriteArray = state.optJSONArray("sprites");
+                if (spriteArray != null) for (int i = 0; i < spriteArray.length(); i++) {
+                    JSONObject item = spriteArray.optJSONObject(i);
+                    if (item != null) sprites.add(item);
+                }
+                JSONArray blockArray = state.optJSONArray("blocks");
+                if (blockArray != null) for (int i = 0; i < blockArray.length(); i++) {
+                    JSONObject item = blockArray.optJSONObject(i);
+                    if (item != null) orderedBlocks.add(item);
+                }
+                orderedBlocks.sort((first, second) -> Integer.compare(first.optInt("z"), second.optInt("z")));
+                JSONArray textArray = state.optJSONArray("texts");
+                if (textArray != null) for (int i = 0; i < textArray.length(); i++) {
+                    JSONObject item = textArray.optJSONObject(i);
+                    if (item != null) textItems.add(item);
+                }
+                invalidate();
+            } catch (JSONException exception) {
+                status.setText("Editor update failed: " + exception.getMessage());
+            }
+        }
+
+        private void copySelectedObjectCode() {
+            String name = selectedEditorName;
+            if (name.isEmpty() || (editor3D
+                    ? findJsonObject(state.optJSONArray("models"), name) == null
+                    : findJsonObject(state.optJSONArray("blocks"), name) == null
+                        && findJsonObject(state.optJSONArray("buttons"), name) == null
+                        && findJsonObject(state.optJSONArray("texts"), name) == null)) {
+                String labelName = editor3D ? "model_label" : "object_label";
+                JSONArray labels = state.optJSONArray("texts");
+                if (labels != null) for (int i = 0; i < labels.length(); i++) {
+                    JSONObject label = labels.optJSONObject(i);
+                    if (label != null && labelName.equals(label.optString("name"))) {
+                        String value = label.optString("value");
+                        if (!value.startsWith("No ")) name = value;
+                        break;
+                    }
+                }
+            }
+            if (name.isEmpty()) {
+                Toast.makeText(MainActivity.this, "Select an object first", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            String code = null;
+            if (editor3D) {
+                JSONObject model = findJsonObject(state.optJSONArray("models"), name);
+                if (model != null) {
+                    if ("sphere".equals(model.optString("shape"))) {
+                        code = "3d sphere " + name + " x " + number(model.optDouble("x"))
+                                + " y " + number(model.optDouble("y")) + " z " + number(model.optDouble("z"))
+                                + " size " + number(model.optDouble("w")) + " color " + model.optString("color");
+                    } else {
+                        code = "3d box " + name + " x " + number(model.optDouble("x"))
+                                + " y " + number(model.optDouble("y")) + " z " + number(model.optDouble("z"))
+                                + " w " + number(model.optDouble("w")) + " h " + number(model.optDouble("h"))
+                                + " d " + number(model.optDouble("d")) + " color " + model.optString("color");
+                    }
+                }
+            } else {
+                JSONObject block = findJsonObject(state.optJSONArray("blocks"), name);
+                if (block != null) {
+                    code = "ui create block " + name + " x " + number(block.optDouble("x"))
+                            + " y " + number(block.optDouble("y")) + " w " + number(block.optDouble("w"))
+                            + " h " + number(block.optDouble("h")) + " color " + block.optString("color")
+                            + " shape " + block.optString("shape", "square");
+                } else {
+                    JSONObject button = findJsonObject(state.optJSONArray("buttons"), name);
+                    if (button != null) {
+                        code = "button " + name + " \"" + escapeCode(button.optString("label")) + "\" x "
+                                + number(button.optDouble("x")) + " y " + number(button.optDouble("y"))
+                                + " w " + number(button.optDouble("w")) + " h " + number(button.optDouble("h"))
+                                + " color " + button.optString("color") + " ( say \"Clicked " + name + "\" )";
+                    } else {
+                        JSONObject text = findJsonObject(state.optJSONArray("texts"), name);
+                        if (text != null) {
+                            code = "text " + name + " \"" + escapeCode(text.optString("value")) + "\" x "
+                                    + number(text.optDouble("x")) + " y " + number(text.optDouble("y"))
+                                    + " size " + number(text.optDouble("size")) + " color " + text.optString("color");
+                        }
+                    }
+                }
+            }
+            if (code == null) {
+                Toast.makeText(MainActivity.this, "Could not find the selected object", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+            if (clipboard != null) {
+                clipboard.setPrimaryClip(ClipData.newPlainText("TRG object source", code));
+                Toast.makeText(MainActivity.this, "TRG creation code copied", Toast.LENGTH_SHORT).show();
+            }
+        }
+
+        private String escapeCode(String value) {
+            return value.replace("\\", "\\\\").replace("\"", "\\\"");
+        }
+
+        private String number(double value) {
+            return String.format(Locale.US, "%.3f", value).replaceAll("0+$", "").replaceAll("\\.$", "");
         }
 
         private void releaseSwipes() {
