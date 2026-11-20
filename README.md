@@ -1,5 +1,7 @@
 # TRG
 
+`code.txt` is an exact, automatically synchronized copy of the latest C++ interpreter source in `TRG.cpp`.
+
 ## Build and run
 
 Run `build.bat` from the repository root to build the Windows desktop app. It supports either MinGW-w64 (with `g++` and `windres` on PATH; the common `C:\\msys64\\mingw64\\bin` folder is detected automatically) or MSVC from a Visual Studio Developer Command Prompt (with `cl.exe` and `rc.exe`). For MSVC, install the Desktop development with C++ workload and Windows SDK. The script creates `TRG-build.exe`, embeds the purple TRG icon, then updates `TRG.exe` when it is not running. If Windows cannot replace a running `TRG.exe`, use the fresh `TRG-build.exe` instead.
@@ -46,9 +48,9 @@ The mobile workspace menu and toolbar are TRG UI programs in `android-app/app/sr
 
 Android hosts these TRG-authored screens in a drawing surface and handles platform actions such as document pickers and text input. The visual layout, buttons, editor controls, and object-editing behavior are TRG programs; they are not separate native Android editor screens. The toolbar provides direct Run, 2D, and 3D actions, and the workspace menu keeps the existing import, export, package, dictionary, settings, and preview actions.
 
-The 2D editor is a touch-first canvas: tap an object to select it, then drag it directly to reposition it. It can create blocks, circles, UI buttons, and text labels; duplicate and delete items; rename objects with **Name**; resize an item with one **Resize** action; change colour and shape; and add simple position animations. **Copy Code** copies the selected object's creation command to the Android clipboard so the object can be recreated in another TRG program.
+The 2D editor is a touch-first canvas: tap an object to select it, then drag it directly to reposition it. It can create blocks, circles, UI buttons, and text labels; duplicate and delete items; rename objects with **Name**; resize an item with one **Resize** action; change colour and shape; and add position animations to blocks, buttons, text, and sprites. **Copy Code** copies a ready-to-paste creation command, including the required library line and the object's `name`, to the Android clipboard.
 
-The 3D editor creates box and sphere primitives. Drag a model to move it, drag empty viewport space to orbit the camera, and use two fingers to orbit and pinch-zoom together. **Reset View** restores the starting camera. It also supports selection, duplication, deletion, naming, resizing, rotation, colour changes, and **Copy Code** for the selected model. Both editors use the same dark, high-contrast visual theme and a fixed-width monospace typeface.
+The 3D editor creates box and sphere primitives. Drag a model to move it, drag empty viewport space to orbit the camera, and use two fingers to orbit and pinch-zoom together. **Reset View** restores the starting camera. It also supports selection, duplication, deletion, naming, resizing, rotation, colour changes, and **Copy Code** for the selected model, including the rotation command when needed. Both editors use the same dark, high-contrast visual theme and a fixed-width monospace typeface.
 
 These screens use the general-purpose UI and 3D libraries documented below. The mobile 3D view now has interactive camera orbit and zoom for the existing box/sphere renderer. It is still a lightweight primitive editor, not a general mesh importer, shader pipeline, or full 3D physics engine.
 
