@@ -4645,7 +4645,7 @@ void physicsStep(double seconds, Vars& variables, Types& currentTypes) {
     }
     double ballX = 0, ballY = 0, ballW = 0, ballH = 0;
     if (uiEntityBounds("ball", ballX, ballY, ballW, ballH)) {
-        for (const auto& entry : physicsBodies) {
+        for (auto& entry : physicsBodies) {
             PhysicsBody& triggerBody = entry.second;
             if (!triggerBody.trigger) continue;
             double tx = 0, ty = 0, tw = 0, th = 0;
