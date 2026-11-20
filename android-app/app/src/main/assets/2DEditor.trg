@@ -128,9 +128,8 @@ button name "NAME" x 27 y 77 w 15 h 7 color #30243F (
 )
 button resize "RESIZE" x 44 y 77 w 16 h 7 color #56368F (
     if objectCount > 0 (
-        ask "Width change (+/-):" widthChange
-        ask "Height change (+/-):" heightChange
-        ui resize selectedName widthChange heightChange
+        ask "Size change (+/-):" widthChange
+        ui resize selectedName widthChange widthChange
     )
 )
 button color "COLOR" x 62 y 77 w 15 h 7 color #30243F (
