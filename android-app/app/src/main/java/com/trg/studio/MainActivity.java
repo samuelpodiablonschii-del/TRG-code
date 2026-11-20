@@ -1587,6 +1587,26 @@ public final class MainActivity extends Activity {
             return null;
         }
 
+        private float[] animatedPosition(String name, float x, float y, double elapsed, JSONArray animations) {
+            if (animations == null) return new float[] {x, y};
+            for (int i = 0; i < animations.length(); i++) {
+                JSONObject animation = animations.optJSONObject(i);
+                if (animation == null || !name.equals(animation.optString("name"))) continue;
+                double start = animation.optDouble("start");
+                double duration = Math.max(0.001, animation.optDouble("duration", 1));
+                double progress = Math.max(0, Math.min(1, (elapsed - start) / duration));
+                x = (float) (animation.optDouble("x") + animation.optDouble("dx") * progress);
+                y = (float) (animation.optDouble("y") + animation.optDouble("dy") * progress);
+            }
+            return new float[] {x, y};
+        }
+
+        private String rotationSource(JSONObject model, String name) {
+            double rx = model.optDouble("rx"), ry = model.optDouble("ry"), rz = model.optDouble("rz");
+            if (Math.abs(rx) < 0.001 && Math.abs(ry) < 0.001 && Math.abs(rz) < 0.001) return "";
+            return "\n3d rotate " + name + " " + number(rx) + " " + number(ry) + " " + number(rz);
+        }
+
         @Override
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
@@ -1595,10 +1615,17 @@ public final class MainActivity extends Activity {
             float height = getHeight();
             JSONArray blocks = state.optJSONArray("blocks");
             boolean animating = false;
+            double elapsed = state.optDouble("elapsed")
+                    + (SystemClock.uptimeMillis() - updatedAt) / 1000.0;
+            JSONArray animations = state.optJSONArray("animations");
+            if (animations != null) {
+                for (int i = 0; i < animations.length(); i++) {
+                    JSONObject animation = animations.optJSONObject(i);
+                    if (animation != null && elapsed < animation.optDouble("start") + animation.optDouble("duration")
+                            && elapsed >= animation.optDouble("start")) animating = true;
+                }
+            }
             if (blocks != null) {
-                double elapsed = state.optDouble("elapsed")
-                        + (SystemClock.uptimeMillis() - updatedAt) / 1000.0;
-                JSONArray animations = state.optJSONArray("animations");
                 for (JSONObject block : orderedBlocks) {
                     if (!block.optBoolean("visible", true)) continue;
                     double x = block.optDouble("x");
@@ -1638,10 +1665,12 @@ public final class MainActivity extends Activity {
                     if (bitmap != null) spriteBitmaps.put(path, bitmap);
                 }
                 if (bitmap != null) {
-                    buttonRect.set((float) (sprite.optDouble("x") * width / 100),
-                            (float) (sprite.optDouble("y") * height / 100),
-                            (float) ((sprite.optDouble("x") + sprite.optDouble("w")) * width / 100),
-                            (float) ((sprite.optDouble("y") + sprite.optDouble("h")) * height / 100));
+                    float[] spritePosition = animatedPosition(sprite.optString("name"),
+                            (float) sprite.optDouble("x"), (float) sprite.optDouble("y"), elapsed, animations);
+                    buttonRect.set(spritePosition[0] * width / 100,
+                            spritePosition[1] * height / 100,
+                            (spritePosition[0] + (float) sprite.optDouble("w")) * width / 100,
+                            (spritePosition[1] + (float) sprite.optDouble("h")) * height / 100);
                     paint.setAlpha(Math.round(255 * Math.max(0f, Math.min(1f,
                             (float) sprite.optDouble("opacity", 1.0)))));
                     canvas.drawBitmap(bitmap, null, buttonRect, paint);
@@ -1656,9 +1685,10 @@ public final class MainActivity extends Activity {
                         "right".equals(text.optString("align")) ? Paint.Align.RIGHT : Paint.Align.LEFT);
                 paint.setTypeface(text.optBoolean("bold", false) ? fixedUiFontBold : fixedUiFont);
                 paint.setTextSize((float) (height * text.optDouble("size") / 100));
+                float[] textPosition = animatedPosition(text.optString("name"),
+                        (float) text.optDouble("x"), (float) text.optDouble("y"), elapsed, animations);
                 canvas.drawText(text.optString("value"),
-                        (float) (text.optDouble("x") * width / 100),
-                        (float) (text.optDouble("y") * height / 100), paint);
+                        textPosition[0] * width / 100, textPosition[1] * height / 100, paint);
             }
             drawSelected2DOutline(canvas, width, height);
             JSONArray buttons = state.optJSONArray("buttons");
@@ -1668,10 +1698,12 @@ public final class MainActivity extends Activity {
                 for (int i = 0; i < buttons.length(); i++) {
                     JSONObject button = buttons.optJSONObject(i);
                     if (button == null || !button.optBoolean("visible", true)) continue;
-                    float left = (float) (button.optDouble("x") * width / 100);
-                    float top = (float) (button.optDouble("y") * height / 100);
-                    float right = (float) ((button.optDouble("x") + button.optDouble("w")) * width / 100);
-                    float bottom = (float) ((button.optDouble("y") + button.optDouble("h")) * height / 100);
+                    float[] buttonPosition = animatedPosition(button.optString("name"),
+                            (float) button.optDouble("x"), (float) button.optDouble("y"), elapsed, animations);
+                    float left = buttonPosition[0] * width / 100;
+                    float top = buttonPosition[1] * height / 100;
+                    float right = (buttonPosition[0] + (float) button.optDouble("w")) * width / 100;
+                    float bottom = (buttonPosition[1] + (float) button.optDouble("h")) * height / 100;
                     int buttonColor = parseColor(button.optString("color", "#7043BE"));
                     paint.setColor(Color.argb(Math.round(255 * Math.max(0f, Math.min(1f,
                             (float) button.optDouble("opacity", 1.0)))), Color.red(buttonColor),
@@ -2035,12 +2067,14 @@ public final class MainActivity extends Activity {
                     if ("sphere".equals(model.optString("shape"))) {
                         code = "3d sphere " + name + " x " + number(model.optDouble("x"))
                                 + " y " + number(model.optDouble("y")) + " z " + number(model.optDouble("z"))
-                                + " size " + number(model.optDouble("w")) + " color " + model.optString("color");
+                                + " size " + number(model.optDouble("w")) + " color " + model.optString("color")
+                                + rotationSource(model, name);
                     } else {
                         code = "3d box " + name + " x " + number(model.optDouble("x"))
                                 + " y " + number(model.optDouble("y")) + " z " + number(model.optDouble("z"))
                                 + " w " + number(model.optDouble("w")) + " h " + number(model.optDouble("h"))
-                                + " d " + number(model.optDouble("d")) + " color " + model.optString("color");
+                                + " d " + number(model.optDouble("d")) + " color " + model.optString("color")
+                                + rotationSource(model, name);
                     }
                 }
             } else {
@@ -2071,6 +2105,7 @@ public final class MainActivity extends Activity {
                 Toast.makeText(MainActivity.this, "Could not find the selected object", Toast.LENGTH_SHORT).show();
                 return;
             }
+            code = (editor3D ? "add (3d)\n" : "add (ui)\n") + code;
             ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
             if (clipboard != null) {
                 clipboard.setPrimaryClip(ClipData.newPlainText("TRG object source", code));
