@@ -4632,8 +4632,24 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
         }
         if (cmd == "animate") {
             if (!uiMode || tokens.size() != 10) { reportError(i + 1, "use animate NAME x DX y DY fps RATE time SECONDS"); continue; }
-            auto block = std::find_if(uiBlocks.begin(), uiBlocks.end(), [&](const UiBlock& item) { return item.name == tokens[1]; });
-            if (block == uiBlocks.end()) { reportError(i + 1, "unknown block", tokens[1]); continue; }
+            const std::string targetName = valueFor(tokens[1], variables);
+            double startX = 0, startY = 0;
+            bool targetFound = false;
+            auto block = std::find_if(uiBlocks.begin(), uiBlocks.end(), [&](const UiBlock& item) { return item.name == targetName; });
+            if (block != uiBlocks.end()) { startX = block->x; startY = block->y; targetFound = true; }
+            if (!targetFound) {
+                auto sprite = std::find_if(uiSprites.begin(), uiSprites.end(), [&](const UiSprite& item) { return item.name == targetName; });
+                if (sprite != uiSprites.end()) { startX = sprite->x; startY = sprite->y; targetFound = true; }
+            }
+            if (!targetFound) {
+                auto button = std::find_if(uiButtons.begin(), uiButtons.end(), [&](const UiButton& item) { return item.name == targetName; });
+                if (button != uiButtons.end()) { startX = button->x; startY = button->y; targetFound = true; }
+            }
+            if (!targetFound) {
+                auto text = std::find_if(uiTexts.begin(), uiTexts.end(), [&](const UiText& item) { return item.name == targetName; });
+                if (text != uiTexts.end()) { startX = text->x; startY = text->y; targetFound = true; }
+            }
+            if (!targetFound) { reportError(i + 1, "unknown UI object to animate", targetName); continue; }
             double dx = 0, dy = 0, fps = 0, duration = 0;
             if (lower(tokens[2]) != "x" || lower(tokens[4]) != "y" ||
                 lower(tokens[6]) != "fps" || lower(tokens[8]) != "time" ||
@@ -4649,10 +4665,10 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 continue;
             }
             UiAnimation animation;
-            animation.name = block->name;
+            animation.name = targetName;
             animation.startTime = std::chrono::duration<double>(std::chrono::steady_clock::now() - uiStart).count();
-            animation.startX = block->x;
-            animation.startY = block->y;
+            animation.startX = startX;
+            animation.startY = startY;
             for (const UiAnimation& previous : uiAnimations) {
                 if (previous.name == block->name) {
                     animation.startTime = std::max(animation.startTime, previous.startTime + previous.duration);
@@ -4703,28 +4719,41 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
     }
 }
 
+void applyUiAnimationPosition(const std::string& name, double& x, double& y) {
+    const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - uiStart).count();
+    for (const UiAnimation& animation : uiAnimations) {
+        if (animation.name != name) continue;
+        if (elapsed < animation.startTime) break;
+        const double progress = std::min(1.0, (elapsed - animation.startTime) / animation.duration);
+        x = animation.startX + animation.dx * progress;
+        y = animation.startY + animation.dy * progress;
+    }
+}
+
 bool uiEntityBounds(const std::string& name, double& x, double& y, double& width, double& height) {
     for (const UiBlock& block : uiBlocks) {
         if (block.name != name || !block.visible || !uiGroupIsVisible(block.group)) continue;
         x = block.x; y = block.y; width = block.width; height = block.height;
-        const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - uiStart).count();
-        for (const UiAnimation& animation : uiAnimations) {
-            if (animation.name != name) continue;
-            if (elapsed < animation.startTime) break;
-            const double progress = std::min(1.0, (elapsed - animation.startTime) / animation.duration);
-            x = animation.startX + animation.dx * progress;
-            y = animation.startY + animation.dy * progress;
-        }
+        applyUiAnimationPosition(name, x, y);
         return true;
     }
     for (const UiSprite& sprite : uiSprites) {
-        if (sprite.name == name && sprite.visible && uiGroupIsVisible(sprite.group)) { x = sprite.x; y = sprite.y; width = sprite.width; height = sprite.height; return true; }
+        if (sprite.name == name && sprite.visible && uiGroupIsVisible(sprite.group)) {
+            x = sprite.x; y = sprite.y; width = sprite.width; height = sprite.height;
+            applyUiAnimationPosition(name, x, y); return true;
+        }
     }
     for (const UiButton& button : uiButtons) {
-        if (button.name == name && button.visible && uiGroupIsVisible(button.group)) { x = button.x; y = button.y; width = button.width; height = button.height; return true; }
+        if (button.name == name && button.visible && uiGroupIsVisible(button.group)) {
+            x = button.x; y = button.y; width = button.width; height = button.height;
+            applyUiAnimationPosition(name, x, y); return true;
+        }
     }
     for (const UiText& text : uiTexts) {
-        if (text.name == name && text.visible && uiGroupIsVisible(text.group)) { x = text.x; y = text.y; width = text.size; height = text.size; return true; }
+        if (text.name == name && text.visible && uiGroupIsVisible(text.group)) {
+            x = text.x; y = text.y; width = text.size; height = text.size;
+            applyUiAnimationPosition(name, x, y); return true;
+        }
     }
     return false;
 }
