@@ -4653,12 +4653,12 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             double dx = 0, dy = 0, fps = 0, duration = 0;
             if (lower(tokens[2]) != "x" || lower(tokens[4]) != "y" ||
                 lower(tokens[6]) != "fps" || lower(tokens[8]) != "time" ||
-                !parseNumber(tokens[3], dx) || !parseNumber(tokens[5], dy) ||
-                !parseNumber(tokens[7], fps)) {
+                !parseNumber(valueFor(tokens[3], variables), dx) || !parseNumber(valueFor(tokens[5], variables), dy) ||
+                !parseNumber(valueFor(tokens[7], variables), fps)) {
                 reportError(i + 1, "invalid animation");
                 continue;
             }
-            std::string durationText = tokens[9];
+            std::string durationText = valueFor(tokens[9], variables);
             if (!durationText.empty() && (durationText.back() == 's' || durationText.back() == 'S')) durationText.pop_back();
             if (!parseNumber(durationText, duration) || duration <= 0 || fps <= 0) {
                 reportError(i + 1, "animation time and fps must be positive");
@@ -4670,7 +4670,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             animation.startX = startX;
             animation.startY = startY;
             for (const UiAnimation& previous : uiAnimations) {
-                if (previous.name == block->name) {
+                if (previous.name == targetName) {
                     animation.startTime = std::max(animation.startTime, previous.startTime + previous.duration);
                     animation.startX = previous.startX + previous.dx;
                     animation.startY = previous.startY + previous.dy;
