@@ -25,6 +25,8 @@ constexpr UINT runtimeResourceId = 201;
 constexpr UINT exampleResourceId = 202;
 constexpr UINT readmeResourceId = 203;
 constexpr UINT iconResourceId = 204;
+constexpr UINT editor2DResourceId = 205;
+constexpr UINT editor3DResourceId = 206;
 
 HWND installerWindow = nullptr;
 HWND installButton = nullptr;
@@ -241,6 +243,8 @@ void installPackage() {
         writeEmbeddedFile(runtimeResourceId, runtimePath, L"TRG.exe");
         writeEmbeddedFile(readmeResourceId, installDirectory / L"README.md", L"README.md");
         writeEmbeddedFile(iconResourceId, installDirectory / L"trg.ico", L"trg.ico");
+        writeEmbeddedFile(editor2DResourceId, installDirectory / L"2DEditor.trg", L"2DEditor.trg");
+        writeEmbeddedFile(editor3DResourceId, installDirectory / L"3DEditor.trg", L"3DEditor.trg");
         writeEmbeddedFile(exampleResourceId, examplePath,
             examplePath.filename().wstring() + L" on the Desktop");
         updateProgress(L"Creating the TRG Desktop shortcut...");
@@ -411,7 +415,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
     }
     try {
         requiredStorage = embeddedSize(runtimeResourceId) + embeddedSize(readmeResourceId) +
-            embeddedSize(iconResourceId) + embeddedSize(exampleResourceId) + 4096;
+            embeddedSize(iconResourceId) + embeddedSize(exampleResourceId) +
+            embeddedSize(editor2DResourceId) + embeddedSize(editor3DResourceId) + 4096;
     } catch (const std::exception& error) {
         const std::wstring message(error.what(), error.what() + strlen(error.what()));
         MessageBoxW(nullptr, message.c_str(), L"TRG Installer error", MB_OK | MB_ICONERROR);

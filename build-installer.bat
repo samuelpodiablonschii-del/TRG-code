@@ -27,7 +27,7 @@ for %%F in ("TRG-build.exe") do if %%~zF LEQ 0 (
     echo ERROR: TRG-build.exe is empty.
     goto :failed
 )
-for %%F in ("TRG-Example.trg" "trg.ico" "README.md" "TRG-Installer.rc" "TRG-Installer.cpp" "resource.h") do if not exist "%%~F" (
+for %%F in ("TRG-Example.trg" "2DEditor.trg" "3DEditor.trg" "trg.ico" "README.md" "TRG-Installer.rc" "TRG-Installer.cpp" "resource.h") do if not exist "%%~F" (
     echo ERROR: Required installer file is missing: %%~F
     goto :failed
 )

@@ -5737,7 +5737,22 @@ std::vector<std::string> readProgram(std::istream& source) {
             static_cast<unsigned char>(line[2]) == 0xBF)
             line.erase(0, 3);
         firstLine = false;
-        program.push_back(stripComment(line));
+        std::string cleanLine = stripComment(line);
+        const std::size_t first = cleanLine.find_first_not_of(" \\t");
+        if (first != std::string::npos) {
+            std::size_t last = first;
+            while (last < cleanLine.size() &&
+                   (std::isalnum(static_cast<unsigned char>(cleanLine[last])) || cleanLine[last] == '_')) ++last;
+            if (last > first) {
+                const std::string typed = cleanLine.substr(first, last - first);
+                const std::string corrected = suggestedCommand(typed);
+                if (!corrected.empty() && lower(typed) != corrected) {
+                    cleanLine.replace(first, last - first, corrected);
+                    appendOutput("AUTO-CORRECTED command '" + typed + "' to '" + corrected + "'\\r\\n");
+                }
+            }
+        }
+        program.push_back(cleanLine);
     }
     return program;
 }
