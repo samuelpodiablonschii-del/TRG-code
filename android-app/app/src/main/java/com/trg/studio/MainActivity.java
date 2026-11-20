@@ -2046,10 +2046,10 @@ public final class MainActivity extends Activity {
             } else {
                 JSONObject block = findJsonObject(state.optJSONArray("blocks"), name);
                 if (block != null) {
-                    code = "ui create block " + name + " x " + number(block.optDouble("x"))
-                            + " y " + number(block.optDouble("y")) + " w " + number(block.optDouble("w"))
-                            + " h " + number(block.optDouble("h")) + " color " + block.optString("color")
-                            + " shape " + block.optString("shape", "square");
+                    code = "block z " + block.optInt("z") + " x " + number(block.optDouble("x"))
+                            + " y " + number(block.optDouble("y")) + " h " + number(block.optDouble("h"))
+                            + " w " + number(block.optDouble("w")) + " color " + block.optString("color")
+                            + " shape " + block.optString("shape", "square") + " name " + name;
                 } else {
                     JSONObject button = findJsonObject(state.optJSONArray("buttons"), name);
                     if (button != null) {
