@@ -1,0 +1,71 @@
+name: TRG validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "TRG.cpp"
+      - "tests/**"
+      - "*.trg"
+      - ".github/workflows/validate-trg.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "TRG.cpp"
+      - "tests/**"
+      - "*.trg"
+      - ".github/workflows/validate-trg.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trg-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Compile TRG and run regression tests
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up MinGW-w64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: mingw-w64-x86_64-gcc
+
+      - name: Compile TRG console test runner
+        shell: msys2 {0}
+        run: |
+          g++ -std=c++17 -O2 -mconsole -DTRG_TEST_CONSOLE TRG.cpp \
+            -lcomdlg32 -lshell32 -lgdiplus -lgdi32 -luser32 -lwinhttp -lwinmm \
+            -o TRG-console.exe
+
+      - name: Run beginner syntax regression test
+        shell: pwsh
+        run: |
+          $output = & .\TRG-console.exe .\tests\beginner_syntax.trg 2>&1 | Out-String
+          Write-Host $output
+          if ($LASTEXITCODE -ne 0 -or $output -notmatch "TRG_BEGINNER_TESTS_PASSED") {
+            throw "Beginner syntax regression test failed."
+          }
+
+      - name: Run math library regression test
+        shell: pwsh
+        run: |
+          $output = & .\TRG-console.exe .\tests\math_library.trg 2>&1 | Out-String
+          Write-Host $output
+          if ($LASTEXITCODE -ne 0 -or $output -notmatch "TRG_MATH_TESTS_PASSED") {
+            throw "Math library regression test failed."
+          }
+
+      - name: Report validation result
+        shell: pwsh
+        run: Write-Host "TRG compiled successfully and all configured regression tests passed."
