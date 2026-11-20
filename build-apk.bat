@@ -30,7 +30,7 @@ if not defined SDK_DIR if defined LOCALAPPDATA if exist "%LOCALAPPDATA%\Android\
 if not defined SDK_DIR if defined USERPROFILE if exist "%USERPROFILE%\AppData\Local\Android\Sdk\platforms" set "SDK_DIR=%USERPROFILE%\AppData\Local\Android\Sdk"
 if not defined SDK_DIR if exist "C:\Android\android-sdk\platforms" set "SDK_DIR=C:\Android\android-sdk"
 if not defined SDK_DIR if defined ProgramFiles if exist "%ProgramFiles%\Android\Android Studio\sdk\platforms" set "SDK_DIR=%ProgramFiles%\Android\Android Studio\sdk"
-if not defined SDK_DIR if defined ProgramFiles(x86) if exist "%ProgramFiles(x86)%\Android\android-sdk\platforms" set "SDK_DIR=%ProgramFiles(x86)%\Android\android-sdk"
+if not defined SDK_DIR if exist "%ProgramFiles(x86)%\Android\android-sdk\platforms" set "SDK_DIR=%ProgramFiles(x86)%\Android\android-sdk"
 
 if defined SDK_DIR (
     set "ANDROID_HOME=%SDK_DIR%"
@@ -65,7 +65,7 @@ if defined LOCALAPPDATA if exist "%LOCALAPPDATA%\Programs\Android Studio\jbr\bin
     set "JAVA_HOME=%LOCALAPPDATA%\Programs\Android Studio\jbr"
     goto :java_ready
 )
-if defined ProgramFiles(x86) if exist "%ProgramFiles(x86)%\Android\Android Studio\jbr\bin\java.exe" (
+if exist "%ProgramFiles(x86)%\Android\Android Studio\jbr\bin\java.exe" (
     set "JAVA_HOME=%ProgramFiles(x86)%\Android\Android Studio\jbr"
     goto :java_ready
 )
