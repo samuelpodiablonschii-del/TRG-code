@@ -4165,7 +4165,19 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     copy.y = std::clamp(copy.y + 3.0, 0.0, 100.0 - copy.height);
                     copy.visible = true; uiSprites.push_back(copy); created = true; break;
                 }
-                if (!created) reportError(i + 1, "ui duplicate needs an existing block or sprite", sourceName);
+                if (!created) for (const UiButton& source : uiButtons) if (source.name == sourceName) {
+                    UiButton copy = source; copy.name = newName; copy.group = currentUiGroup;
+                    copy.x = std::clamp(copy.x + 3.0, 0.0, 100.0 - copy.width);
+                    copy.y = std::clamp(copy.y + 3.0, 0.0, 100.0 - copy.height);
+                    copy.visible = true; uiButtons.push_back(copy); created = true; break;
+                }
+                if (!created) for (const UiText& source : uiTexts) if (source.name == sourceName) {
+                    UiText copy = source; copy.name = newName; copy.group = currentUiGroup;
+                    copy.x = std::clamp(copy.x + 3.0, 0.0, 100.0 - copy.size);
+                    copy.y = std::clamp(copy.y + 3.0, 0.0, 100.0 - copy.size);
+                    copy.visible = true; uiTexts.push_back(copy); created = true; break;
+                }
+                if (!created) reportError(i + 1, "ui duplicate needs an existing UI object", sourceName);
                 else {
                     variables["last_ui_object"] = newName;
                     types["last_ui_object"] = "word";
