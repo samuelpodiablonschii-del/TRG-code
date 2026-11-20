@@ -32,7 +32,7 @@ block z 3 x 5 y 44 w 90 h 0.25 color #252235 name GRID_H3
 block z 3 x 5 y 54 w 90 h 0.25 color #252235 name GRID_H4
 
 text "2D EDITOR" x 4 y 8 size 4 color #FFFFFF bold true
-text "Design objects • select, move, resize and recolour" x 4 y 11 size 1.7 color #B9B2CA
+text "Create, select, move and resize canvas objects" x 4 y 11 size 1.7 color #B9B2CA
 text object_label "No object selected" x 5 y 69 size 3 color #FFFFFF bold true
 text object_count "0 OBJECTS" x 95 y 69 size 2 color #A69CB8 align right
 

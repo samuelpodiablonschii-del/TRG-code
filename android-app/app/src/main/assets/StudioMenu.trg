@@ -24,25 +24,25 @@ button code "BACK TO CODE" x 52 y 30 w 43 h 8 color #322542 text_size 0.3 (
 button example "LOAD EXAMPLE" x 5 y 40 w 43 h 8 color #322542 text_size 0.3 (
     studio example
 )
-button import "IMPORT FILE / MEDIA" x 52 y 40 w 43 h 8 color #322542 text_size 0.27 (
+button import "IMPORT FILE / MEDIA" x 52 y 40 w 43 h 8 color #322542 text_size 0.22 (
     studio import
 )
 button export "EXPORT SOURCE" x 5 y 50 w 43 h 8 color #322542 text_size 0.3 (
     studio export
 )
-button package "PACKAGE TRGPACK" x 52 y 50 w 43 h 8 color #322542 text_size 0.3 (
+button package "PACKAGE TRGPACK" x 52 y 50 w 43 h 8 color #322542 text_size 0.25 (
     studio package
 )
-button preview "PREVIEW PROGRAM UI" x 5 y 60 w 43 h 8 color #322542 text_size 0.27 (
+button preview "PREVIEW PROGRAM UI" x 5 y 60 w 43 h 8 color #322542 text_size 0.22 (
     studio preview
 )
-button dictionary "COMMAND DICTIONARY" x 52 y 60 w 43 h 8 color #322542 text_size 0.27 (
+button dictionary "COMMAND DICTIONARY" x 52 y 60 w 43 h 8 color #322542 text_size 0.22 (
     studio dictionary
 )
-button settings "EDITOR SETTINGS" x 5 y 70 w 43 h 8 color #322542 text_size 0.3 (
+button settings "EDITOR SETTINGS" x 5 y 70 w 43 h 8 color #322542 text_size 0.25 (
     studio settings
 )
-button debug "EXPLAIN LAST ERROR" x 52 y 70 w 43 h 8 color #322542 text_size 0.3 (
+button debug "EXPLAIN LAST ERROR" x 52 y 70 w 43 h 8 color #322542 text_size 0.22 (
     studio debug
 )
 button closemenu "CLOSE MENU" x 5 y 87 w 90 h 8 color #5B273C text_size 0.3 (

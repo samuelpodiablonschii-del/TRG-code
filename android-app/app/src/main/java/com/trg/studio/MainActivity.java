@@ -1641,6 +1641,7 @@ public final class MainActivity extends Activity {
                 int sequence = touchSequence;
                 if (buttonIndex >= 0 && studioMenuPreview == this) {
                     String action = buttonName(buttonIndex);
+                    nativeSetMobileInput("mobile_tap", "released");
                     if (!action.isEmpty()) onTrgStudioAction(action);
                     postDelayed(() -> {
                         if (sequence == touchSequence) releaseSwipes();

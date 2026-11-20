@@ -21,7 +21,7 @@ block z 3 x 12 y 53 w 76 h 0.25 color #252235 name FLOOR_A
 block z 3 x 17 y 59 w 66 h 0.25 color #252235 name FLOOR_B
 block z 3 x 24 y 65 w 52 h 0.25 color #252235 name FLOOR_C
 text "3D SCENE EDITOR" x 4 y 8 size 4 color #FFFFFF bold true
-text "Create and transform reusable 3D primitives" x 4 y 11 size 1.7 color #B9B2CA
+text "Create and transform 3D scene primitives" x 4 y 11 size 1.7 color #B9B2CA
 text object_label "No model selected" x 5 y 74 size 2.8 color #FFFFFF bold true
 text object_count "0 MODELS" x 95 y 74 size 1.9 color #A69CB8 align right
 
