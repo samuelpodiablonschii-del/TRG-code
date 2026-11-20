@@ -107,6 +107,7 @@ public final class MainActivity extends Activity {
     private static native void nativeSetMobileInput(String name, String state);
     private static native void nativeSetPointer(float x, float y, boolean down);
     private static native void nativeStop();
+    private static native void nativeSetEditorSelection(String name);
     private static native String nativeTransformEditorObject(String kind, String name, float dx, float dy, float dz);
     private static native String nativeScaleEditorObject(String kind, String name, float factor);
 
@@ -1415,6 +1416,25 @@ public final class MainActivity extends Activity {
                     if (text != null) textItems.add(text);
                 }
             }
+            if (editor2D || editor3D) {
+                String selectionLabel = editor3D ? "model_label" : "object_label";
+                JSONArray labels = state.optJSONArray("texts");
+                if (labels != null) for (int i = 0; i < labels.length(); i++) {
+                    JSONObject label = labels.optJSONObject(i);
+                    if (label == null || !selectionLabel.equals(label.optString("name"))) continue;
+                    String candidate = label.optString("value");
+                    if (!candidate.startsWith("No ")) {
+                        selectedEditorName = candidate;
+                        selectedEditorKind = editor3D ? "3d" :
+                                findJsonObject(state.optJSONArray("blocks"), candidate) != null ? "block" :
+                                findJsonObject(state.optJSONArray("buttons"), candidate) != null ? "button" : "text";
+                    } else {
+                        selectedEditorName = "";
+                        selectedEditorKind = "";
+                    }
+                    break;
+                }
+            }
             invalidate();
         }
 
@@ -1896,6 +1916,8 @@ public final class MainActivity extends Activity {
                 if (hit != null) {
                     selectedEditorKind = hit.kind;
                     selectedEditorName = hit.name;
+                    nativeSetEditorSelection(selectedEditorName);
+                    status.setText("Selected: " + selectedEditorName);
                     editorObjectDragging = true;
                     editorGestureMode = 1;
                 } else {
