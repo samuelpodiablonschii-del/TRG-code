@@ -1,4 +1,4 @@
-name: TRG Windows build
+name: TRG Mobile APK build
 
 on:
   workflow_dispatch:
@@ -6,80 +6,77 @@ on:
     branches: [main]
     paths:
       - "TRG.cpp"
-      - "TRG.rc"
-      - "resource.h"
-      - "build.bat"
-      - "compile_console.bat"
+      - "android-app/**"
+      - "build-apk.bat"
       - ".github/workflows/validate-trg.yml"
   pull_request:
     branches: [main]
     paths:
       - "TRG.cpp"
-      - "TRG.rc"
-      - "resource.h"
-      - "build.bat"
-      - "compile_console.bat"
+      - "android-app/**"
+      - "build-apk.bat"
       - ".github/workflows/validate-trg.yml"
 
 permissions:
   contents: read
 
 concurrency:
-  group: trg-windows-build-${{ github.ref }}
+  group: trg-mobile-apk-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  windows:
-    name: Compile TRG desktop and console executables
+  android:
+    name: Compile TRG Studio for Android
     runs-on: windows-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up MinGW-w64
-        uses: msys2/setup-msys2@v2
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
         with:
-          msystem: MINGW64
-          update: true
-          install: mingw-w64-x86_64-gcc
-          suppress-deprecation-warnings: msystem-mingw64
+          distribution: temurin
+          java-version: "21"
 
-      - name: Compile TRG console executable using project build script
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android build components
+        shell: pwsh
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;36.0.0" "ndk;28.2.13676358" "cmake;3.22.1"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build Android debug APK
         shell: pwsh
         env:
           CI: "true"
           TRG_NO_PAUSE: "1"
         run: |
-          cmd /c compile_console.bat
+          .\\build-apk.bat
           if ($LASTEXITCODE -ne 0) {
-            throw "compile_console.bat failed."
-          }
-          if (!(Test-Path ".\\TRG-console.exe")) {
-            throw "TRG-console.exe was not produced."
+            throw "The Android APK build failed."
           }
 
-      - name: Compile TRG desktop executable using project build script
+      - name: Verify APK
         shell: pwsh
-        env:
-          CI: "true"
-          TRG_NO_PAUSE: "1"
         run: |
-          cmd /c build.bat
-          if ($LASTEXITCODE -ne 0) {
-            throw "build.bat failed."
+          $apk = "android-app/app/build/outputs/apk/debug/app-debug.apk"
+          if (!(Test-Path $apk)) {
+            throw "Android APK was not produced: $apk"
           }
-          if (!(Test-Path ".\\TRG-build.exe")) {
-            throw "TRG-build.exe was not produced."
-          }
+          Write-Host "Android APK created successfully."
 
-      - name: Upload compiled executables
+      - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
-          name: TRG-Windows-builds
-          path: |
-            TRG-build.exe
-            TRG-console.exe
+          name: TRG-Studio-Android-debug-APK
+          path: android-app/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
