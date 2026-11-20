@@ -7,12 +7,14 @@ on:
     paths:
       - "android-app/**"
       - "build-apk.bat"
+      - "TRG.cpp"
       - ".github/workflows/build.yml"
   pull_request:
     branches: [main]
     paths:
       - "android-app/**"
       - "build-apk.bat"
+      - "TRG.cpp"
       - ".github/workflows/build.yml"
 
 permissions:
