@@ -1942,7 +1942,12 @@ public final class MainActivity extends Activity {
                 if (!editorMoved && tappedButton >= 0) {
                     String actionName = buttonName(tappedButton);
                     if ("copy_code".equalsIgnoreCase(actionName)) copySelectedObjectCode();
-                    else runButton(tappedButton);
+                    else if ("reset_view".equalsIgnoreCase(actionName)) {
+                        cameraYaw = 0.48f;
+                        cameraPitch = 0.32f;
+                        cameraZoom = 1.0f;
+                        invalidate();
+                    } else runButton(tappedButton);
                 } else if (!editorMoved && selectedEditorName.isEmpty()) {
                     EditorHit hit = hitEditorObject(event.getX(), event.getY());
                     if (hit != null) {
