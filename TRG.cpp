@@ -5748,7 +5748,7 @@ std::vector<std::string> readProgram(std::istream& source) {
                 const std::string corrected = suggestedCommand(typed);
                 if (!corrected.empty() && lower(typed) != corrected) {
                     cleanLine.replace(first, last - first, corrected);
-                    appendOutput("AUTO-CORRECTED command '" + typed + "' to '" + corrected + "'\\r\\n");
+                    appendOutput("AUTO-CORRECTED command '" + typed + "' to '" + corrected + "'\r\n");
                 }
             }
         }

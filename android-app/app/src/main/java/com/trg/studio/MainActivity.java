@@ -1547,18 +1547,34 @@ public final class MainActivity extends Activity {
                 }
                 float[] center = project3DPoint(model.optDouble("x"), model.optDouble("y"),
                         model.optDouble("z"), width, height);
+                float[] ground = project3DPoint(model.optDouble("x"),
+                        model.optDouble("y") - halfH - 0.08, model.optDouble("z"), width, height);
+                float shadowWidth = Math.max(dp(10), halfW * Math.min(width, height) * 0.115f * cameraZoom * ground[2]);
+                float shadowHeight = Math.max(dp(4), halfD * Math.min(width, height) * 0.038f * cameraZoom * ground[2]);
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(Color.argb(46, 18, 14, 30));
+                canvas.drawOval(new RectF(ground[0] - shadowWidth, ground[1] - shadowHeight * 0.5f,
+                        ground[0] + shadowWidth, ground[1] + shadowHeight * 0.5f), paint);
                 if ("sphere".equals(model.optString("shape"))) {
                     float radiusX = halfW * Math.min(width, height) * 0.115f * cameraZoom * center[2];
                     float radiusY = halfH * Math.min(width, height) * 0.115f * cameraZoom * center[2];
                     RectF sphere = new RectF(center[0] - radiusX, center[1] - radiusY,
                             center[0] + radiusX, center[1] + radiusY);
+                    int red = Color.red(base), green = Color.green(base), blue = Color.blue(base);
+                    int highlight = Color.rgb(Math.min(255, red + 82), Math.min(255, green + 82),
+                            Math.min(255, blue + 82));
+                    int shadowColor = Color.rgb(Math.round(red * 0.38f), Math.round(green * 0.38f),
+                            Math.round(blue * 0.42f));
                     paint.setStyle(Paint.Style.FILL);
-                    paint.setColor(Color.argb(Math.round(255 * opacity), Color.red(base), Color.green(base), Color.blue(base)));
+                    paint.setShader(new android.graphics.RadialGradient(
+                            sphere.left + radiusX * 0.34f, sphere.top + radiusY * 0.28f,
+                            Math.max(radiusX, radiusY) * 1.35f,
+                            new int[] { highlight, base, shadowColor },
+                            new float[] { 0f, 0.58f, 1f }, android.graphics.Shader.TileMode.CLAMP));
+                    paint.setAlpha(Math.round(255 * opacity));
                     canvas.drawOval(sphere, paint);
-                    paint.setColor(Color.argb(Math.round(70 * opacity), 255, 255, 255));
-                    canvas.drawOval(new RectF(sphere.left + sphere.width() * 0.16f,
-                            sphere.top + sphere.height() * 0.10f, sphere.centerX(),
-                            sphere.centerY()), paint);
+                    paint.setShader(null);
+                    paint.setAlpha(255);
                 } else {
                     Integer[] order = {0, 1, 2, 3, 4, 5};
                     java.util.Arrays.sort(order, (a, b) -> {
