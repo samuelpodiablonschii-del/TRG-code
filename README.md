@@ -2,7 +2,7 @@
 
 ## Build and run
 
-In the developer project folder, run `build.bat` to build `TRG.exe`. It builds a Windows desktop app (no terminal window), embeds the purple TRG icon, and statically links the MinGW runtime. It can also use MSVC from a Developer Command Prompt. The script first writes a fresh `TRG-build.exe`, then replaces `TRG.exe` when possible. If `TRG.exe` is running, the fresh build remains as `TRG-build.exe` so it can still be packaged or copied after the old instance closes. The installer does not include C++ source or build scripts.
+Run `build.bat` from the repository root to build the Windows desktop app. It supports either MinGW-w64 (with `g++` and `windres` on PATH; the common `C:\\msys64\\mingw64\\bin` folder is detected automatically) or MSVC from a Visual Studio Developer Command Prompt (with `cl.exe` and `rc.exe`). For MSVC, install the Desktop development with C++ workload and Windows SDK. The script creates `TRG-build.exe`, embeds the purple TRG icon, then updates `TRG.exe` when it is not running. If Windows cannot replace a running `TRG.exe`, use the fresh `TRG-build.exe` instead.
 
 Run `build-installer.bat` to rebuild the latest desktop runtime and create `TRG-Installer.exe` in one step. You can still run `build.bat` alone when you only want the desktop app. The installer embeds `TRG-build.exe` when a fresh locked-file fallback exists; otherwise it embeds `TRG.exe`. The installer reports the package's storage size, asks for administrator permission to install under `C:\Program Files\TRG-code`, and shows progress while installing. It includes the runtime, icon, README, and interactive example, but not C++ source code. It associates `.trg` files with TRG and places both a TRG desktop shortcut (using the purple icon) and `TRG-Example.trg` on the Desktop. Existing desktop files are preserved; if `TRG.lnk` already exists, the installer creates a uniquely named shortcut instead. The installer uses its embedded files and does not download anything from the internet.
 
@@ -26,7 +26,7 @@ Open `TRG-Example.trg` from your Desktop for a clickable tour. Each button expla
 
 ## Android app
 
-The Android Studio project is in `android-app`. Open that folder in Android Studio or double-click `build-apk.bat` in the repository root to build a debug APK. The script checks for Java and the Gradle wrapper, keeps the window open on errors, and opens File Explorer with the APK selected after a successful build. You can also build from PowerShell:
+The Android Studio project is in `android-app`. Install Android Studio with a JDK (17 or newer; the CI build uses Java 21) and these SDK components: Android SDK Platform 35, Build-Tools 36.0.0, NDK 28.2.13676358, and CMake 3.22.1. Then double-click `build-apk.bat` in the repository root. It detects common Android Studio JDK/SDK locations, checks the required SDK components, runs the Gradle wrapper, and opens File Explorer with the generated APK selected. The first build needs internet access to download Gradle and Android/Gradle dependencies. You can also build from PowerShell:
 
 ```text
 cd android-app
@@ -48,8 +48,9 @@ Android hosts these TRG-authored screens in a drawing surface and handles platfo
 
 The 2D editor provides a grid workspace with block and circle creation, selection, copy, rename, delete, movement, resizing, shape toggling, and colour changes. The 3D editor provides an isometric scene view with box and sphere primitives, selection, copy, rename, delete, movement, rotation, scaling, and colour changes.
 
-`These screens use the general-purpose UI and 3D libraries documented below. The current 3D renderer displays primitive boxes and spheres in an isometric view; it is not yet a general mesh importer, perspective camera system, shader pipeline, or full 3D physics engine.\n\n
-The Android `studio menu` bridge command opens the native action list from the TRG-defined toolbar button. Android handles platform operations such as document pickers and editor focus; the bundled TRG program defines the toolbar UI, while C++ interprets user programs and returns their output. The editor includes a plain-text command dictionary, syntax colors and typo underlines, new-line indentation, `.trg`/`.txt` tabs, and settings for font size and the color wheel. The program UI preview fills the screen and keeps an on-screen menu button.
+These screens use the general-purpose UI and 3D libraries documented below. The current 3D renderer displays primitive boxes and spheres in an isometric view; it is not yet a general mesh importer, perspective camera system, shader pipeline, or full 3D physics engine.
+
+The Android `studio menu` bridge connects TRG-authored toolbar and workspace-menu buttons to platform actions. Android handles platform operations such as document pickers and editor focus; the bundled TRG programs define the visible toolbar, workspace menu, and editor screens, while C++ interprets user programs and returns their output. The editor includes a command dictionary, syntax colours and typo underlines, new-line indentation, `.trg`/`.txt` tabs, and settings for font size and the colour wheel. The program UI preview fills the screen and keeps an on-screen menu button.
 
 UI text labels can be declared inside `add (ui)`:
 
