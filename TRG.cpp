@@ -4197,6 +4197,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 bool renamed = false;
                 for (UiBlock& item : uiBlocks) if (item.name == oldName) { item.name = newName; renamed = true; break; }
                 if (!renamed) for (UiSprite& item : uiSprites) if (item.name == oldName) { item.name = newName; renamed = true; break; }
+                if (!renamed) for (UiButton& item : uiButtons) if (item.name == oldName) { item.name = newName; renamed = true; break; }
                 if (!renamed) for (UiText& item : uiTexts) if (item.name == oldName) { item.name = newName; renamed = true; break; }
                 if (!renamed) reportError(i + 1, "unknown UI object", oldName);
                 else {
@@ -4216,7 +4217,13 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 }
                 if (block != uiBlocks.end()) { block->x += dx; block->y += dy; }
                 else if (sprite != uiSprites.end()) { sprite->x += dx; sprite->y += dy; }
-                else { reportError(i + 1, "unknown movable UI object", name); continue; }
+                else {
+                    auto button = std::find_if(uiButtons.begin(), uiButtons.end(), [&](const UiButton& item) { return item.name == name; });
+                    auto text = std::find_if(uiTexts.begin(), uiTexts.end(), [&](const UiText& item) { return item.name == name; });
+                    if (button != uiButtons.end()) { button->x += dx; button->y += dy; }
+                    else if (text != uiTexts.end()) { text->x += dx; text->y += dy; }
+                    else { reportError(i + 1, "unknown movable UI object", name); continue; }
+                }
                 refreshCollisionWatches(variables, types);
                 continue;
             }
@@ -4227,7 +4234,13 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 }
                 if (block != uiBlocks.end() && block->width + dw > 0 && block->height + dh > 0) { block->width += dw; block->height += dh; }
                 else if (sprite != uiSprites.end() && sprite->width + dw > 0 && sprite->height + dh > 0) { sprite->width += dw; sprite->height += dh; }
-                else { reportError(i + 1, "resize needs a block or sprite and a positive result", name); continue; }
+                else {
+                    auto button = std::find_if(uiButtons.begin(), uiButtons.end(), [&](const UiButton& item) { return item.name == name; });
+                    auto text = std::find_if(uiTexts.begin(), uiTexts.end(), [&](const UiText& item) { return item.name == name; });
+                    if (button != uiButtons.end() && button->width + dw > 0 && button->height + dh > 0) { button->width += dw; button->height += dh; }
+                    else if (text != uiTexts.end() && text->size + dw > 0) { text->size += dw; }
+                    else { reportError(i + 1, "resize needs a UI object and a positive result", name); continue; }
+                }
                 refreshCollisionWatches(variables, types);
                 continue;
             }
@@ -4238,6 +4251,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 bool changed = false;
                 for (UiBlock& item : uiBlocks) if (item.name == name) { item.color = color; changed = true; }
                 for (UiButton& item : uiButtons) if (item.name == name) { item.color = color; changed = true; }
+                for (UiText& item : uiTexts) if (item.name == name) { item.color = color; changed = true; }
                 if (!changed) reportError(i + 1, "unknown recolorable UI object", name);
                 continue;
             }
