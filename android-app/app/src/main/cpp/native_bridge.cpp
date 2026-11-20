@@ -300,6 +300,26 @@ Java_com_trg_studio_MainActivity_nativeSetPointer(JNIEnv*, jclass, jfloat x, jfl
     androidMobileInputs["pointer_down"] = down == JNI_TRUE ? "press" : "released";
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_trg_studio_MainActivity_nativeSetEditorSelection(JNIEnv* env, jclass, jstring nameValue) {
+    const std::string name = fromJavaString(env, nameValue);
+    if (name.empty()) return;
+    uiVariables["selectedName"] = name;
+    uiTypes["selectedName"] = "word";
+    auto list = uiVariables.find("objects");
+    if (list != uiVariables.end()) {
+        if (auto* items = std::get_if<std::vector<std::string>>(&list->second.value)) {
+            for (std::size_t index = 0; index < items->size(); ++index) {
+                if ((*items)[index] == name) {
+                    uiVariables["selectedIndex"] = static_cast<double>(index);
+                    uiTypes["selectedIndex"] = "num";
+                    break;
+                }
+            }
+        }
+    }
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_trg_studio_MainActivity_nativeTransformEditorObject(JNIEnv* env, jclass, jstring kindValue,
                                                               jstring nameValue, jfloat dx, jfloat dy, jfloat dz) {
