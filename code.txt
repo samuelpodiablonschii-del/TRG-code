@@ -2866,6 +2866,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 const std::string library = lower(tokens[1]);
                 if (library == "(files)") { filesEnabled = true; appendOutput("TRG files library enabled.\r\n"); continue; }
                 if (library == "(json)") { jsonEnabled = true; appendOutput("TRG JSON library enabled.\r\n"); continue; }
+                if (library == "(database)" || library == "(db)") { databaseEnabled = true; appendOutput("TRG Database library enabled.\r\n"); continue; }
                 if (library == "(web)") { webEnabled = true; appendOutput("TRG WebAssembly commands enabled.\r\n"); continue; }
                 if (library == "(collision)") { collisionEnabled = true; appendOutput("TRG collision helpers enabled.\r\n"); continue; }
                 if (library == "(physics)") { physicsEnabled = true; appendOutput("TRG physics library enabled.\r\n"); continue; }
@@ -2980,17 +2981,17 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                         trgDatabaseTables.clear(); trgDatabasePath = path;
                         if (!saveTrgDatabase(dbError)) { reportError(i + 1, dbError, tokens[2]); continue; }
                     }
-                    appendOutput("Database opened: " + path.filename().u8string() + "\\r\\n");
+                    appendOutput("Database opened: " + path.filename().u8string() + "\r\n");
                 } else if (action == "save" && tokens.size() == 2) {
                     if (!saveTrgDatabase(dbError)) reportError(i + 1, dbError);
-                    else appendOutput("Database saved.\\r\\n");
+                    else appendOutput("Database saved.\r\n");
                 } else if (action == "close" && tokens.size() == 2) {
-                    trgDatabaseTables.clear(); trgDatabasePath.clear(); appendOutput("Database closed.\\r\\n");
+                    trgDatabaseTables.clear(); trgDatabasePath.clear(); appendOutput("Database closed.\r\n");
                 } else if (action == "tables" && tokens.size() == 2) {
                     std::vector<std::string> names;
                     for (const auto& item : trgDatabaseTables) names.push_back(item.first);
                     std::sort(names.begin(), names.end());
-                    for (const auto& name : names) appendOutput(name + "\\r\\n");
+                    for (const auto& name : names) appendOutput(name + "\r\n");
                     variables["database_table_count"] = static_cast<double>(names.size()); types["database_table_count"] = "num";
                 } else reportError(i + 1, "use database open FILE, database save, database close, or database tables");
                 continue;
@@ -3009,7 +3010,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     if (!valid) { reportError(i + 1, "table columns must be unique valid names"); continue; }
                     trgDatabaseTables.emplace(name, std::move(table));
                     if (!saveTrgDatabase(dbError)) reportError(i + 1, dbError);
-                    else appendOutput("Created table " + name + ".\\r\\n");
+                    else appendOutput("Created table " + name + ".\r\n");
                 } else if (action == "delete" && tokens.size() == 3) {
                     if (!trgDatabaseTables.erase(valueFor(tokens[2], variables))) reportError(i + 1, "unknown table", tokens[2]);
                     else if (!saveTrgDatabase(dbError)) reportError(i + 1, dbError);
