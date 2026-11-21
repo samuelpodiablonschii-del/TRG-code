@@ -30,6 +30,21 @@ block z 2 x 79.75 y 8 w 0.25 h 74 color #343B4A name RIGHT_DIVIDER
 block z 2 x 0 y 81.75 w 100 h 0.25 color #343B4A name SHELF_DIVIDER
 block z 2 x 0 y 7.75 w 100 h 0.25 color #343B4A name TOP_DIVIDER
 
+// Subtle viewport grid and world axes
+block z 1 x 22 y 22 w 54 h 0.12 color #2B3443 name GRID_H1
+block z 1 x 22 y 32 w 54 h 0.12 color #2B3443 name GRID_H2
+block z 1 x 22 y 42 w 54 h 0.12 color #2B3443 name GRID_H3
+block z 1 x 22 y 52 w 54 h 0.12 color #2B3443 name GRID_H4
+block z 1 x 22 y 62 w 54 h 0.12 color #2B3443 name GRID_H5
+block z 1 x 22 y 72 w 54 h 0.12 color #2B3443 name GRID_H6
+block z 1 x 28 y 18 w 0.12 h 58 color #2B3443 name GRID_V1
+block z 1 x 38 y 18 w 0.12 h 58 color #2B3443 name GRID_V2
+block z 1 x 48 y 18 w 0.12 h 58 color #2B3443 name GRID_V3
+block z 1 x 58 y 18 w 0.12 h 58 color #2B3443 name GRID_V4
+block z 1 x 68 y 18 w 0.12 h 58 color #2B3443 name GRID_V5
+block z 2 x 22 y 52 w 54 h 0.2 color #465B79 name WORLD_X_AXIS
+block z 2 x 48 y 18 w 0.2 h 58 color #6B4D73 name WORLD_Y_AXIS
+
 // Top toolbar
 text "TRG" x 2 y 5 size 2.8 color #FFFFFF
 text "SCENE EDITOR" x 6 y 4.7 size 1.55 color #AAB3C5
