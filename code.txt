@@ -4614,6 +4614,12 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 bool validPath = false;
                 const std::filesystem::path scenePath = projectFilePath(valueFor(tokens[2], variables), validPath);
                 if (!validPath) { reportError(i + 1, "3d save needs a project-relative .trgscene path"); continue; }
+                const std::filesystem::path canonicalRoot = canonicalProjectPath(projectRoot);
+                const std::filesystem::path canonicalTarget = canonicalProjectPath(scenePath);
+                const std::filesystem::path relativeTarget = canonicalTarget.lexically_relative(canonicalRoot);
+                if (relativeTarget.empty() || relativeTarget == ".." || *relativeTarget.begin() == "..") {
+                    reportError(i + 1, "3d save cannot write outside the project directory"); continue;
+                }
                 std::error_code directoryError;
                 if (!scenePath.parent_path().empty())
                     std::filesystem::create_directories(scenePath.parent_path(), directoryError);
