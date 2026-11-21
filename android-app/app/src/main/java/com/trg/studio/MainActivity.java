@@ -240,17 +240,17 @@ public final class MainActivity extends Activity {
     private void buildInterface() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.rgb(13, 11, 18));
+        root.setBackgroundColor(Color.rgb(10, 16, 25));
 
         preview = new PreviewView(true);
-        root.addView(preview, new LinearLayout.LayoutParams(-1, dp(62)));
+        root.addView(preview, new LinearLayout.LayoutParams(-1, dp(72)));
 
         editorScreen = new LinearLayout(this);
         editorScreen.setOrientation(LinearLayout.VERTICAL);
-        editorScreen.setBackgroundColor(Color.rgb(13, 11, 18));
+        editorScreen.setBackgroundColor(Color.rgb(10, 16, 25));
         HorizontalScrollView tabScroller = new HorizontalScrollView(this);
         tabScroller.setHorizontalScrollBarEnabled(false);
-        tabScroller.setBackgroundColor(Color.rgb(23, 20, 31));
+        tabScroller.setBackgroundColor(Color.rgb(16, 27, 40));
         fileTabs = new LinearLayout(this);
         fileTabs.setOrientation(LinearLayout.HORIZONTAL);
         tabScroller.addView(fileTabs);
@@ -258,32 +258,34 @@ public final class MainActivity extends Activity {
 
         LinearLayout codePane = new LinearLayout(this);
         codePane.setOrientation(LinearLayout.HORIZONTAL);
-        codePane.setBackgroundColor(Color.rgb(17, 15, 23));
+        codePane.setBackgroundColor(Color.rgb(11, 19, 29));
         lineNumbers = new TextView(this);
         lineNumbers.setText("1");
-        lineNumbers.setTextColor(Color.rgb(135, 124, 158));
+        lineNumbers.setTextColor(Color.rgb(112, 139, 160));
         lineNumbers.setTextSize(editorFontSize);
         lineNumbers.setTypeface(fixedUiFontBold);
         lineNumbers.setMaxLines(Integer.MAX_VALUE);
         lineNumbers.setIncludeFontPadding(false);
         lineNumbers.setGravity(Gravity.TOP | Gravity.RIGHT);
         lineNumbers.setPadding(dp(10), dp(12), dp(9), dp(10));
-        lineNumbers.setBackgroundColor(Color.rgb(22, 19, 29));
+        lineNumbers.setBackgroundColor(Color.rgb(15, 25, 37));
         codePane.addView(lineNumbers, new LinearLayout.LayoutParams(dp(42), -1));
 
         editor = new LineNumberEditText();
         editor.setGravity(Gravity.TOP | Gravity.START);
-        editor.setTextColor(Color.rgb(235, 230, 244));
-        editor.setHintTextColor(Color.GRAY);
+        editor.setTextColor(Color.rgb(226, 237, 246));
+        editor.setHintTextColor(Color.rgb(105, 126, 145));
         editor.setHint("Write TRG source here");
         editor.setTextSize(editorFontSize);
-        editor.setTypeface(fixedUiFontBold);
+        editor.setTypeface(fixedUiFont);
         editor.setMaxLines(Integer.MAX_VALUE);
         editor.setIncludeFontPadding(false);
         editor.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE
-                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+        editor.setImeOptions(android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI
+                | android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
         editor.setPadding(dp(12), dp(12), dp(12), dp(10));
-        editor.setBackgroundColor(Color.rgb(17, 15, 23));
+        editor.setBackgroundColor(Color.rgb(11, 19, 29));
         editor.setVerticalScrollBarEnabled(true);
         editor.setFilters(new InputFilter[]{new TrgIndentFilter()});
         codePane.addView(editor, new LinearLayout.LayoutParams(0, -1, 1));
@@ -292,23 +294,23 @@ public final class MainActivity extends Activity {
 
         outputScreen = new LinearLayout(this);
         outputScreen.setOrientation(LinearLayout.VERTICAL);
-        outputScreen.setBackgroundColor(Color.rgb(8, 7, 11));
+        outputScreen.setBackgroundColor(Color.rgb(8, 14, 22));
         TextView outputHeader = new TextView(this);
         outputHeader.setText("  >   PROGRAM OUTPUT");
         outputHeader.setTypeface(fixedUiFontBold);
-        outputHeader.setTextColor(Color.rgb(194, 180, 214));
+        outputHeader.setTextColor(Color.rgb(113, 222, 207));
         outputHeader.setTextSize(11);
         outputHeader.setGravity(Gravity.CENTER_VERTICAL);
-        outputHeader.setBackgroundColor(Color.rgb(25, 22, 32));
+        outputHeader.setBackgroundColor(Color.rgb(17, 29, 42));
         outputScreen.addView(outputHeader, new LinearLayout.LayoutParams(-1, dp(36)));
 
         ScrollView outputScroll = new ScrollView(this);
         outputScroll.setFillViewport(true);
-        outputScroll.setBackgroundColor(Color.rgb(8, 7, 11));
+        outputScroll.setBackgroundColor(Color.rgb(8, 14, 22));
         output = new TextView(this);
-        output.setTextColor(Color.rgb(219, 213, 230));
+        output.setTextColor(Color.rgb(213, 226, 237));
         output.setTextSize(14);
-        output.setTypeface(fixedUiFontBold);
+        output.setTypeface(fixedUiFont);
         output.setPadding(dp(14), dp(12), dp(12), dp(12));
         output.setText("Run a TRG program to see its output here.\n");
         outputScroll.addView(output);
@@ -318,10 +320,10 @@ public final class MainActivity extends Activity {
 
         status = new TextView(this);
         status.setTypeface(fixedUiFontBold);
-        status.setTextColor(Color.rgb(200, 190, 218));
+        status.setTextColor(Color.rgb(151, 177, 194));
         status.setTextSize(11);
         status.setPadding(dp(12), dp(4), dp(10), dp(4));
-        status.setBackgroundColor(Color.rgb(23, 20, 31));
+        status.setBackgroundColor(Color.rgb(16, 27, 40));
         status.setText("Ready  |  TRG C++ interpreter");
         root.addView(status, new LinearLayout.LayoutParams(-1, dp(24)));
 
@@ -508,7 +510,7 @@ public final class MainActivity extends Activity {
                     studioMenuDialog = dialog;
                     studioMenuPreview = menuView;
                     FrameLayout surface = new FrameLayout(this);
-                    surface.setBackgroundColor(Color.rgb(13, 11, 18));
+                    surface.setBackgroundColor(Color.rgb(10, 16, 25));
                     surface.addView(menuView, new FrameLayout.LayoutParams(-1, -1));
                     dialog.setCancelable(true);
                     dialog.setOnCancelListener(ignored -> {
@@ -809,8 +811,8 @@ public final class MainActivity extends Activity {
             tab.setTextSize(12);
             tab.setGravity(Gravity.CENTER_VERTICAL);
             tab.setPadding(dp(12), 0, dp(12), 0);
-            tab.setTextColor(name.equals(currentDocumentName) ? Color.WHITE : Color.rgb(160, 151, 171));
-            tab.setBackgroundColor(name.equals(currentDocumentName) ? Color.rgb(72, 48, 112) : Color.TRANSPARENT);
+            tab.setTextColor(name.equals(currentDocumentName) ? Color.rgb(224, 250, 246) : Color.rgb(139, 160, 178));
+            tab.setBackgroundColor(name.equals(currentDocumentName) ? Color.rgb(24, 75, 78) : Color.TRANSPARENT);
             tab.setOnClickListener(view -> {
                 openDocuments.put(currentDocumentName, editor.getText().toString());
                 currentDocumentName = name;
@@ -885,7 +887,7 @@ public final class MainActivity extends Activity {
         menuButton.setTextSize(12);
         menuButton.setGravity(Gravity.CENTER);
         menuButton.setPadding(dp(14), dp(8), dp(14), dp(8));
-        menuButton.setBackgroundColor(Color.rgb(91, 52, 170));
+        menuButton.setBackgroundColor(Color.rgb(20, 105, 99));
         FrameLayout.LayoutParams menuLayout = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END);
         menuLayout.setMargins(0, dp(16), dp(16), 0);
         fullScreen.addView(menuButton, menuLayout);
@@ -896,7 +898,7 @@ public final class MainActivity extends Activity {
         closeButton.setTextColor(Color.WHITE);
         closeButton.setTextSize(25);
         closeButton.setGravity(Gravity.CENTER);
-        closeButton.setBackgroundColor(Color.rgb(38, 25, 56));
+        closeButton.setBackgroundColor(Color.rgb(22, 43, 58));
         FrameLayout.LayoutParams closeLayout = new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.TOP | Gravity.START);
         closeLayout.setMargins(dp(14), dp(14), 0, 0);
         fullScreen.addView(closeButton, closeLayout);
