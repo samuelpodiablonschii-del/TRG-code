@@ -1,0 +1,1427 @@
+        if (setUiEntityPosition(name, currentX, nextY) && overlapsSolid(currentX, nextY, hitY)) {
+            contactPairs.insert(name + "\n" + hitY);
+            setUiEntityPosition(name, currentX, currentY);
+            body.vy = -body.vy * body.restitution;
+            ++body.bounceCount;
+            variables["bb_bounces"] = static_cast<double>(body.bounceCount);
+        }
+    }
+    double ballX = 0, ballY = 0, ballW = 0, ballH = 0;
+    if (uiEntityBounds("ball", ballX, ballY, ballW, ballH)) {
+        for (auto& entry : physicsBodies) {
+            PhysicsBody& triggerBody = entry.second;
+            if (!triggerBody.trigger) continue;
+            double tx = 0, ty = 0, tw = 0, th = 0;
+            if (!uiEntityBounds(triggerBody.name, tx, ty, tw, th)) continue;
+            if (ballX < tx + tw && ballX + ballW > tx && ballY < ty + th && ballY + ballH > ty) {
+                if (triggerBody.triggerKind == "finish-line") {
+                    variables["bb_finish_hit"] = true; currentTypes["bb_finish_hit"] = "toggle";
+                    if (physicsBodies.count("ball")) physicsBodies["ball"].frozen = true;
+                } else if (triggerBody.triggerKind == "death-brick") {
+                    auto ballBody = physicsBodies.find("ball");
+                    if (ballBody != physicsBodies.end() && !ballBody->second.immortal) {
+                        if (ballBody->second.lives > 1) {
+                            --ballBody->second.lives;
+                            setUiEntityPosition("ball", ballBody->second.spawnX, ballBody->second.spawnY);
+                            ballBody->second.vx = ballBody->second.vy = 0;
+                            ballBody->second.frozen = false;
+                            ballBody->second.launched = false;
+                            variables["bb_lives"] = static_cast<double>(ballBody->second.lives);
+                            currentTypes["bb_lives"] = "num";
+                        } else {
+                            variables["bb_death_hit"] = true; currentTypes["bb_death_hit"] = "toggle";
+                            ballBody->second.frozen = true;
+                        }
+                    }
+                } else if (triggerBody.triggerKind == "trigger-block" &&
+                           (!triggerBody.triggerHasActivated || triggerBody.triggerRepeats)) {
+                    auto ballBody = physicsBodies.find("ball");
+                    if (ballBody != physicsBodies.end()) {
+                        ballBody->second.gravityDirection = triggerBody.gravityDirection;
+                        ballBody->second.gravity = triggerBody.gravity;
+                        ballBody->second.speedMultiplier = triggerBody.speedMultiplier;
+                        ballBody->second.launchPowerMultiplier = triggerBody.launchPowerMultiplier;
+                        ballBody->second.drag = triggerBody.drag;
+                        ballBody->second.restitution = triggerBody.restitution;
+                        ballBody->second.midAirLaunch = triggerBody.midAirLaunch;
+                        ballBody->second.lives = triggerBody.lives;
+                        triggerBody.triggerHasActivated = true;
+                        if (triggerBody.ballSizeMultiplier > 0) {
+                            double bx=0, by=0, bw=0, bh=0;
+                            if (uiEntityBounds("ball", bx, by, bw, bh)) {
+                                const double cx=bx+bw/2, cy=by+bh/2;
+                                for (UiBlock& ballBlock : uiBlocks) if (ballBlock.name=="ball") {
+                                    ballBlock.width=5*triggerBody.ballSizeMultiplier;
+                                    ballBlock.height=5*triggerBody.ballSizeMultiplier;
+                                    ballBlock.x=cx-ballBlock.width/2; ballBlock.y=cy-ballBlock.height/2;
+                                }
+                            }
+                        }
+                    }
+                } else if (triggerBody.triggerKind == "freeze-pad") {
+                    variables["bb_freeze_hit"] = true; currentTypes["bb_freeze_hit"] = "toggle";
+                    if (physicsBodies.count("ball")) physicsBodies["ball"].frozen = true;
+                }
+            }
+        }
+    }
+    refreshCollisionWatches(variables, currentTypes);
+    for (const CollisionWatch& watch : collisionWatches) {
+        if (contactPairs.count(watch.first + "\n" + watch.second) ||
+            contactPairs.count(watch.second + "\n" + watch.first)) {
+            variables[watch.result] = true;
+            if (!currentTypes.count(watch.result)) currentTypes[watch.result] = "toggle";
+        }
+    }
+}
+
+#ifdef _WIN32
+std::pair<double, double> animatedPosition(const UiBlock& block, double elapsed) {
+    double x = block.x;
+    double y = block.y;
+    for (const UiAnimation& animation : uiAnimations) {
+        if (animation.name != block.name) continue;
+        if (elapsed < animation.startTime) break;
+        const double progress = std::min(1.0, (elapsed - animation.startTime) / animation.duration);
+        x = animation.startX + animation.dx * progress;
+        y = animation.startY + animation.dy * progress;
+    }
+    return {x, y};
+}
+
+struct DesktopLayout {
+    LONG width;
+    LONG height;
+    LONG headerHeight;
+    LONG panelTop;
+    LONG canvasHeight;
+    LONG margin;
+    LONG outputTop;
+    LONG outputBottom;
+};
+
+DesktopLayout desktopLayout(HWND window, const RECT& client) {
+    const LONG width = std::max<LONG>(0, client.right - client.left);
+    const LONG height = std::max<LONG>(0, client.bottom - client.top);
+    const LONG margin = scaleForDpi(window, 20);
+    if (previewMode) {
+        return {width, height, 0, height, std::max<LONG>(1, height),
+            margin, height, height};
+    }
+    const LONG headerHeight = std::min<LONG>(scaleForDpi(window, 76),
+        std::max<LONG>(scaleForDpi(window, 48), height / 5));
+    const LONG outputMinimum = scaleForDpi(window, 80);
+    const LONG canvasMinimum = scaleForDpi(window, 100);
+    const LONG panelMinimum = std::min(height, headerHeight + canvasMinimum);
+    const LONG panelMaximum = std::max(panelMinimum, height - outputMinimum);
+    const LONG panelTop = std::clamp<LONG>(height * 65 / 100, panelMinimum, panelMaximum);
+    return {width, height, headerHeight, panelTop,
+        std::max<LONG>(1, panelTop - headerHeight), margin,
+        panelTop + scaleForDpi(window, 10),
+        std::max<LONG>(panelTop + scaleForDpi(window, 10),
+                       height - scaleForDpi(window, 16))};
+}
+
+LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (message == WM_CREATE) {
+        mainWindow = window;
+        openButton = CreateWindowExW(0, L"BUTTON", L"Open",
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
+            reinterpret_cast<HMENU>(openButtonId), GetModuleHandleW(nullptr), nullptr);
+        saveButton = CreateWindowExW(0, L"BUTTON", L"Save",
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
+            reinterpret_cast<HMENU>(saveButtonId), GetModuleHandleW(nullptr), nullptr);
+        runButton = CreateWindowExW(0, L"BUTTON", L"Run",
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
+            reinterpret_cast<HMENU>(runButtonId), GetModuleHandleW(nullptr), nullptr);
+        previewButton = CreateWindowExW(0, L"BUTTON", L"Preview",
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
+            reinterpret_cast<HMENU>(previewButtonId), GetModuleHandleW(nullptr), nullptr);
+        newButton = CreateWindowExW(0, L"BUTTON", L"New",
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
+            reinterpret_cast<HMENU>(newButtonId), GetModuleHandleW(nullptr), nullptr);
+        buildButton = CreateWindowExW(0, L"BUTTON", L"Compile",
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
+            reinterpret_cast<HMENU>(buildButtonId), GetModuleHandleW(nullptr), nullptr);
+        dictionaryButton = CreateWindowExW(0, L"BUTTON", L"Dictionary",
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
+            reinterpret_cast<HMENU>(dictionaryButtonId), GetModuleHandleW(nullptr), nullptr);
+        editor2DButton = CreateWindowExW(0, L"BUTTON", L"2D Editor",
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
+            reinterpret_cast<HMENU>(editor2DButtonId), GetModuleHandleW(nullptr), nullptr);
+        editor3DButton = CreateWindowExW(0, L"BUTTON", L"3D Editor",
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
+            reinterpret_cast<HMENU>(editor3DButtonId), GetModuleHandleW(nullptr), nullptr);
+        richEditModule = LoadLibraryW(L"Msftedit.dll");
+        const wchar_t* editorClass = richEditModule ? MSFTEDIT_CLASS : L"EDIT";
+        codeEditor = CreateWindowExW(WS_EX_CLIENTEDGE, editorClass, L"",
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP | WS_VSCROLL | WS_HSCROLL |
+                ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | ES_NOHIDESEL,
+            0, 0, 100, 100, window, reinterpret_cast<HMENU>(codeEditorId),
+            GetModuleHandleW(nullptr), nullptr);
+        SendMessageW(codeEditor, EM_SETLIMITTEXT, 8 * 1024 * 1024, 0);
+        setOpenButtonFont(window);
+        if (codeEditor && richEditModule) {
+            SendMessageW(codeEditor, EM_SETBKGNDCOLOR, 0, RGB(13, 22, 33));
+            CHARFORMAT2W baseFormat = {};
+            baseFormat.cbSize = sizeof(baseFormat);
+            baseFormat.dwMask = CFM_COLOR | CFM_FACE | CFM_SIZE | CFM_BOLD;
+            baseFormat.crTextColor = RGB(220, 234, 243);
+            baseFormat.yHeight = 195;
+            baseFormat.dwEffects = 0;
+            std::wcsncpy(baseFormat.szFaceName, L"Consolas", LF_FACESIZE - 1);
+            baseFormat.szFaceName[LF_FACESIZE - 1] = L'\0';
+            SendMessageW(codeEditor, EM_SETCHARFORMAT, SCF_ALL, reinterpret_cast<LPARAM>(&baseFormat));
+        }
+        layoutOutputControls(window);
+        updateEditorWindowTitle();
+        return 0;
+    }
+    if (message == WM_DRAWITEM) {
+        auto* item = reinterpret_cast<DRAWITEMSTRUCT*>(lParam);
+        if (item && item->CtlType == ODT_BUTTON) {
+            COLORREF fill = RGB(29, 48, 65);
+            COLORREF textColor = RGB(226, 239, 246);
+            switch (item->CtlID) {
+                case runButtonId: fill = RGB(20, 119, 111); break;
+                case previewButtonId: fill = RGB(35, 76, 91); break;
+                case buildButtonId: fill = RGB(35, 63, 82); break;
+                case newButtonId: fill = RGB(47, 56, 72); break;
+                case dictionaryButtonId: fill = RGB(35, 48, 65); break;
+                case editor2DButtonId:
+                case editor3DButtonId: fill = RGB(27, 59, 72); break;
+                default: break;
+            }
+            if (item->itemState & ODS_SELECTED) {
+                fill = RGB(GetRValue(fill) * 3 / 4, GetGValue(fill) * 3 / 4,
+                    GetBValue(fill) * 3 / 4);
+            }
+            RECT area = item->rcItem;
+            HBRUSH brush = CreateSolidBrush(fill);
+            HPEN pen = CreatePen(PS_SOLID, 1, RGB(48, 76, 94));
+            HGDIOBJ oldBrush = SelectObject(item->hDC, brush);
+            HGDIOBJ oldPen = SelectObject(item->hDC, pen);
+            RoundRect(item->hDC, area.left + 1, area.top + 1, area.right - 1,
+                area.bottom - 1, scaleForDpi(window, 10), scaleForDpi(window, 10));
+            SelectObject(item->hDC, oldBrush);
+            SelectObject(item->hDC, oldPen);
+            DeleteObject(brush);
+            DeleteObject(pen);
+            SetBkMode(item->hDC, TRANSPARENT);
+            SetTextColor(item->hDC, textColor);
+            HFONT font = CreateFontW(-scaleForDpi(window, 11), 0, 0, 0, FW_BOLD,
+                FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+                CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS,
+                L"Segoe UI");
+            HGDIOBJ oldFont = SelectObject(item->hDC, font);
+            wchar_t label[128] = {};
+            GetWindowTextW(item->hwndItem, label, 127);
+            InflateRect(&area, -scaleForDpi(window, 3), 0);
+            DrawTextW(item->hDC, label, -1, &area,
+                DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+            SelectObject(item->hDC, oldFont);
+            DeleteObject(font);
+            if (item->itemState & ODS_FOCUS) {
+                InflateRect(&area, -scaleForDpi(window, 3), -scaleForDpi(window, 3));
+                DrawFocusRect(item->hDC, &area);
+            }
+            return TRUE;
+        }
+    }
+    if (message == WM_SIZE) {
+        layoutOutputControls(window);
+        InvalidateRect(window, nullptr, TRUE);
+        return 0;
+    }
+    if (message == WM_GETMINMAXINFO) {
+        auto* limits = reinterpret_cast<MINMAXINFO*>(lParam);
+        limits->ptMinTrackSize.x = scaleForDpi(window, 820);
+        limits->ptMinTrackSize.y = scaleForDpi(window, 420);
+        return 0;
+    }
+    if (message == WM_DPICHANGED) {
+        const RECT* suggested = reinterpret_cast<const RECT*>(lParam);
+        SetWindowPos(window, nullptr, suggested->left, suggested->top,
+                     suggested->right - suggested->left, suggested->bottom - suggested->top,
+                     SWP_NOZORDER | SWP_NOACTIVATE);
+        setOpenButtonFont(window);
+        layoutOutputControls(window);
+        InvalidateRect(window, nullptr, TRUE);
+        return 0;
+    }
+    if (message == WM_COMMAND && LOWORD(wParam) == codeEditorId && HIWORD(wParam) == EN_CHANGE) {
+        if (!loadingEditorText && !highlightingEditor) {
+            editorDirty = true;
+            updateEditorWindowTitle();
+            applyEditorSyntaxHighlighting();
+        }
+        return 0;
+    }
+    if (message == WM_COMMAND && LOWORD(wParam) == openButtonId) {
+        std::filesystem::path path;
+        if (openSourceDialog(path, window) && confirmDiscardEditorChanges(window)) loadSourceFile(path);
+        return 0;
+    }
+    if (message == WM_COMMAND && LOWORD(wParam) == saveButtonId) {
+        saveSourceFile();
+        return 0;
+    }
+    if (message == WM_COMMAND && LOWORD(wParam) == runButtonId) {
+        runEditorSource();
+        return 0;
+    }
+    if (message == WM_COMMAND && LOWORD(wParam) == editor2DButtonId) {
+        launchDesktopVisualEditor("2DEditor.trg");
+        return 0;
+    }
+    if (message == WM_COMMAND && LOWORD(wParam) == editor3DButtonId) {
+        launchDesktopVisualEditor("3DEditor.trg");
+        return 0;
+    }
+    if (message == WM_COMMAND && LOWORD(wParam) == dictionaryButtonId) {
+        const wchar_t* dictionary =
+            L"TRG COMMAND DICTIONARY\n\n"
+            L"OUTPUT: print / show / say\n"
+            L"INPUT: ask \"Question?\" variable\n"
+            L"VARIABLES: let name = value; num, word, toggle, color\n"
+            L"FLOW: if, else, loop, break, stop, every, wait\n"
+            L"FUNCTIONS: function, return, call\n"
+            L"DATA: list, push, insert, get, set, remove, pop, join, split\n"
+            L"TEXT: upper, lower, trim, length, contains, replace, substring\n"
+            L"MATH: random; add (math) for sin, cos, tan, sqrt, abs, min, max, clamp, distance\n"
+            L"AI: add (ai); ai create, teach, train, predict, classify\n"
+            L"FILES: add (files); read_file, write_file, append_file, file_exists\n"
+            L"JSON: add (json); json GROUP clean RESULT / compressed RESULT\n"
+            L"DATABASE: add (database); database open/save; table create; record add/get/update/delete; query\n"
+            L"UI: add (ui); text, button, rectangle, circle, image, animate\n\n"
+            L"Blocks use parentheses: if score > 0 ( ... )\n"
+            L"Libraries are file-wide: add (math), add (ai), add (json), add (database), add (all).";
+        MessageBoxW(window, dictionary, L"TRG - Command Dictionary", MB_OK | MB_ICONINFORMATION);
+        return 0;
+    }
+    if (message == WM_COMMAND && LOWORD(wParam) == buildButtonId) {
+        if (!saveSourceFile()) return 0;
+        wchar_t executablePath[32768] = {};
+        const DWORD executableLength = GetModuleFileNameW(nullptr, executablePath, 32768);
+        if (executableLength == 0 || executableLength >= 32768) {
+            appendOutput("ERROR Could not locate the TRG runtime for building.\r\n");
+            return 0;
+        }
+        const std::wstring parameters = L"compile \"" + currentSourcePath.wstring() + L"\"";
+        const HINSTANCE launched = ShellExecuteW(window, L"open", executablePath, parameters.c_str(),
+            projectRoot.c_str(), SW_SHOWNORMAL);
+        if (reinterpret_cast<INT_PTR>(launched) <= 32)
+            appendOutput("ERROR Could not start the TRG build process.\r\n");
+        else
+            appendOutput("Building standalone app for " + currentSourcePath.u8string() + "...\r\n");
+        return 0;
+    }
+    if (message == WM_COMMAND && LOWORD(wParam) == previewButtonId) {
+        if (desktopVisualEditorActive && previewMode) {
+            returnFromDesktopVisualEditor();
+            return 0;
+        }
+        previewMode = !previewMode;
+        SetWindowTextW(previewButton, previewMode ? L"Code" : L"Preview");
+        layoutOutputControls(window);
+        InvalidateRect(window, nullptr, TRUE);
+        return 0;
+    }
+    if (message == WM_COMMAND && LOWORD(wParam) == newButtonId) {
+        if (confirmDiscardEditorChanges(window)) {
+            currentSourcePath.clear();
+            editorDirty = false;
+            previewMode = false;
+            loadingEditorText = true;
+            SetWindowTextW(codeEditor, L"");
+            loadingEditorText = false;
+            SetWindowTextW(previewButton, L"Preview");
+            outputBuffer.clear();
+            projectRoot = std::filesystem::current_path();
+            uiBlocks.clear(); ui3DObjects.clear(); uiSprites.clear(); uiAnimations.clear();
+            everyTasks.clear(); uiButtons.clear(); uiTexts.clear();
+            collisionWatches.clear();
+            updateEditorWindowTitle();
+            layoutOutputControls(window);
+            InvalidateRect(window, nullptr, TRUE);
+        }
+        return 0;
+    }
+    if (message == WM_MOUSEMOVE || message == WM_LBUTTONDOWN || message == WM_LBUTTONUP) {
+        RECT client = {};
+        GetClientRect(window, &client);
+        const DesktopLayout layout = desktopLayout(window, client);
+        const double canvasWidth = static_cast<double>(std::max<LONG>(1, layout.width));
+        const double canvasHeight = static_cast<double>(std::max<LONG>(1, layout.canvasHeight));
+        const double mouseX = static_cast<double>(static_cast<short>(LOWORD(lParam)));
+        const double mouseY = static_cast<double>(static_cast<short>(HIWORD(lParam)));
+        uiVariables["pointer_x"] = mouseX * 100.0 / canvasWidth + viewportX;
+        uiVariables["pointer_y"] = (mouseY - layout.headerHeight) * 100.0 / canvasHeight + viewportY;
+        uiVariables["pointer_down"] = (message == WM_LBUTTONDOWN ||
+            (message == WM_MOUSEMOVE && (GetKeyState(VK_LBUTTON) & 0x8000))) ? "press" : "released";
+        uiTypes["pointer_x"] = "num";
+        uiTypes["pointer_y"] = "num";
+        uiTypes["pointer_down"] = "word";
+        if (message == WM_LBUTTONDOWN) SetCapture(window);
+        if (message == WM_LBUTTONUP && GetCapture() == window) ReleaseCapture();
+    }
+    if (message == WM_LBUTTONUP && !uiButtons.empty()) {
+        RECT client = {};
+        GetClientRect(window, &client);
+        const DesktopLayout layout = desktopLayout(window, client);
+        const double canvasWidth = static_cast<double>(std::max<LONG>(1, layout.width));
+        const double canvasHeight = static_cast<double>(layout.canvasHeight);
+        const LONG mouseX = static_cast<short>(LOWORD(lParam));
+        const LONG mouseY = static_cast<short>(HIWORD(lParam));
+        for (auto button = uiButtons.rbegin(); button != uiButtons.rend(); ++button) {
+            if (!button->visible || !uiGroupIsVisible(button->group)) continue;
+            const double buttonX = button->x - viewportX;
+            const double buttonY = button->y - viewportY;
+            RECT area = {
+                static_cast<LONG>(buttonX * canvasWidth / 100.0),
+                static_cast<LONG>(layout.headerHeight + buttonY * canvasHeight / 100.0),
+                static_cast<LONG>((buttonX + button->width) * canvasWidth / 100.0),
+                static_cast<LONG>(layout.headerHeight +
+                    (buttonY + button->height) * canvasHeight / 100.0)
+            };
+            if (PtInRect(&area, POINT{mouseX, mouseY})) {
+                outputBuffer.clear();
+                appendOutput("--- " + button->label + " ---\r\n");
+                conditionIsTrue("false", uiVariables);
+                Flow flow;
+                executeBlock(button->body, 0, button->body.size(), uiVariables, uiTypes,
+                             uiDefaults, flow, false, true);
+                refreshCollisionWatches(uiVariables, uiTypes);
+                if (flow.stopped) everyTasks.clear();
+                if (!uiAnimations.empty() || !everyTasks.empty()) SetTimer(window, 1, 16, nullptr);
+                InvalidateRect(window, nullptr, TRUE);
+                return 0;
+            }
+        }
+    }
+    if (message == WM_TIMER) {
+        const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - uiStart).count();
+        const auto now = std::chrono::steady_clock::now();
+        for (std::size_t index = 0; index < everyTasks.size();) {
+            if (now < everyTasks[index].nextRun) { ++index; continue; }
+            const EveryTask task = everyTasks[index];
+            everyTasks[index].nextRun = now + task.interval;
+            refreshCollisionWatches(uiVariables, uiTypes);
+            Flow taskFlow;
+            executeBlock(task.body, 0, task.body.size(), uiVariables, uiTypes,
+                         uiDefaults, taskFlow, task.manualMode, task.uiMode);
+            if (taskFlow.stopped) { everyTasks.clear(); break; }
+            if (taskFlow.broke) everyTasks.erase(everyTasks.begin() + static_cast<std::ptrdiff_t>(index));
+            else ++index;
+        }
+        const bool animationsFinished = std::all_of(uiAnimations.begin(), uiAnimations.end(),
+            [&](const UiAnimation& animation) { return elapsed >= animation.startTime + animation.duration; });
+        InvalidateRect(window, nullptr, FALSE);
+        if (animationsFinished && everyTasks.empty()) KillTimer(window, 1);
+        return 0;
+    }
+    if (message == WM_PAINT) {
+        PAINTSTRUCT paint;
+        HDC dc = BeginPaint(window, &paint);
+        RECT client;
+        GetClientRect(window, &client);
+        HBRUSH background = CreateSolidBrush(RGB(24, 22, 32));
+        FillRect(dc, &client, background);
+        DeleteObject(background);
+        const DesktopLayout layout = desktopLayout(window, client);
+        RECT header = {0, 0, layout.width, layout.headerHeight};
+        HBRUSH headerBrush = CreateSolidBrush(RGB(10, 16, 25));
+        FillRect(dc, &header, headerBrush);
+        DeleteObject(headerBrush);
+        if (layout.headerHeight > 0) {
+            RECT accentBar = {0, 0, layout.width, scaleForDpi(window, 4)};
+            HBRUSH accentBrush = CreateSolidBrush(RGB(85, 214, 190));
+            FillRect(dc, &accentBar, accentBrush);
+            DeleteObject(accentBrush);
+        }
+        SetBkMode(dc, TRANSPARENT);
+        SetTextColor(dc, RGB(255, 255, 255));
+        HFONT titleFont = CreateFontW(-scaleForDpi(window, 32), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+            DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+        HGDIOBJ previousFont = SelectObject(dc, titleFont);
+        RECT title = {
+            scaleForDpi(window, 24), scaleForDpi(window, 10),
+            scaleForDpi(window, 170), layout.headerHeight - scaleForDpi(window, 8)
+        };
+        DrawTextW(dc, L"TRG", -1, &title, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+        SelectObject(dc, previousFont);
+        DeleteObject(titleFont);
+        const LONG panelTop = layout.panelTop;
+        RECT canvas = {0, layout.headerHeight, layout.width, panelTop};
+        HBRUSH canvasBrush = CreateSolidBrush(RGB(12, 20, 30));
+        FillRect(dc, &canvas, canvasBrush);
+        DeleteObject(canvasBrush);
+        HFONT bodyFont = CreateFontW(-scaleForDpi(window, 13), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+            DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+        HGDIOBJ previousBodyFont = bodyFont ? SelectObject(dc, bodyFont) : nullptr;
+        const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - uiStart).count();
+       
+        for (auto it = particles.begin(); it != particles.end();) {
+            it->x += it->vx;
+            it->y += it->vy;
+            it->life -= 0.016;
+            if (it->life <= 0) it = particles.erase(it);
+            else ++it;
+        }
+        std::vector<const UiBlock*> ordered;
+        for (const UiBlock& block : uiBlocks) ordered.push_back(&block);
+        std::stable_sort(ordered.begin(), ordered.end(), [](const UiBlock* a, const UiBlock* b) { return a->z < b->z; });
+        const double canvasWidth = static_cast<double>(std::max<LONG>(1, layout.width));
+        const double canvasHeight = static_cast<double>(layout.canvasHeight);
+        for (const UiBlock* block : ordered) {
+            if (!block->visible || !uiGroupIsVisible(block->group)) continue;
+            unsigned red = 0, green = 0, blue = 0;
+            if (!parseColor(block->color, red, green, blue)) continue;
+            const auto position = animatedPosition(*block, elapsed);
+            
+            double bx = position.first - viewportX;
+            double by = position.second - viewportY;
+            RECT area = {
+                static_cast<LONG>(bx * canvasWidth / 100.0),
+                static_cast<LONG>(layout.headerHeight + by * canvasHeight / 100.0),
+                static_cast<LONG>((bx + block->width) * canvasWidth / 100.0),
+                static_cast<LONG>(layout.headerHeight + (by + block->height) * canvasHeight / 100.0)
+            };
+            if (block->glowIntensity > 0 && !block->glowColor.empty()) {
+                unsigned gr = 0, gg = 0, gb = 0;
+                if (parseColor(block->glowColor, gr, gg, gb)) {
+                    int glowPad = static_cast<int>(block->glowIntensity * 12.0);
+                    RECT glowArea = { area.left - glowPad, area.top - glowPad, area.right + glowPad, area.bottom + glowPad };
+                    HBRUSH glowBrush = CreateSolidBrush(RGB(gr, gg, gb));
+                    HPEN glowPen = CreatePen(PS_SOLID, 1, RGB(gr, gg, gb));
+                    HGDIOBJ oldPen2 = SelectObject(dc, glowPen);
+                    HGDIOBJ oldBrush2 = SelectObject(dc, glowBrush);
+                    if (block->shape == "circle") {
+                        Ellipse(dc, glowArea.left, glowArea.top, glowArea.right, glowArea.bottom);
+                    } else if (block->shape == "square" || block->shape == "rect") {
+                        RoundRect(dc, glowArea.left, glowArea.top, glowArea.right, glowArea.bottom, glowPad * 2, glowPad * 2);
+                    } else {
+                        Rectangle(dc, glowArea.left, glowArea.top, glowArea.right, glowArea.bottom);
+                    }
+                    SelectObject(dc, oldBrush2); SelectObject(dc, oldPen2);
+                    DeleteObject(glowPen); DeleteObject(glowBrush);
+                }
+            }
+            HBRUSH brush = CreateSolidBrush(RGB(red, green, blue));
+            HPEN pen = CreatePen(PS_SOLID, 1, RGB(red, green, blue));
+            HGDIOBJ oldPen = SelectObject(dc, pen);
+            HGDIOBJ oldBrush = SelectObject(dc, brush);
+            const int centerX = (area.left + area.right) / 2;
+            const int centerY = (area.top + area.bottom) / 2;
+            const int radius = std::max(1, static_cast<int>(std::min(block->width, block->height) * std::min(canvasWidth, canvasHeight) / 200.0));
+            if (block->shape == "circle") {
+                Ellipse(dc, area.left, area.top, area.right, area.bottom);
+            } else if (block->shape == "triangle") {
+                POINT tri[3] = { {centerX, area.top}, {area.left, area.bottom}, {area.right, area.bottom} };
+                Polygon(dc, tri, 3);
+            } else if (block->shape == "pentagon") {
+                POINT pent[5];
+                for (int k = 0; k < 5; ++k) {
+                    double angle = -90.0 + k * 72.0;
+                    double rad = angle * 3.14159265358979 / 180.0;
+                    pent[k].x = centerX + static_cast<LONG>(radius * cos(rad));
+                    pent[k].y = centerY + static_cast<LONG>(radius * sin(rad));
+                }
+                Polygon(dc, pent, 5);
+            } else if (block->shape == "hexagon") {
+                POINT hex[6];
+                for (int k = 0; k < 6; ++k) {
+                    double angle = -90.0 + k * 60.0;
+                    double rad = angle * 3.14159265358979 / 180.0;
+                    hex[k].x = centerX + static_cast<LONG>(radius * cos(rad));
+                    hex[k].y = centerY + static_cast<LONG>(radius * sin(rad));
+                }
+                Polygon(dc, hex, 6);
+            } else if (block->shape == "star") {
+                POINT star[10];
+                for (int k = 0; k < 10; ++k) {
+                    double angle = -90.0 + k * 36.0;
+                    double rad = angle * 3.14159265358979 / 180.0;
+                    double r = (k % 2 == 0) ? radius : radius * 0.4;
+                    star[k].x = centerX + static_cast<LONG>(r * cos(rad));
+                    star[k].y = centerY + static_cast<LONG>(r * sin(rad));
+                }
+                Polygon(dc, star, 10);
+            } else {
+                if (block->cornerRadius > 0) {
+                    const int rad = std::max(1, static_cast<int>(block->cornerRadius * std::min(canvasWidth, canvasHeight) / 100.0));
+                    RoundRect(dc, area.left, area.top, area.right, area.bottom, rad * 2, rad * 2);
+                } else {
+                    Rectangle(dc, area.left, area.top, area.right, area.bottom);
+                }
+            }
+            SelectObject(dc, oldBrush); SelectObject(dc, oldPen);
+            DeleteObject(pen); DeleteObject(brush);
+            
+            SetBkMode(dc, TRANSPARENT);
+            SetTextColor(dc, RGB(255, 255, 255));
+            const std::wstring name = wideFromUtf8(block->name);
+            DrawTextW(dc, name.c_str(), -1, &area, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        }
+        
+        if (gdiplusToken != 0) {
+            Gdiplus::Graphics graphics(dc);
+            for (const Particle& p : particles) {
+                unsigned pr = 0, pg = 0, pb = 0;
+                if (!parseColor(p.color, pr, pg, pb)) continue;
+                Gdiplus::Color gcolor(static_cast<BYTE>(255 * (p.life / p.maxLife)), pr, pg, pb);
+                Gdiplus::SolidBrush brush(gcolor);
+                double px = p.x - viewportX;
+                double py = p.y - viewportY;
+                Gdiplus::RectF rect(
+                    static_cast<Gdiplus::REAL>(px * canvasWidth / 100.0),
+                    static_cast<Gdiplus::REAL>(layout.headerHeight + py * canvasHeight / 100.0),
+                    static_cast<Gdiplus::REAL>(p.size * canvasWidth / 100.0),
+                    static_cast<Gdiplus::REAL>(p.size * canvasHeight / 100.0));
+                graphics.FillEllipse(&brush, rect);
+            }
+        }
+        if (gdiplusToken != 0) {
+            Gdiplus::Graphics graphics(dc);
+            graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+            for (const UiSprite& sprite : uiSprites) {
+                if (!sprite.visible || !uiGroupIsVisible(sprite.group)) continue;
+                auto& image = desktopSpriteCache[sprite.path];
+                if (!image) {
+                    const std::wstring path = std::filesystem::u8path(sprite.path).wstring();
+                    image = std::make_unique<Gdiplus::Image>(path.c_str());
+                }
+                if (image->GetLastStatus() != Gdiplus::Ok) continue;
+                const Gdiplus::RectF destination(
+                    static_cast<Gdiplus::REAL>(sprite.x * canvasWidth / 100.0),
+                    static_cast<Gdiplus::REAL>(layout.headerHeight + sprite.y * canvasHeight / 100.0),
+                    static_cast<Gdiplus::REAL>(sprite.width * canvasWidth / 100.0),
+                    static_cast<Gdiplus::REAL>(sprite.height * canvasHeight / 100.0));
+                graphics.DrawImage(image.get(), destination);
+            }
+        }
+        const std::array<std::array<int, 4>, 6> modelFaces = {{
+            {{0, 1, 2, 3}}, {{4, 5, 6, 7}}, {{0, 3, 7, 4}},
+            {{1, 2, 6, 5}}, {{0, 1, 5, 4}}, {{3, 2, 6, 7}}
+        }};
+        const std::array<double, 6> faceLight = {{0.58, 1.0, 0.68, 0.78, 0.52, 0.90}};
+        for (const Ui3DObject& model : ui3DObjects) {
+            if (!model.visible || !uiGroupIsVisible(model.group)) continue;
+            unsigned red = 0, green = 0, blue = 0;
+            if (!parseColor(model.color, red, green, blue)) continue;
+            const double rx = model.rotateX * 3.141592653589793 / 180.0;
+            const double ry = model.rotateY * 3.141592653589793 / 180.0;
+            const double rz = model.rotateZ * 3.141592653589793 / 180.0;
+            const double cosineX = std::cos(rx), sineX = std::sin(rx);
+            const double cosineY = std::cos(ry), sineY = std::sin(ry);
+            const double cosineZ = std::cos(rz), sineZ = std::sin(rz);
+            const double halfW = model.width * 0.5, halfH = model.height * 0.5, halfD = model.depth * 0.5;
+            const std::array<std::array<double, 3>, 8> local = {{
+                {{-halfW,-halfH,-halfD}}, {{halfW,-halfH,-halfD}},
+                {{halfW,halfH,-halfD}}, {{-halfW,halfH,-halfD}},
+                {{-halfW,-halfH,halfD}}, {{halfW,-halfH,halfD}},
+                {{halfW,halfH,halfD}}, {{-halfW,halfH,halfD}}
+            }};
+            std::array<std::array<double, 3>, 8> rotated{};
+            std::array<POINT, 8> projected{};
+            const double modelScale = std::min(canvasWidth, canvasHeight) * 0.115;
+            const double centerX = canvasWidth * 0.5;
+            const double centerY = layout.headerHeight + canvasHeight * 0.53;
+            for (std::size_t vertex = 0; vertex < local.size(); ++vertex) {
+                const double x1 = local[vertex][0];
+                const double y1 = local[vertex][1] * cosineX - local[vertex][2] * sineX;
+                const double z1 = local[vertex][1] * sineX + local[vertex][2] * cosineX;
+                const double x2 = x1 * cosineY + z1 * sineY;
+                const double y2 = y1;
+                const double z2 = -x1 * sineY + z1 * cosineY;
+                const double x3 = x2 * cosineZ - y2 * sineZ + model.x;
+                const double y3 = x2 * sineZ + y2 * cosineZ + model.y;
+                const double z3 = z2 + model.z;
+                rotated[vertex] = {{x3, y3, z3}};
+                projected[vertex].x = static_cast<LONG>(centerX + (x3 - z3 * 0.48) * modelScale);
+                projected[vertex].y = static_cast<LONG>(centerY - (y3 - (x3 + z3) * 0.27) * modelScale);
+            }
+            if (model.shape == "sphere") {
+                const LONG radiusX = static_cast<LONG>(std::max(2.0, halfW * modelScale));
+                const LONG radiusY = static_cast<LONG>(std::max(2.0, halfH * modelScale * 0.82));
+                RECT sphereArea = {static_cast<LONG>(centerX) - radiusX, static_cast<LONG>(centerY) - radiusY,
+                    static_cast<LONG>(centerX) + radiusX, static_cast<LONG>(centerY) + radiusY};
+                HBRUSH sphereBrush = CreateSolidBrush(RGB(red, green, blue));
+                HPEN spherePen = CreatePen(PS_SOLID, 1, RGB(35, 27, 49));
+                HGDIOBJ oldBrush = SelectObject(dc, sphereBrush), oldPen = SelectObject(dc, spherePen);
+                Ellipse(dc, sphereArea.left, sphereArea.top, sphereArea.right, sphereArea.bottom);
+                SelectObject(dc, oldBrush); SelectObject(dc, oldPen); DeleteObject(sphereBrush); DeleteObject(spherePen);
+                continue;
+            }
+            std::array<int, 6> faceOrder = {{0, 1, 2, 3, 4, 5}};
+            std::stable_sort(faceOrder.begin(), faceOrder.end(), [&](int first, int second) {
+                double firstDepth = 0, secondDepth = 0;
+                for (int vertex : modelFaces[first]) firstDepth += rotated[vertex][2];
+                for (int vertex : modelFaces[second]) secondDepth += rotated[vertex][2];
+                return firstDepth < secondDepth;
+            });
+            for (int faceIndex : faceOrder) {
+                POINT polygon[4];
+                for (int corner = 0; corner < 4; ++corner) polygon[corner] = projected[modelFaces[faceIndex][corner]];
+                const double shade = faceLight[faceIndex] * std::clamp(model.opacity, 0.0, 1.0);
+                const COLORREF faceColor = RGB(static_cast<BYTE>(red * shade),
+                    static_cast<BYTE>(green * shade), static_cast<BYTE>(blue * shade));
+                HBRUSH faceBrush = CreateSolidBrush(faceColor);
+                HPEN facePen = CreatePen(PS_SOLID, 1, RGB(28, 22, 40));
+                HGDIOBJ oldBrush = SelectObject(dc, faceBrush), oldPen = SelectObject(dc, facePen);
+                Polygon(dc, polygon, 4);
+                SelectObject(dc, oldBrush); SelectObject(dc, oldPen); DeleteObject(faceBrush); DeleteObject(facePen);
+            }
+        }
+        for (const UiButton& button : uiButtons) {
+            if (!button.visible || !uiGroupIsVisible(button.group)) continue;
+            const double buttonX = button.x - viewportX;
+            const double buttonY = button.y - viewportY;
+            RECT area = {
+                static_cast<LONG>(buttonX * canvasWidth / 100.0),
+                static_cast<LONG>(layout.headerHeight + buttonY * canvasHeight / 100.0),
+                static_cast<LONG>((buttonX + button.width) * canvasWidth / 100.0),
+                static_cast<LONG>(layout.headerHeight +
+                    (buttonY + button.height) * canvasHeight / 100.0)
+            };
+            unsigned red = 0, green = 0, blue = 0;
+            parseColor(button.color, red, green, blue);
+            const double opacity = std::clamp(button.opacity, 0.0, 1.0);
+            const COLORREF blended = RGB(
+                static_cast<BYTE>(red * opacity + 38 * (1.0 - opacity)),
+                static_cast<BYTE>(green * opacity + 36 * (1.0 - opacity)),
+                static_cast<BYTE>(blue * opacity + 44 * (1.0 - opacity)));
+            HBRUSH buttonBrush = CreateSolidBrush(blended);
+            if (button.cornerRadius > 0) {
+                HPEN pen = CreatePen(PS_SOLID, 1, blended);
+                HGDIOBJ oldPen = SelectObject(dc, pen);
+                HGDIOBJ oldBrush = SelectObject(dc, buttonBrush);
+                const int radius = std::max(1, static_cast<int>(button.cornerRadius * systemDpi() / 96.0));
+                RoundRect(dc, area.left, area.top, area.right, area.bottom, radius * 2, radius * 2);
+                SelectObject(dc, oldBrush); SelectObject(dc, oldPen); DeleteObject(pen);
+            } else FillRect(dc, &area, buttonBrush);
+            DeleteObject(buttonBrush);
+            if (button.cornerRadius <= 0) FrameRect(dc, &area, static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
+            SetBkMode(dc, TRANSPARENT);
+            SetTextColor(dc, RGB(255, 255, 255));
+            const std::wstring label = wideFromUtf8(button.label);
+            DrawTextW(dc, label.c_str(), -1, &area, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+        }
+        for (const UiText& text : uiTexts) {
+            if (!text.visible || !uiGroupIsVisible(text.group)) continue;
+            unsigned red = 0, green = 0, blue = 0;
+            if (!parseColor(text.color, red, green, blue)) continue;
+            const int fontHeight = std::max(1, static_cast<int>(
+                text.size * canvasHeight / 100.0));
+            HFONT font = CreateFontW(-fontHeight, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+                DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+                DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+            HGDIOBJ previousFont = SelectObject(dc, font);
+            SetBkMode(dc, TRANSPARENT);
+            SetTextColor(dc, RGB(red, green, blue));
+            const std::wstring value = wideFromUtf8(text.value);
+            const LONG x = static_cast<LONG>(text.x * canvasWidth / 100.0);
+            const LONG baseline = static_cast<LONG>(
+                layout.headerHeight + text.y * canvasHeight / 100.0);
+            RECT area = {x, baseline - fontHeight, client.right, baseline + fontHeight / 4};
+            DrawTextW(dc, value.c_str(), -1, &area, DT_LEFT | DT_SINGLELINE | DT_NOPREFIX);
+            SelectObject(dc, previousFont);
+            DeleteObject(font);
+        }
+        RECT outputArea = {
+            layout.margin, layout.outputTop,
+            std::max<LONG>(layout.margin, layout.width - layout.margin), layout.outputBottom
+        };
+        SetBkMode(dc, TRANSPARENT);
+        SetTextColor(dc, RGB(245, 242, 255));
+        DrawTextW(dc, outputBuffer.c_str(), static_cast<int>(outputBuffer.size()), &outputArea,
+                  DT_LEFT | DT_TOP | DT_WORDBREAK | DT_NOPREFIX);
+        if (bodyFont) {
+            SelectObject(dc, previousBodyFont);
+            DeleteObject(bodyFont);
+        }
+        EndPaint(window, &paint);
+        return 0;
+    }
+    if (message == WM_CLOSE) {
+        if (!confirmDiscardEditorChanges(window)) return 0;
+        DestroyWindow(window);
+        return 0;
+    }
+    if (message == WM_DESTROY) {
+        mainWindow = nullptr;
+        codeEditor = nullptr;
+        openButton = saveButton = runButton = previewButton = newButton = buildButton = dictionaryButton = nullptr;
+        editor2DButton = editor3DButton = nullptr;
+        desktopSpriteCache.clear();
+        if (gdiplusToken != 0) {
+            Gdiplus::GdiplusShutdown(gdiplusToken);
+            gdiplusToken = 0;
+        }
+        if (openButtonFont) {
+            DeleteObject(openButtonFont);
+            openButtonFont = nullptr;
+        }
+        if (codeEditorFont) {
+            DeleteObject(codeEditorFont);
+            codeEditorFont = nullptr;
+        }
+        if (richEditModule) { FreeLibrary(richEditModule); richEditModule = nullptr; }
+        PostQuitMessage(0);
+        return 0;
+    }
+    return DefWindowProcW(window, message, wParam, lParam);
+}
+
+LRESULT CALLBACK inputWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (message == WM_CREATE) {
+        const auto scale = [window](int value) { return scaleForDpi(window, value); };
+        CreateWindowExW(0, L"STATIC", inputPrompt.c_str(), WS_CHILD | WS_VISIBLE,
+            scale(16), scale(16), scale(400), scale(36),
+            window, nullptr, GetModuleHandleW(nullptr), nullptr);
+        inputControl = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP | ES_AUTOHSCROLL,
+            scale(16), scale(58), scale(400), scale(28),
+            window, reinterpret_cast<HMENU>(inputEditId),
+            GetModuleHandleW(nullptr), nullptr);
+        CreateWindowExW(0, L"BUTTON", L"OK", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
+            scale(330), scale(100), scale(86), scale(30),
+            window, reinterpret_cast<HMENU>(inputButtonId),
+            GetModuleHandleW(nullptr), nullptr);
+        SetFocus(inputControl);
+        return 0;
+    }
+    if (message == WM_COMMAND && LOWORD(wParam) == inputButtonId) {
+        const int length = GetWindowTextLengthW(inputControl);
+        std::wstring answer(static_cast<std::size_t>(length) + 1, L'\0');
+        GetWindowTextW(inputControl, &answer[0], length + 1);
+        answer.resize(static_cast<std::size_t>(length));
+        inputResult = utf8FromWide(answer);
+        inputAccepted = true;
+        inputFinished = true;
+        DestroyWindow(window);
+        return 0;
+    }
+    if (message == WM_CLOSE) {
+        inputAccepted = false;
+        inputFinished = true;
+        DestroyWindow(window);
+        return 0;
+    }
+    return DefWindowProcW(window, message, wParam, lParam);
+}
+
+bool askForInput(const std::string& prompt, std::string& answer) {
+#ifdef TRG_TEST_CONSOLE
+    appendOutput(prompt + " ");
+    return static_cast<bool>(std::getline(std::cin, answer));
+#else
+    inputPrompt = wideFromUtf8(prompt);
+    inputFinished = false;
+    inputAccepted = false;
+    inputResult.clear();
+    const wchar_t* className = L"TRGInputWindow";
+    WNDCLASSW windowClass = {};
+    windowClass.lpfnWndProc = inputWindowProc;
+    windowClass.hInstance = GetModuleHandleW(nullptr);
+    windowClass.lpszClassName = className;
+    windowClass.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
+    if (!RegisterClassW(&windowClass) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) return false;
+    if (mainWindow) EnableWindow(mainWindow, FALSE);
+    const auto scale = [](int value) {
+        return mainWindow ? scaleForDpi(mainWindow, value) : value;
+    };
+    HWND dialog = CreateWindowExW(WS_EX_DLGMODALFRAME, className, L"TRG input",
+        WS_CAPTION | WS_SYSMENU, CW_USEDEFAULT, CW_USEDEFAULT, scale(450), scale(180),
+        mainWindow, nullptr, windowClass.hInstance, nullptr);
+    if (!dialog) {
+        if (mainWindow) EnableWindow(mainWindow, TRUE);
+        return false;
+    }
+    ShowWindow(dialog, SW_SHOW);
+    UpdateWindow(dialog);
+    MSG message;
+    while (!inputFinished && GetMessageW(&message, nullptr, 0, 0) > 0) {
+        if (!IsDialogMessageW(dialog, &message)) {
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
+    }
+    if (mainWindow) {
+        EnableWindow(mainWindow, TRUE);
+        SetForegroundWindow(mainWindow);
+    }
+    if (inputAccepted) answer = inputResult;
+    return inputAccepted;
+#endif
+}
+
+bool runUi() {
+    enablePerMonitorDpiAwareness();
+    Gdiplus::GdiplusStartupInput gdiplusInput;
+    Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusInput, nullptr);
+    const wchar_t* className = L"TRGMainWindow";
+    WNDCLASSW windowClass = {};
+    windowClass.lpfnWndProc = mainWindowProc;
+    windowClass.hInstance = GetModuleHandleW(nullptr);
+    windowClass.lpszClassName = className;
+    windowClass.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
+    windowClass.hIcon = LoadIconW(windowClass.hInstance, MAKEINTRESOURCEW(IDI_TRG));
+    if (!RegisterClassW(&windowClass) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) return false;
+    const int dpi = systemDpi();
+    mainWindow = CreateWindowExW(0, className, L"TRG", WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, MulDiv(1000, dpi, 96), MulDiv(720, dpi, 96),
+        nullptr, nullptr, windowClass.hInstance, nullptr);
+    if (!mainWindow) return false;
+    uiStart = std::chrono::steady_clock::now();
+    int fps = 60;
+    for (const UiAnimation& animation : uiAnimations) fps = std::max(fps, animation.fps);
+    if (!uiAnimations.empty() || !everyTasks.empty()) SetTimer(mainWindow, 1, static_cast<UINT>(std::max(1, 1000 / fps)), nullptr);
+    ShowWindow(mainWindow, SW_SHOW);
+    UpdateWindow(mainWindow);
+    appendOutput("TRG is ready. Output and errors appear here.\r\n");
+    return true;
+}
+
+void runMessageLoop() {
+    MSG message;
+    while (GetMessageW(&message, nullptr, 0, 0) > 0) {
+        TranslateMessage(&message);
+        DispatchMessageW(&message);
+    }
+}
+
+#else
+bool askForInput(const std::string& prompt, std::string& answer) {
+#ifdef __ANDROID__
+    bool accepted = false;
+    answer = trgAskAndroid(prompt, accepted);
+    return accepted;
+#else
+    appendOutput(prompt + " ");
+    return static_cast<bool>(std::getline(std::cin, answer));
+#endif
+}
+#endif
+
+std::vector<std::string> readProgram(std::istream& source) {
+    std::vector<std::string> program;
+    std::string line;
+    bool firstLine = true;
+    while (std::getline(source, line)) {
+        if (firstLine && line.size() >= 3 &&
+            static_cast<unsigned char>(line[0]) == 0xEF &&
+            static_cast<unsigned char>(line[1]) == 0xBB &&
+            static_cast<unsigned char>(line[2]) == 0xBF)
+            line.erase(0, 3);
+        firstLine = false;
+        std::string cleanLine = stripComment(line);
+        const std::size_t first = cleanLine.find_first_not_of(" \\t");
+        if (first != std::string::npos) {
+            std::size_t last = first;
+            while (last < cleanLine.size() &&
+                   (std::isalnum(static_cast<unsigned char>(cleanLine[last])) || cleanLine[last] == '_')) ++last;
+            if (last > first) {
+                const std::string typed = cleanLine.substr(first, last - first);
+                const std::string corrected = suggestedCommand(typed);
+                if (!corrected.empty() && lower(typed) != corrected) {
+                    cleanLine.replace(first, last - first, corrected);
+                    appendOutput("AUTO-CORRECTED command '" + typed + "' to '" + corrected + "'\r\n");
+                }
+            }
+        }
+        program.push_back(cleanLine);
+    }
+    return program;
+}
+
+void executeProgram(const std::vector<std::string>& program) {
+    uiStart = std::chrono::steady_clock::now();
+#ifdef __ANDROID__
+    androidStopRequested.store(false);
+#endif
+    uiVariables.clear();
+    uiTypes.clear();
+    uiDefaults = standardDefaults();
+    keyboardControls.clear();
+    controllerControls.clear();
+    controlsEnabled = false;
+    filesEnabled = false;
+    jsonEnabled = false;
+    databaseEnabled = false;
+    trgDatabaseTables.clear();
+    trgDatabasePath.clear();
+    webEnabled = false;
+    collisionEnabled = false;
+    physicsEnabled = false;
+    physicsBodies.clear();
+    collisionWatches.clear();
+    webPageHtml.clear();
+    Flow flow;
+    errorCount = 0;
+    uiBlocks.clear();
+    ui3DObjects.clear();
+    uiAutoNameCounter = 1;
+    threeDAutoNameCounter = 1;
+    uiSprites.clear();
+    uiGroups.clear();
+    currentUiGroup = "default";
+#ifdef _WIN32
+    desktopSpriteCache.clear();
+#endif
+    uiAnimations.clear();
+    everyTasks.clear();
+    uiButtons.clear();
+    uiTexts.clear();
+    userStructs.clear();
+    variableGroups.clear();
+    groupStack.clear();
+    groupSnapshots.clear();
+    executedFileKeys.clear();
+    activeRunFiles.clear();
+
+    
+    
+    
+    uiProgram = mergePrograms(program, currentSourcePath, true, true);
+    LibraryState libraries;
+    scanLibraries(uiProgram, libraries);
+    filesEnabled = libraries.files;
+    jsonEnabled = libraries.json;
+    databaseEnabled = libraries.database;
+    webEnabled = libraries.web;
+    collisionEnabled = libraries.collision;
+    physicsEnabled = libraries.physics;
+    networkEnabled = libraries.network;
+    aiEnabled = libraries.ai;
+    mathEnabled = libraries.math;
+    binaryEnabled = libraries.binary;
+    regexEnabled = libraries.regex;
+    compressionEnabled = libraries.compression;
+    powershellEnabled = libraries.powershell;
+    raspberryEnabled = libraries.raspberry;
+    accessibilityEnabled = libraries.accessibility;
+    timeEnabled = libraries.time;
+    convertEnabled = libraries.convert;
+    statsEnabled = libraries.stats;
+    unitsEnabled = libraries.units;
+    threeDEnabled = libraries.threeD;
+    aiModels.clear();
+    if (libraries.controls) initializeControls(uiVariables, uiTypes);
+    registerFunctions(uiProgram);
+    executeBlock(uiProgram, 0, uiProgram.size(), uiVariables, uiTypes, uiDefaults, flow,
+                 libraries.manual, libraries.ui);
+    if (flow.stopped) everyTasks.clear();
+    if (!everyTasks.empty()) appendOutput("Program started with repeating tasks.\r\n");
+    else if (errorCount == 0) appendOutput("Program finished.\r\n");
+    else appendOutput("Program finished with " + std::to_string(errorCount) + " error(s).\r\n");
+#ifdef _WIN32
+    if (mainWindow) {
+        if (!uiAnimations.empty() || !everyTasks.empty()) SetTimer(mainWindow, 1, 16, nullptr);
+        InvalidateRect(mainWindow, nullptr, TRUE);
+    }
+#elif !defined(__ANDROID__)
+    if (!uiBlocks.empty()) appendOutput("TRG UI is currently supported on Windows only.\n");
+#endif
+}
+
+#ifdef _WIN32
+
+void applyEditorSyntaxHighlighting() {
+    if (!codeEditor || !richEditModule || highlightingEditor) return;
+    const int length = GetWindowTextLengthW(codeEditor);
+    if (length <= 0) return;
+    std::wstring source(static_cast<std::size_t>(length) + 1, L'\0');
+    GetWindowTextW(codeEditor, source.data(), length + 1);
+    source.resize(static_cast<std::size_t>(length));
+    highlightingEditor = true;
+    DWORD selectionStart = 0, selectionEnd = 0;
+    SendMessageW(codeEditor, EM_GETSEL, reinterpret_cast<WPARAM>(&selectionStart),
+                 reinterpret_cast<LPARAM>(&selectionEnd));
+    CHARFORMAT2W base = {};
+    base.cbSize = sizeof(base);
+    base.dwMask = CFM_COLOR | CFM_BOLD;
+    base.crTextColor = RGB(220, 220, 220);
+    base.dwEffects = CFE_BOLD;
+    SendMessageW(codeEditor, EM_SETSEL, 0, length);
+    SendMessageW(codeEditor, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&base));
+    static const std::unordered_set<std::wstring> keywords = {
+        L"let",L"num",L"word",L"toggle",L"color",L"list",L"record",L"struct",L"class",L"new",
+        L"if",L"else",L"loop",L"every",L"wait",L"break",L"stop",L"return",L"function",L"call",
+        L"say",L"print",L"show",L"ask",L"random",L"add",L"create",L"json",L"read_file",
+        L"write_file",L"append_file",L"file_exists",L"delete_file",L"push",L"insert",L"get",
+        L"set",L"remove",L"pop",L"join",L"split",L"upper",L"lower",L"trim",L"length",
+        L"contains",L"index_of",L"replace",L"substring",L"find",L"find_position",L"replace_text",
+        L"count_text",L"starts_with",L"ends_with",L"add_numbers",L"subtract_numbers",L"multiply_numbers",
+        L"divide_numbers",L"square_root",L"round_number",L"absolute_number",L"minimum",L"maximum",L"distance_between",L"math",L"ai",L"text",L"button",
+        L"rectangle",L"circle",L"image",L"animate",L"true",L"false",L"none"
+    };
+    auto paint = [&](std::size_t start, std::size_t count, COLORREF color, bool bold = false) {
+        if (!count) return;
+        CHARFORMAT2W format = {};
+        format.cbSize = sizeof(format);
+        format.dwMask = CFM_COLOR | CFM_BOLD;
+        format.crTextColor = color;
+        format.dwEffects = bold ? CFE_BOLD : 0;
+        SendMessageW(codeEditor, EM_SETSEL, static_cast<WPARAM>(start), static_cast<LPARAM>(start + count));
+        SendMessageW(codeEditor, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&format));
+    };
+    std::size_t i = 0;
+    while (i < source.size()) {
+        if (source[i] == L'/' && i + 1 < source.size() && source[i + 1] == L'/') {
+            const std::size_t start = i;
+            while (i < source.size() && source[i] != L'\n') ++i;
+            paint(start, i - start, RGB(106, 153, 85));
+        } else if (source[i] == L'"') {
+            const std::size_t start = i++;
+            bool escaped = false;
+            while (i < source.size()) {
+                const wchar_t ch = source[i++];
+                if (ch == L'"' && !escaped) break;
+                if (ch == L'\\' && !escaped) escaped = true;
+                else escaped = false;
+            }
+            paint(start, i - start, RGB(206, 145, 120));
+        } else if (std::iswdigit(source[i])) {
+            const std::size_t start = i++;
+            while (i < source.size() && (std::iswalnum(source[i]) || source[i] == L'.')) ++i;
+            paint(start, i - start, RGB(181, 206, 168));
+        } else if (std::iswalpha(source[i]) || source[i] == L'_') {
+            const std::size_t start = i++;
+            while (i < source.size() && (iswalnum(source[i]) || source[i] == L'_')) ++i;
+            std::wstring word = source.substr(start, i - start);
+            std::transform(word.begin(), word.end(), word.begin(), [](wchar_t ch) { return static_cast<wchar_t>(std::towlower(ch)); });
+            if (keywords.count(word)) paint(start, i - start, RGB(86, 156, 214), true);
+        } else if (source[i] == L'#') {
+            const std::size_t start = i++;
+            while (i < source.size() && std::iswxdigit(source[i])) ++i;
+            if (i - start == 7 || i - start == 9) paint(start, i - start, RGB(197, 134, 192));
+        } else ++i;
+    }
+    SendMessageW(codeEditor, EM_SETSEL, selectionStart, selectionEnd);
+    highlightingEditor = false;
+}
+
+bool loadSourceFile(const std::filesystem::path& path) {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+        appendOutput("ERROR Could not open \"" + path.u8string() + "\".\r\n");
+        return false;
+    }
+    std::ostringstream contents;
+    contents << file.rdbuf();
+    std::string source = contents.str();
+    if (source.size() >= 3 && static_cast<unsigned char>(source[0]) == 0xEF &&
+        static_cast<unsigned char>(source[1]) == 0xBB && static_cast<unsigned char>(source[2]) == 0xBF)
+        source.erase(0, 3);
+    loadingEditorText = true;
+    SetWindowTextW(codeEditor, wideFromUtf8(source).c_str());
+    loadingEditorText = false;
+    applyEditorSyntaxHighlighting();
+    currentSourcePath = std::filesystem::absolute(path);
+    projectRoot = currentSourcePath.parent_path();
+    editorDirty = false;
+    previewMode = false;
+    if (previewButton) SetWindowTextW(previewButton, L"Preview");
+    updateEditorWindowTitle();
+    layoutOutputControls(mainWindow);
+    outputBuffer.clear();
+    appendOutput("Opened: " + currentSourcePath.u8string() + "\r\n");
+    InvalidateRect(mainWindow, nullptr, TRUE);
+    return true;
+}
+
+bool saveSourceFile() {
+    std::filesystem::path path = currentSourcePath;
+    if (path.empty() && !saveSourceDialog(path, mainWindow)) return false;
+    const int length = GetWindowTextLengthW(codeEditor);
+    std::wstring wideSource(static_cast<std::size_t>(length) + 1, L'\0');
+    GetWindowTextW(codeEditor, wideSource.data(), length + 1);
+    wideSource.resize(static_cast<std::size_t>(length));
+    const std::string source = utf8FromWide(wideSource);
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    if (!output) {
+        appendOutput("ERROR Could not save \"" + path.u8string() + "\".\r\n");
+        return false;
+    }
+    output.write(source.data(), static_cast<std::streamsize>(source.size()));
+    if (!output) {
+        appendOutput("ERROR Failed while writing \"" + path.u8string() + "\".\r\n");
+        return false;
+    }
+    currentSourcePath = std::filesystem::absolute(path);
+    projectRoot = currentSourcePath.parent_path();
+    editorDirty = false;
+    updateEditorWindowTitle();
+    appendOutput("Saved: " + currentSourcePath.u8string() + "\r\n");
+    return true;
+}
+
+bool launchDesktopVisualEditor(const std::string& fileName) {
+    if (!codeEditor) return false;
+    if (!desktopVisualEditorActive) {
+        const int length = GetWindowTextLengthW(codeEditor);
+        std::wstring current(static_cast<std::size_t>(length) + 1, L'\0');
+        GetWindowTextW(codeEditor, current.data(), length + 1);
+        current.resize(static_cast<std::size_t>(length));
+        desktopPreviousSource = current;
+        desktopPreviousPath = currentSourcePath;
+        desktopPreviousDirty = editorDirty;
+        desktopVisualEditorActive = true;
+    }
+    std::filesystem::path editorPath = std::filesystem::current_path() / fileName;
+    if (!std::filesystem::exists(editorPath)) {
+        wchar_t executable[32768] = {};
+        const DWORD count = GetModuleFileNameW(nullptr, executable, 32768);
+        if (count > 0 && count < 32768)
+            editorPath = std::filesystem::path(executable).parent_path() / fileName;
+    }
+    if (!std::filesystem::exists(editorPath) || !loadSourceFile(editorPath)) {
+        appendOutput("ERROR Could not find the bundled " + fileName + ".\r\n");
+        desktopVisualEditorActive = false;
+        return false;
+    }
+    runEditorSource();
+    previewMode = true;
+    SetWindowTextW(previewButton, L"Code");
+    layoutOutputControls(mainWindow);
+    InvalidateRect(mainWindow, nullptr, TRUE);
+    return true;
+}
+
+bool returnFromDesktopVisualEditor() {
+    if (!desktopVisualEditorActive || !codeEditor) return false;
+    loadingEditorText = true;
+    SetWindowTextW(codeEditor, desktopPreviousSource.c_str());
+    loadingEditorText = false;
+    currentSourcePath = desktopPreviousPath;
+    projectRoot = currentSourcePath.empty() ? std::filesystem::current_path() : currentSourcePath.parent_path();
+    editorDirty = desktopPreviousDirty;
+    desktopVisualEditorActive = false;
+    previewMode = false;
+    SetWindowTextW(previewButton, L"Preview");
+    applyEditorSyntaxHighlighting();
+    updateEditorWindowTitle();
+    layoutOutputControls(mainWindow);
+    InvalidateRect(mainWindow, nullptr, TRUE);
+    return true;
+}
+
+bool runEditorSource() {
+    if (!codeEditor) return false;
+    const int length = GetWindowTextLengthW(codeEditor);
+    std::wstring wideSource(static_cast<std::size_t>(length) + 1, L'\0');
+    GetWindowTextW(codeEditor, wideSource.data(), length + 1);
+    wideSource.resize(static_cast<std::size_t>(length));
+    const std::string source = utf8FromWide(wideSource);
+    if (!currentSourcePath.empty()) projectRoot = currentSourcePath.parent_path();
+    else projectRoot = std::filesystem::current_path();
+    outputBuffer.clear();
+    appendOutput("Running: " + (currentSourcePath.empty() ? std::string("Untitled.trg") : currentSourcePath.u8string()) + "\r\n\r\n");
+    std::istringstream input(source);
+    executeProgram(readProgram(input));
+    InvalidateRect(mainWindow, nullptr, TRUE);
+    return true;
+}
+
+bool runSourceFile(const std::filesystem::path& path) {
+    return loadSourceFile(path) && runEditorSource();
+}
+#endif
+
+
+
+
+#ifndef TRG_ANDROID_BRIDGE
+int runApplication(int argc, char** argv) {
+#if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
+    if (!runUi()) {
+        MessageBoxW(nullptr, L"Could not create the TRG window.", L"TRG error", MB_OK | MB_ICONERROR);
+        return 1;
+    }
+#endif
+
+    if (argc > 1 && lower(argv[1]) == "compile") {
+        if (argc != 3) {
+            appendOutput("ERROR Usage: TRG compile <file.trg>\r\n");
+#if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
+            runMessageLoop();
+#endif
+            return 2;
+        }
+        std::filesystem::path sourcePath = std::filesystem::u8path(argv[2]);
+        if (!std::filesystem::exists(sourcePath) && sourcePath.extension().empty()) sourcePath += ".trg";
+        std::ifstream source(sourcePath, std::ios::binary);
+        if (!source) {
+            appendOutput("ERROR Could not open \"" + sourcePath.u8string() + "\".\r\n");
+#if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
+            runMessageLoop();
+#endif
+            return 1;
+        }
+#ifdef _WIN32
+        wchar_t executableBuffer[32768];
+        const DWORD executableLength = GetModuleFileNameW(nullptr, executableBuffer, 32768);
+        if (executableLength == 0 || executableLength >= 32768) {
+            appendOutput("ERROR Could not locate the TRG executable.\r\n");
+#if !defined(TRG_TEST_CONSOLE)
+            runMessageLoop();
+#endif
+            return 1;
+        }
+        const std::filesystem::path executablePath(std::wstring(executableBuffer, executableLength));
+#else
+        const std::filesystem::path executablePath = std::filesystem::absolute(argv[0]);
+#endif
+        std::filesystem::path outputPath = sourcePath;
+        outputPath.replace_extension(".exe");
+        std::error_code error;
+        const std::uint64_t payloadSize = std::filesystem::file_size(sourcePath, error);
+        if (error) { appendOutput("ERROR Could not determine source size: " + error.message() + "\r\n"); return 1; }
+        std::filesystem::copy_file(executablePath, outputPath, std::filesystem::copy_options::overwrite_existing, error);
+        if (error) { appendOutput("ERROR Could not create " + outputPath.u8string() + ": " + error.message() + "\r\n"); return 1; }
+        std::ofstream output(outputPath, std::ios::binary | std::ios::app);
+        if (!output) { appendOutput("ERROR Could not write " + outputPath.u8string() + "\r\n"); return 1; }
+        output << source.rdbuf();
+        for (unsigned byte = 0; byte < 8; ++byte) output.put(static_cast<char>((payloadSize >> (byte * 8)) & 0xff));
+        output.write("TRGPKG01", 8);
+        output.close();
+        if (!output) { appendOutput("ERROR Could not finish writing " + outputPath.u8string() + "\r\n"); return 1; }
+        appendOutput("Created " + outputPath.u8string() + " (standalone TRG app).\r\n");
+#if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
+        runMessageLoop();
+#endif
+        return 0;
+    }
+
+    std::filesystem::path scriptPath;
+    std::string embeddedSource;
+    bool hasEmbeddedSource = false;
+    if (argc > 1) {
+        scriptPath = argv[1];
+    } else {
+#ifdef _WIN32
+        wchar_t executableBuffer[32768];
+        const DWORD executableLength = GetModuleFileNameW(nullptr, executableBuffer, 32768);
+        if (executableLength > 0 && executableLength < 32768) scriptPath = std::filesystem::path(std::wstring(executableBuffer, executableLength));
+#else
+        scriptPath = std::filesystem::absolute(argv[0]);
+#endif
+        std::ifstream executable(scriptPath, std::ios::binary);
+        if (executable) {
+            executable.seekg(0, std::ios::end);
+            const std::streamoff totalSize = executable.tellg();
+            if (totalSize >= 16) {
+                executable.seekg(totalSize - 8);
+                char marker[8] = {};
+                executable.read(marker, 8);
+                if (executable && std::string(marker, 8) == "TRGPKG01") {
+                    executable.seekg(totalSize - 16);
+                    std::uint64_t payloadSize = 0;
+                    for (unsigned byte = 0; byte < 8; ++byte) {
+                        const int value = executable.get();
+                        if (value == EOF) { payloadSize = 0; break; }
+                        payloadSize |= static_cast<std::uint64_t>(static_cast<unsigned char>(value)) << (byte * 8);
+                    }
+                    if (payloadSize > static_cast<std::uint64_t>(totalSize - 16)) {
+                        appendOutput("ERROR Invalid embedded TRG program.\r\n");
+#if !defined(TRG_TEST_CONSOLE)
+                        runMessageLoop();
+#endif
+                        return 1;
+                    }
+                    executable.seekg(totalSize - 16 - static_cast<std::streamoff>(payloadSize));
+                    embeddedSource.resize(static_cast<std::size_t>(payloadSize));
+                    if (payloadSize > 0) executable.read(&embeddedSource[0], static_cast<std::streamsize>(payloadSize));
+                    if (!executable) {
+                        appendOutput("ERROR Could not read embedded TRG program.\r\n");
+#if !defined(TRG_TEST_CONSOLE)
+                        runMessageLoop();
+#endif
+                        return 1;
+                    }
+                    hasEmbeddedSource = true;
+                }
+            }
+        }
+    }
+
+    std::vector<std::string> program;
+    if (hasEmbeddedSource) {
+        std::istringstream input(embeddedSource);
+        program = readProgram(input);
+    } else if (!scriptPath.empty() && argc > 1) {
+        std::ifstream file(scriptPath);
+        if (!file.is_open()) {
+            appendOutput("ERROR Could not open \"" + scriptPath.u8string() + "\".\r\n");
+#if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
+            runMessageLoop();
+#endif
+            return 1;
+        }
+#ifdef _WIN32
+        SetWindowTextW(mainWindow, (L"TRG - " + scriptPath.filename().wstring()).c_str());
+#endif
+        program = readProgram(file);
+        currentSourcePath = std::filesystem::absolute(scriptPath);
+        projectRoot = currentSourcePath.parent_path();
+#ifdef _WIN32
+        loadSourceFile(scriptPath);
+#endif
+    } else if (argc == 1) {
+#ifdef _WIN32
+        if (mainWindow) runMessageLoop();
+        return 0;
+#else
+        std::cout << "TRG Interpreter. Type 'exit' or 'stop' to quit.\n";
+        std::string line;
+        Vars variables;
+        Types types;
+        Defaults defaults = standardDefaults();
+        Flow flow;
+        while (std::getline(std::cin, line)) {
+            line = stripComment(line);
+            if (trim(line).empty()) continue;
+            std::vector<std::string> interactiveProgram = {line};
+            registerFunctions(interactiveProgram);
+            executeBlock(interactiveProgram, 0, interactiveProgram.size(), variables, types, defaults, flow);
+            if (flow.stopped) break;
+        }
+        return 0;
+#endif
+    }
+
+    executeProgram(program);
+#if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
+    runMessageLoop();
+#endif
+    return 0;
+}
+
+
+#if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
+int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
+    int argumentCount = 0;
+    LPWSTR* wideArguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount);
+    if (!wideArguments) {
+        MessageBoxW(nullptr, L"Could not read the TRG command line.", L"TRG error", MB_OK | MB_ICONERROR);
+        return 1;
+    }
+    std::vector<std::string> arguments;
+    std::vector<char*> narrowArguments;
+    arguments.reserve(static_cast<std::size_t>(argumentCount));
+    narrowArguments.reserve(static_cast<std::size_t>(argumentCount));
+    for (int i = 0; i < argumentCount; ++i) arguments.push_back(utf8FromWide(wideArguments[i]));
+    LocalFree(wideArguments);
+    for (std::string& argument : arguments) narrowArguments.push_back(&argument[0]);
+    return runApplication(argumentCount, narrowArguments.data());
+}
+#endif
+#if !defined(_WIN32) || defined(TRG_TEST_CONSOLE)
+int main(int argc, char** argv) {
+    return runApplication(argc, argv);
+}
+#endif
+#endif
