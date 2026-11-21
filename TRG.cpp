@@ -570,18 +570,41 @@ void layoutOutputControls(HWND window) {
         std::max<LONG>(scaleForDpi(window, 48), height / 5));
     const LONG gap = scaleForDpi(window, 5);
     const LONG margin = scaleForDpi(window, 12);
-    const LONG desiredWidth = scaleForDpi(window, 88);
-    const LONG available = std::max<LONG>(scaleForDpi(window, 9 * 48 + 8 * 5), width - scaleForDpi(window, 170) - margin * 2);
-    const LONG buttonWidth = std::clamp<LONG>((available - gap * 8) / 9,
-        scaleForDpi(window, 48), scaleForDpi(window, 78));
-    const LONG buttonHeight = scaleForDpi(window, 34);
-    const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton, buildButton, dictionaryButton};
-    LONG x = width - margin - (buttonWidth + gap) * 9 + gap;
-    const LONG y = std::max<LONG>(0, (headerHeight - buttonHeight) / 2);
-    for (HWND button : buttons) {
-        if (button) MoveWindow(button, x, y, buttonWidth, buttonHeight, TRUE);
-        x += buttonWidth + gap;
+
+    if (previewMode) {
+        const HWND controls[] = {openButton, saveButton, runButton, newButton, buildButton,
+            dictionaryButton, editor2DButton, editor3DButton};
+        for (HWND control : controls) if (control) ShowWindow(control, SW_HIDE);
+        if (previewButton) {
+            SetWindowTextW(previewButton, L"Code");
+            const LONG buttonWidth = scaleForDpi(window, 76);
+            const LONG buttonHeight = scaleForDpi(window, 34);
+            MoveWindow(previewButton, std::max<LONG>(margin, width - margin - buttonWidth),
+                margin, buttonWidth, buttonHeight, TRUE);
+            ShowWindow(previewButton, SW_SHOW);
+            SetWindowPos(previewButton, HWND_TOP, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        }
+    } else {
+        const LONG available = std::max<LONG>(scaleForDpi(window, 9 * 48 + 8 * 5),
+            width - scaleForDpi(window, 170) - margin * 2);
+        const LONG buttonWidth = std::clamp<LONG>((available - gap * 8) / 9,
+            scaleForDpi(window, 48), scaleForDpi(window, 78));
+        const LONG buttonHeight = scaleForDpi(window, 34);
+        const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton,
+            buildButton, dictionaryButton, editor2DButton, editor3DButton};
+        LONG x = width - margin - (buttonWidth + gap) * 9 + gap;
+        const LONG y = std::max<LONG>(0, (headerHeight - buttonHeight) / 2);
+        for (HWND button : buttons) {
+            if (button) {
+                MoveWindow(button, x, y, buttonWidth, buttonHeight, TRUE);
+                ShowWindow(button, SW_SHOW);
+            }
+            x += buttonWidth + gap;
+        }
+        if (previewButton) SetWindowTextW(previewButton, L"Preview");
     }
+
     if (codeEditor) {
         const LONG editorMargin = scaleForDpi(window, 10);
         const LONG top = headerHeight + editorMargin;
@@ -4979,25 +5002,23 @@ struct DesktopLayout {
 DesktopLayout desktopLayout(HWND window, const RECT& client) {
     const LONG width = std::max<LONG>(0, client.right - client.left);
     const LONG height = std::max<LONG>(0, client.bottom - client.top);
+    const LONG margin = scaleForDpi(window, 20);
+    if (previewMode) {
+        return {width, height, 0, height, std::max<LONG>(1, height),
+            margin, height, height};
+    }
     const LONG headerHeight = std::min<LONG>(scaleForDpi(window, 76),
         std::max<LONG>(scaleForDpi(window, 48), height / 5));
-    const LONG margin = scaleForDpi(window, 20);
     const LONG outputMinimum = scaleForDpi(window, 80);
     const LONG canvasMinimum = scaleForDpi(window, 100);
     const LONG panelMinimum = std::min(height, headerHeight + canvasMinimum);
     const LONG panelMaximum = std::max(panelMinimum, height - outputMinimum);
     const LONG panelTop = std::clamp<LONG>(height * 65 / 100, panelMinimum, panelMaximum);
-    return {
-        width,
-        height,
-        headerHeight,
-        panelTop,
-        std::max<LONG>(1, panelTop - headerHeight),
-        margin,
+    return {width, height, headerHeight, panelTop,
+        std::max<LONG>(1, panelTop - headerHeight), margin,
         panelTop + scaleForDpi(window, 10),
         std::max<LONG>(panelTop + scaleForDpi(window, 10),
-                       height - scaleForDpi(window, 16))
-    };
+                       height - scaleForDpi(window, 16))};
 }
 
 LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
