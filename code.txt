@@ -4610,6 +4610,80 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 types["last_3d_object"] = "word";
                 continue;
             }
+            if (action == "save" && tokens.size() == 3) {
+                bool validPath = false;
+                const std::filesystem::path scenePath = projectFilePath(valueFor(tokens[2], variables), validPath);
+                if (!validPath) { reportError(i + 1, "3d save needs a project-relative .trgscene path"); continue; }
+                std::error_code directoryError;
+                if (!scenePath.parent_path().empty())
+                    std::filesystem::create_directories(scenePath.parent_path(), directoryError);
+                if (directoryError) { reportError(i + 1, "could not create the scene directory", directoryError.message()); continue; }
+                std::ofstream sceneFile(scenePath, std::ios::binary | std::ios::trunc);
+                if (!sceneFile) { reportError(i + 1, "could not write the 3D scene", scenePath.string()); continue; }
+                sceneFile << "TRGSCENE 1\n" << ui3DObjects.size() << "\n";
+                for (const Ui3DObject& item : ui3DObjects) {
+                    sceneFile << std::quoted(item.name) << ' ' << std::quoted(item.group) << ' '
+                              << std::quoted(item.shape) << ' ' << std::quoted(item.color) << ' '
+                              << std::setprecision(17)
+                              << item.x << ' ' << item.y << ' ' << item.z << ' '
+                              << item.width << ' ' << item.height << ' ' << item.depth << ' '
+                              << item.rotateX << ' ' << item.rotateY << ' ' << item.rotateZ << ' '
+                              << item.opacity << ' ' << (item.visible ? 1 : 0) << '\n';
+                }
+                if (!sceneFile) { reportError(i + 1, "failed while writing the 3D scene", scenePath.string()); continue; }
+                appendOutput("Saved 3D scene: " + scenePath.string() + "\r\n");
+                continue;
+            }
+            if (action == "load" && tokens.size() == 3) {
+                bool validPath = false;
+                const std::filesystem::path scenePath = projectExistingFile(valueFor(tokens[2], variables), validPath);
+                if (!validPath || !std::filesystem::is_regular_file(scenePath)) {
+                    reportError(i + 1, "3d load needs an existing project-relative .trgscene file", tokens[2]); continue;
+                }
+                std::ifstream sceneFile(scenePath, std::ios::binary);
+                std::string magic;
+                unsigned version = 0;
+                std::size_t objectCount = 0;
+                if (!sceneFile || !(sceneFile >> magic >> version >> objectCount) ||
+                    magic != "TRGSCENE" || version != 1 || objectCount > 100000) {
+                    reportError(i + 1, "invalid or unsupported 3D scene file", scenePath.string()); continue;
+                }
+                std::vector<Ui3DObject> loadedObjects;
+                loadedObjects.reserve(objectCount);
+                std::unordered_set<std::string> loadedNames;
+                bool validScene = true;
+                for (std::size_t objectIndex = 0; objectIndex < objectCount; ++objectIndex) {
+                    Ui3DObject item;
+                    int visible = 0;
+                    if (!(sceneFile >> std::quoted(item.name) >> std::quoted(item.group)
+                          >> std::quoted(item.shape) >> std::quoted(item.color)
+                          >> item.x >> item.y >> item.z
+                          >> item.width >> item.height >> item.depth
+                          >> item.rotateX >> item.rotateY >> item.rotateZ
+                          >> item.opacity >> visible) ||
+                        !validName(item.name) ||
+                        (item.shape != "box" && item.shape != "sphere") ||
+                        item.width <= 0 || item.height <= 0 || item.depth <= 0 ||
+                        item.opacity < 0 || item.opacity > 1 ||
+                        (visible != 0 && visible != 1) ||
+                        !loadedNames.insert(item.name).second) {
+                        validScene = false;
+                        break;
+                    }
+                    unsigned red = 0, green = 0, blue = 0;
+                    if (!parseColor(item.color, red, green, blue)) { validScene = false; break; }
+                    item.visible = visible != 0;
+                    loadedObjects.push_back(std::move(item));
+                }
+                std::string trailing;
+                if (validScene && (sceneFile >> trailing)) validScene = false;
+                if (!validScene || loadedObjects.size() != objectCount) {
+                    reportError(i + 1, "3D scene contains invalid or incomplete object data", scenePath.string()); continue;
+                }
+                ui3DObjects = std::move(loadedObjects);
+                appendOutput("Loaded 3D scene: " + scenePath.string() + "\r\n");
+                continue;
+            }
             if (action == "clear" && tokens.size() == 2) { ui3DObjects.clear(); continue; }
             const std::string name = tokens.size() > 2 ? valueFor(tokens[2], variables) : "";
             auto object = std::find_if(ui3DObjects.begin(), ui3DObjects.end(), [&](const Ui3DObject& item) { return item.name == name; });
