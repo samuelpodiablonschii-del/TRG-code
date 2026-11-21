@@ -1,0 +1,1288 @@
+    if (!session) { error = "could not open WinHTTP session"; return {}; }
+
+    std::wstring whost = wideFromUtf8(host);
+    std::wstring wpath = wideFromUtf8(path);
+    INTERNET_PORT port = (lower(scheme) == "https") ? INTERNET_DEFAULT_HTTPS_PORT : INTERNET_DEFAULT_HTTP_PORT;
+    DWORD flag = (lower(scheme) == "https") ? WINHTTP_FLAG_SECURE : 0;
+
+    HINTERNET connect = WinHttpConnect(session, whost.c_str(), port, 0);
+    if (!connect) { WinHttpCloseHandle(session); error = "could not connect"; return {}; }
+
+    HINTERNET request = WinHttpOpenRequest(connect, L"POST", wpath.c_str(),
+                                           nullptr, WINHTTP_NO_REFERER,
+                                           WINHTTP_DEFAULT_ACCEPT_TYPES, flag);
+    if (!request) { WinHttpCloseHandle(connect); WinHttpCloseHandle(session); error = "could not open request"; return {}; }
+
+    std::string headers = "Content-Type: application/x-www-form-urlencoded\r\n";
+    std::wstring wheaders = wideFromUtf8(headers);
+
+    if (!WinHttpSendRequest(request, wheaders.c_str(), (DWORD)wheaders.size(),
+                            (LPVOID)body.data(), (DWORD)body.size(), (DWORD)body.size(), 0)) {
+        DWORD err = GetLastError();
+        WinHttpCloseHandle(request); WinHttpCloseHandle(connect); WinHttpCloseHandle(session);
+        error = "send request failed: " + std::to_string(err);
+        return {};
+    }
+    if (!WinHttpReceiveResponse(request, nullptr)) {
+        DWORD err = GetLastError();
+        WinHttpCloseHandle(request); WinHttpCloseHandle(connect); WinHttpCloseHandle(session);
+        error = "receive response failed: " + std::to_string(err);
+        return {};
+    }
+
+    DWORD size = 0;
+    do {
+        size = 0;
+        if (!WinHttpQueryDataAvailable(request, &size)) break;
+        if (size == 0) break;
+        std::vector<char> buffer(size + 1);
+        DWORD read = 0;
+        if (!WinHttpReadData(request, buffer.data(), size, &read)) break;
+        buffer[read] = '\0';
+        result += buffer.data();
+    } while (size > 0);
+
+    WinHttpCloseHandle(request);
+    WinHttpCloseHandle(connect);
+    WinHttpCloseHandle(session);
+    return result;
+}
+
+#else
+std::string httpPost(const std::string&, const std::string&, std::string& error) {
+    error = "network only on Windows";
+    return {};
+}
+#endif
+
+// ---------------------------------------------------------
+
+// PowerShell library (add (powershell))
+// ---------------------------------------------------------
+bool psIsSafeCommand(const std::string& cmd) {
+    // Whitelist of safe PowerShell commands/verbs-nouns
+    static const std::unordered_set<std::string> safeCommands = {
+        "Write-Host", "Write-Verbose", "Write-Debug",
+        "Get-Help", "Get-Member", "Get-Command",
+        "Set-Variable", "Get-Variable", "New-Variable",
+        "Clear-Variable", "Remove-Variable",
+        "Select-Object", "Where-Object",
+        "Measure-Object", "Sort-Object",
+        "Export-Csv", "ConvertTo-Csv",
+        "Get-Process", "Get-Service",
+        "Start-Process", "Stop-Process",
+        "Test-Path", "Get-ChildItem",
+        "Write-Output", "Read-Host"
+    };
+    // Check if cmd starts with any safe verb-noun
+    for (const auto& safe : safeCommands) {
+        if (cmd.rfind(safe, 0) == 0) return true;
+    }
+    return false;
+}
+
+std::string psExecuteSafe(const std::string& code, std::string& error) {
+    error.clear();
+    // Simple whitelist-based approach: only allow known safe commands
+    // Extract first token (command name)
+    std::string firstLine = code;
+    std::size_t nl = firstLine.find('\n');
+    if (nl != std::string::npos) firstLine = firstLine.substr(0, nl);
+    firstLine = trim(firstLine);
+    if (firstLine.empty()) return "";
+    
+    std::istringstream iss(firstLine);
+    std::string cmd;
+    iss >> cmd;
+    
+    if (!psIsSafeCommand(cmd)) {
+        error = "powershell command not in whitelist: " + cmd;
+        return {};
+    }
+    
+    // For whitelisted commands, we'll just log/append output what would run
+    // In a real implementation, you'd use PowerShell API or invoke with constraints
+    // Here we just append the command to output as a safe placeholder
+    return "POWERSHELL EXECUTED (whitelisted): " + code;
+}
+
+struct LibraryState {
+    bool files = false;
+    bool json = false;
+    bool database = false;
+    bool web = false;
+    bool collision = false;
+    bool manual = false;
+    bool ui = false;
+    bool controls = false;
+    bool network = false;
+    bool ai = false;
+    bool math = false;
+    bool binary = false;
+    bool regex = false;
+    bool compression = false;
+    bool powershell = false;
+    bool raspberry = false;
+    bool accessibility = false;
+    bool time = false;
+    bool convert = false;
+    bool stats = false;
+    bool units = false;
+    bool physics = false;
+    bool threeD = false;
+    bool bouncyballs = false;
+};
+
+std::string parenContent(const std::string& line) {
+    
+    
+    bool quoted = false;
+    char quote = '\0';
+    std::size_t open = std::string::npos;
+    int depth = 0;
+    for (std::size_t i = 0; i < line.size(); ++i) {
+        const char c = line[i];
+        if (quoted) {
+            if (c == '\\' && i + 1 < line.size()) ++i;
+            else if (c == quote) quoted = false;
+            continue;
+        }
+        if (c == '"' || c == '\'') { quoted = true; quote = c; continue; }
+        if (c == '(') {
+            if (open == std::string::npos) { open = i; depth = 1; }
+            else ++depth;
+        } else if (c == ')' && open != std::string::npos) {
+            if (--depth == 0) return trim(line.substr(open + 1, i - open - 1));
+        }
+    }
+    return "";
+}
+
+bool addDirectiveKind(const std::vector<std::string>& tokens, std::string& kind) {
+    if (tokens.size() < 2 || lower(tokens[0]) != "add") return false;
+    const std::string second = lower(tokens[1]);
+    if (second == "global" || second == "(global)") { kind = "global"; return true; }
+    if (second == "connect" || second == "(connect)") { kind = "connect"; return true; }
+    return false;
+}
+
+
+
+void stripProjectDirectives(const std::vector<std::string>& program,
+                            std::vector<std::string>& kept,
+                            std::vector<std::string>& globals,
+                            std::vector<std::string>& connects,
+                            bool report,
+                            std::unordered_set<std::string>* seenGlobals = nullptr) {
+    for (std::size_t i = 0; i < program.size(); ++i) {
+        const std::string line = trim(program[i]);
+        const std::vector<std::string> tokens = tokenize(line);
+        std::string kind;
+        if (!addDirectiveKind(tokens, kind)) {
+            kept.push_back(program[i]);
+            continue;
+        }
+        if (kind == "global") {
+            std::size_t open = 0, close = 0;
+            if (findBlock(program, i, program.size(), open, close)) {
+                std::string signature;
+                for (std::size_t row = open + 1; row < close; ++row) signature += program[row] + '\n';
+                if (seenGlobals && !seenGlobals->insert(signature).second) {
+                    i = close;
+                    continue;
+                }
+                for (std::size_t row = open + 1; row < close; ++row) globals.push_back(program[row]);
+                i = close;
+            } else if (report) {
+                reportError(i + 1, "add global needs a ( ... ) block");
+            }
+            continue;
+        }
+        std::string target;
+        if (lower(tokens[1]) == "(connect)") {
+            if (tokens.size() >= 3) target = tokens[2];
+        } else {
+            target = parenContent(line);
+        }
+        if (target.empty() && tokens.size() >= 3) target = tokens[2];
+        if (target.size() >= 2 && target.front() == '(' && target.back() == ')')
+            target = target.substr(1, target.size() - 2);
+        if (!target.empty()) connects.push_back(target);
+        else if (report) reportError(i + 1, "add connect needs a file name");
+    }
+}
+
+void scanLibraries(const std::vector<std::string>& program, LibraryState& libraries) {
+    for (const auto& raw : program) {
+        const std::vector<std::string> tokens = tokenize(trim(raw));
+        if (tokens.size() < 2 || lower(tokens[0]) != "add") continue;
+        const std::string second = lower(tokens[1]);
+        if (second == "global" || second == "(global)" || second == "connect" || second == "(connect)") continue;
+        if (second.size() < 3 || second.front() != '(' || second.back() != ')') continue;
+        const std::string name = lower(second.substr(1, second.size() - 2));
+        if (name == "all") {
+            libraries.files = libraries.json = libraries.database = libraries.web = libraries.collision = true;
+            libraries.manual = libraries.ui = libraries.controls = libraries.network = libraries.ai = libraries.math = true;
+            libraries.binary = libraries.regex = libraries.compression = true;
+            libraries.powershell = libraries.raspberry = libraries.accessibility = true;
+            libraries.stats = libraries.units = true;
+            libraries.physics = true;
+            libraries.threeD = true;
+            libraries.bouncyballs = true;
+        } else if (name == "files") libraries.files = true;
+        else if (name == "json") libraries.json = true;
+        else if (name == "database" || name == "db") libraries.database = true;
+        else if (name == "web") libraries.web = true;
+        else if (name == "collision") libraries.collision = true;
+        else if (name == "physics") libraries.physics = true;
+        else if (name == "3d") libraries.threeD = true;
+        else if (name == "bouncyballs") libraries.bouncyballs = true;
+        else if (name == "manual") libraries.manual = true;
+        else if (name == "ui" || name == "animation") libraries.ui = true;
+        else if (name == "controls") libraries.controls = true;
+        else if (name == "network") libraries.network = true;
+        else if (name == "ai") libraries.ai = true;
+        else if (name == "math") libraries.math = true;
+        else if (name == "binary") libraries.binary = true;
+        else if (name == "regex") libraries.regex = true;
+        else if (name == "compression") libraries.compression = true;
+        else if (name == "powershell") libraries.powershell = true;
+        else if (name == "raspberry") libraries.raspberry = true;
+        else if (name == "accessibility") libraries.accessibility = true;
+        else if (name == "time") libraries.time = true;
+        else if (name == "convert") libraries.convert = true;
+        else if (name == "stats") libraries.stats = true;
+        else if (name == "units") libraries.units = true;
+    }
+}
+
+void collectTrgFiles(const std::filesystem::path& root, std::vector<std::filesystem::path>& files) {
+    std::error_code error;
+    const std::filesystem::path canonicalRoot = std::filesystem::weakly_canonical(root, error);
+    std::filesystem::recursive_directory_iterator iterator(root,
+        std::filesystem::directory_options::skip_permission_denied, error);
+    const std::filesystem::recursive_directory_iterator end;
+    while (!error && iterator != end) {
+        std::error_code entryError;
+        if (iterator->is_regular_file(entryError) && !entryError &&
+            lower(iterator->path().extension().u8string()) == ".trg") {
+            
+            std::error_code canonicalError;
+            const std::filesystem::path canonical =
+                std::filesystem::weakly_canonical(iterator->path(), canonicalError);
+            bool inside = !canonicalError;
+            if (inside) {
+                const std::filesystem::path relative = canonical.lexically_relative(canonicalRoot);
+                inside = !relative.empty() && relative != "." && *relative.begin() != "..";
+            }
+            if (inside) files.push_back(iterator->path());
+        }
+        iterator.increment(error);
+    }
+    std::sort(files.begin(), files.end());
+}
+
+
+
+
+
+std::vector<std::string> mergePrograms(const std::vector<std::string>& mainProgram,
+                                       const std::filesystem::path& mainPath,
+                                       bool includeProjectGlobals, bool report,
+                                       const std::filesystem::path& excludePath = {}) {
+    struct ProjectNode {
+        std::filesystem::path path;
+        std::vector<std::string> program;
+        std::vector<std::string> connects;
+    };
+
+    std::vector<std::string> globals;
+    std::vector<std::string> keptMain;
+    std::vector<std::string> mainConnects;
+    std::unordered_set<std::string> seenGlobals;
+    stripProjectDirectives(mainProgram, keptMain, globals, mainConnects, report, &seenGlobals);
+
+    const std::filesystem::path mainCanonical = mainPath.empty() ? std::filesystem::path() : canonicalProjectPath(mainPath);
+    const std::string mainKey = mainCanonical.empty() ? "__main__" : lower(mainCanonical.u8string());
+
+    std::unordered_map<std::string, ProjectNode> nodes;
+    std::vector<std::filesystem::path> files;
+    collectTrgFiles(projectRoot, files);
+    for (const auto& file : files) {
+        const std::filesystem::path canonical = canonicalProjectPath(file);
+        const std::string key = lower(canonical.u8string());
+        if (key == mainKey) continue;
+        std::ifstream input(file, std::ios::binary);
+        if (!input) continue;
+        std::vector<std::string> kept, localGlobals, connects;
+        stripProjectDirectives(readProgram(input), kept, localGlobals, connects, false, &seenGlobals);
+        if (includeProjectGlobals) globals.insert(globals.end(), localGlobals.begin(), localGlobals.end());
+        nodes[key] = {canonical, std::move(kept), std::move(connects)};
+    }
+    nodes[mainKey] = {mainCanonical, keptMain, mainConnects};
+
+    std::unordered_map<std::string, std::vector<std::string>> adjacency;
+    std::unordered_map<std::string, std::vector<std::string>> connectionErrors;
+    std::unordered_set<std::string> processed;
+    std::deque<std::string> pending;
+    for (const auto& item : nodes) pending.push_back(item.first);
+
+    auto loadConnectedNode = [&](const std::string& raw, const std::string& owner) -> std::string {
+        bool valid = false;
+        const std::filesystem::path path = projectExistingFile(raw, valid);
+        if (!valid) {
+            connectionErrors[owner].push_back("connect target must stay inside the TRG project folder: \"" + raw + "\"");
+            return {};
+        }
+        const std::filesystem::path canonical = canonicalProjectPath(path);
+        const std::string key = lower(canonical.u8string());
+        if (nodes.count(key)) return key;
+        std::ifstream input(canonical, std::ios::binary);
+        if (!input) {
+            connectionErrors[owner].push_back("could not open connected file: \"" + canonical.u8string() + "\"");
+            return {};
+        }
+        std::vector<std::string> kept, localGlobals, connects;
+        stripProjectDirectives(readProgram(input), kept, localGlobals, connects, false, &seenGlobals);
+        if (includeProjectGlobals) globals.insert(globals.end(), localGlobals.begin(), localGlobals.end());
+        nodes[key] = {canonical, std::move(kept), std::move(connects)};
+        return key;
+    };
+
+    while (!pending.empty()) {
+        const std::string key = pending.front();
+        pending.pop_front();
+        if (!processed.insert(key).second) continue;
+        for (const auto& connect : nodes[key].connects) {
+            const std::string target = loadConnectedNode(connect, key);
+            if (target.empty() || target == key) continue;
+            adjacency[key].push_back(target);
+            adjacency[target].push_back(key);
+            if (!processed.count(target)) pending.push_back(target);
+        }
+    }
+
+    
+    std::vector<std::string> order;
+    std::unordered_set<std::string> visited;
+    std::deque<std::string> queue;
+    queue.push_back(mainKey);
+    visited.insert(mainKey);
+    while (!queue.empty()) {
+        const std::string key = queue.front();
+        queue.pop_front();
+        order.push_back(key);
+        const auto edges = adjacency.find(key);
+        if (edges == adjacency.end()) continue;
+        for (const auto& next : edges->second) {
+            if (visited.insert(next).second) queue.push_back(next);
+        }
+    }
+
+    if (report) {
+        for (const auto& key : order) {
+            const auto errors = connectionErrors.find(key);
+            if (errors == connectionErrors.end()) continue;
+            for (const auto& message : errors->second) {
+                ++errorCount;
+                appendOutput("ERROR " + message + "\r\n");
+            }
+        }
+    }
+
+    std::string excludeKey;
+    if (!excludePath.empty()) excludeKey = lower(canonicalProjectPath(excludePath).u8string());
+
+    std::vector<std::string> merged;
+    merged.insert(merged.end(), globals.begin(), globals.end());
+    for (auto it = order.rbegin(); it != order.rend(); ++it) {
+        if (*it == mainKey || *it == excludeKey) continue;
+        if (executedFileKeys.count(*it)) continue;
+        const auto node = nodes.find(*it);
+        if (node == nodes.end()) continue;
+        merged.insert(merged.end(), node->second.program.begin(), node->second.program.end());
+    }
+    merged.insert(merged.end(), keptMain.begin(), keptMain.end());
+    for (const auto& key : order) executedFileKeys.insert(key);
+    return merged;
+}
+
+
+
+
+void registerFunctions(const std::vector<std::string>& program, bool clearFirst = true) {
+    if (clearFirst) userFunctions.clear();
+    for (std::size_t i = 0; i < program.size(); ++i) {
+        std::string line = trim(program[i]);
+        if (lower(line).rfind("define ", 0) != 0) continue;
+
+        std::istringstream in(line);
+        std::string kw, name;
+        in >> kw >> name;
+        if (!validName(name)) continue;
+
+        std::vector<std::string> params;
+        std::string p;
+        while (in >> p) {
+            if (p == "(") break; 
+            if (p != ",") params.push_back(p);
+        }
+
+        std::size_t open, close;
+        if (findBlock(program, i, program.size(), open, close)) {
+            userFunctions[lower(name)] = {name, params,
+                std::vector<std::string>(program.begin() + static_cast<std::ptrdiff_t>(open + 1),
+                                         program.begin() + static_cast<std::ptrdiff_t>(close))};
+        }
+    }
+}
+
+
+std::string databaseEncode(const std::string& value) { return value.empty() ? "-" : hexEncode(value); }
+bool databaseDecode(const std::string& encoded, std::string& value) {
+    if (encoded == "-") { value.clear(); return true; }
+    return hexDecode(encoded, value);
+}
+std::size_t databaseColumnIndex(const TrgDatabaseTable& table, const std::string& name) {
+    const auto found = std::find(table.columns.begin(), table.columns.end(), name);
+    return found == table.columns.end() ? table.columns.size() : static_cast<std::size_t>(found - table.columns.begin());
+}
+bool saveTrgDatabase(std::string& error) {
+    error.clear();
+    if (trgDatabasePath.empty()) { error = "open a database first"; return false; }
+    std::ofstream out(trgDatabasePath, std::ios::binary | std::ios::trunc);
+    if (!out) { error = "could not write database file"; return false; }
+    out << "TRGDB1\n";
+    std::vector<std::string> names;
+    for (const auto& item : trgDatabaseTables) names.push_back(item.first);
+    std::sort(names.begin(), names.end());
+    for (const auto& name : names) {
+        const auto& table = trgDatabaseTables.at(name);
+        out << "T\t" << databaseEncode(name) << "\t" << table.columns.size() << "\t" << table.rows.size() << "\n";
+        for (const auto& column : table.columns) out << "C\t" << databaseEncode(column) << "\n";
+        for (const auto& row : table.rows) {
+            out << "R";
+            for (const auto& cell : row) out << "\t" << databaseEncode(cell);
+            out << "\n";
+        }
+    }
+    if (!out) { error = "database write failed"; return false; }
+    return true;
+}
+bool loadTrgDatabase(const std::filesystem::path& path, std::string& error) {
+    error.clear();
+    std::ifstream in(path, std::ios::binary);
+    if (!in) { error = "could not read database file"; return false; }
+    std::string line;
+    if (!std::getline(in, line) || line != "TRGDB1") { error = "not a supported TRG database file"; return false; }
+    std::unordered_map<std::string, TrgDatabaseTable> loaded;
+    while (std::getline(in, line)) {
+        if (line.empty()) continue;
+        std::vector<std::string> parts;
+        std::istringstream stream(line);
+        std::string part;
+        while (std::getline(stream, part, '\t')) parts.push_back(part);
+        if (parts.size() != 4 || parts[0] != "T") { error = "corrupt database table header"; return false; }
+        std::string name;
+        if (!databaseDecode(parts[1], name) || name.empty()) { error = "corrupt database table name"; return false; }
+        std::size_t columns = 0, rows = 0;
+        try { columns = static_cast<std::size_t>(std::stoull(parts[2])); rows = static_cast<std::size_t>(std::stoull(parts[3])); }
+        catch (...) { error = "corrupt database dimensions"; return false; }
+        if (columns > 1024 || rows > 1000000) { error = "database dimensions exceed safety limits"; return false; }
+        TrgDatabaseTable table;
+        for (std::size_t c = 0; c < columns; ++c) {
+            if (!std::getline(in, line) || line.rfind("C\t", 0) != 0) { error = "corrupt database column"; return false; }
+            std::string value;
+            if (!databaseDecode(line.substr(2), value) || value.empty() ||
+                std::find(table.columns.begin(), table.columns.end(), value) != table.columns.end()) { error = "invalid or duplicate database column"; return false; }
+            table.columns.push_back(std::move(value));
+        }
+        for (std::size_t r = 0; r < rows; ++r) {
+            if (!std::getline(in, line)) { error = "incomplete database records"; return false; }
+            std::istringstream cellsStream(line);
+            std::string cell;
+            if (!std::getline(cellsStream, cell, '\t') || cell != "R") { error = "corrupt database record"; return false; }
+            std::vector<std::string> values;
+            while (std::getline(cellsStream, cell, '\t')) {
+                std::string value;
+                if (!databaseDecode(cell, value)) { error = "corrupt database value"; return false; }
+                values.push_back(std::move(value));
+            }
+            if (values.size() != columns) { error = "database record has the wrong number of fields"; return false; }
+            table.rows.push_back(std::move(values));
+        }
+        if (!loaded.emplace(name, std::move(table)).second) { error = "duplicate database table"; return false; }
+    }
+    trgDatabaseTables = std::move(loaded);
+    trgDatabasePath = path;
+    return true;
+}
+
+void executeBlock(const std::vector<std::string>& program, std::size_t begin, std::size_t end,
+                  Vars& variables, Types& types, Defaults& defaults, Flow& flow,
+                  bool manualMode = false, bool uiMode = false) {
+    for (std::size_t i = begin; i < end; ++i) {
+#ifdef __ANDROID__
+        if (androidStopRequested.load()) {
+            flow.stopped = true;
+            return;
+        }
+#endif
+        if (flow.stopped || flow.broke || flow.continued) return;
+        
+        std::string line = trim(program[i]);
+        if (line.empty() || line == "(" || line == ")") continue;
+        if (line == "{" || line == "}") {
+            reportError(i + 1, "TRG blocks use ( and ); braces are not supported");
+            continue;
+        }
+        
+        const std::vector<std::string> tokens = tokenize(line);
+        if (tokens.empty()) continue;
+        std::string cmd = lower(tokens[0]);
+        if (cmd == "print" || cmd == "show") cmd = "say";
+
+
+        
+        
+        if (cmd == "set") {
+            if (tokens.size() < 3 || !validVariablePath(tokens[1])) {
+                reportError(i + 1, "use set VARIABLE VALUE", "set");
+                continue;
+            }
+            const std::size_t namePosition = positionAfterArgument(line, tokens[1]);
+            if (namePosition == std::string::npos) { reportError(i + 1, "set needs a valid variable", tokens[1]); continue; }
+            std::string raw = trim(line.substr(namePosition));
+            if (!raw.empty() && raw.front() == '=') raw = trim(raw.substr(1));
+            const std::string type = types.count(tokens[1]) ? types[tokens[1]] : "word";
+            if (type == "num") {
+                double number = 0;
+                if (!evaluateExpression(raw, variables, number)) { reportError(i + 1, "set needs a valid number", raw); continue; }
+                variables[tokens[1]] = number;
+            } else {
+                const auto parts = tokenize(raw);
+                std::string value;
+                for (std::size_t part = 0; part < parts.size(); ++part) {
+                    if (part) value += ' ';
+                    value += valueFor(parts[part], variables);
+                }
+                if (type == "toggle") {
+                    const std::string flag = lower(value);
+                    if (flag != "true" && flag != "false" && flag != "yes" && flag != "no" && value != "1" && value != "0") {
+                        reportError(i + 1, "set toggle needs true or false", value); continue;
+                    }
+                    variables[tokens[1]] = flag == "true" || flag == "yes" || value == "1";
+                } else if (type == "color") {
+                    unsigned red = 0, green = 0, blue = 0;
+                    if (!parseColor(value, red, green, blue)) { reportError(i + 1, "set color needs a valid color", value); continue; }
+                    variables[tokens[1]] = value;
+                } else if (type == "list") {
+                    reportError(i + 1, "use push or remove to change list values", tokens[1]);
+                    continue;
+                } else variables[tokens[1]] = value;
+            }
+            if (!types.count(tokens[1])) types[tokens[1]] = type;
+            continue;
+        }
+        if (cmd == "increase" || cmd == "decrease") {
+            if ((tokens.size() != 2 && tokens.size() != 3) || !validVariablePath(tokens[1]) ||
+                !variables.count(tokens[1]) || !types.count(tokens[1]) || types[tokens[1]] != "num") {
+                reportError(i + 1, "use increase/decrease NUMBER_VARIABLE [AMOUNT]");
+                continue;
+            }
+            const std::string amountText = tokens.size() == 3 ? tokens[2] : "1";
+            double amount = 0, current = 0;
+            if (!evaluateExpression(amountText, variables, amount) || !parseNumber(static_cast<std::string>(variables[tokens[1]]), current)) {
+                reportError(i + 1, "increase/decrease needs numeric values", tokens[1]);
+                continue;
+            }
+            variables[tokens[1]] = current + (cmd == "increase" ? amount : -amount);
+            continue;
+        }
+
+        
+        
+        if (cmd == "record" || cmd == "struct" || cmd == "class") {
+            std::size_t open = 0, close = 0;
+            const bool headerShape = tokens.size() == 2 || (tokens.size() == 3 && tokens[2] == "(");
+            if (!headerShape || !validName(tokens[1]) || !findBlock(program, i, end, open, close)) {
+                reportError(i + 1, "use record NAME ( word field; num count = 0 )", tokens.size() > 1 ? tokens[1] : "");
+                continue;
+            }
+            StructDefinition definition;
+            for (std::size_t row = open + 1; row < close; ++row) {
+                const auto field = tokenize(trim(program[row]));
+                if (field.empty()) continue;
+                const std::string fieldType = lower(field[0]);
+                if (field.size() < 2 || !validName(field[1]) ||
+                    (fieldType != "word" && fieldType != "num" && fieldType != "toggle" && fieldType != "color")) {
+                    reportError(row + 1, "record fields use word, num, toggle, or color", field[0]);
+                    continue;
+                }
+                std::string initial;
+                const std::size_t equals = trim(program[row]).find('=');
+                if (equals != std::string::npos) {
+                    const auto initialTokens = tokenize(trim(program[row]).substr(equals + 1));
+                    for (std::size_t part = 0; part < initialTokens.size(); ++part) {
+                        if (part) initial += ' ';
+                        initial += initialTokens[part];
+                    }
+                }
+                definition[field[1]] = {fieldType, initial};
+            }
+            userStructs[tokens[1]] = std::move(definition);
+            i = close;
+            continue;
+        }
+        if (cmd == "new") {
+            if (tokens.size() != 3 || !validName(tokens[2]) || !userStructs.count(tokens[1])) {
+                reportError(i + 1, "use new TYPE instanceName (define TYPE with record first)");
+                continue;
+            }
+            for (const auto& field : userStructs[tokens[1]]) {
+                const std::string key = tokens[2] + "." + field.first;
+                const std::string raw = field.second.initial;
+                const std::string initial = raw.empty() ? defaults[field.second.type] : valueFor(raw, variables);
+                if (field.second.type == "num") {
+                    double number = 0;
+                    if (!evaluateExpression(raw.empty() ? initial : raw, variables, number)) number = 0;
+                    variables[key] = number;
+                } else if (field.second.type == "toggle") variables[key] = lower(initial) == "true";
+                else variables[key] = initial;
+                types[key] = field.second.type;
+            }
+            continue;
+        }
+
+        
+        if (tokens.size() == 3 && validName(tokens[0]) &&
+            (std::any_of(uiBlocks.begin(), uiBlocks.end(), [&](const UiBlock& block) { return block.name == tokens[0]; }) ||
+             std::any_of(uiSprites.begin(), uiSprites.end(), [&](const UiSprite& sprite) { return sprite.name == tokens[0]; }) ||
+             std::any_of(uiButtons.begin(), uiButtons.end(), [&](const UiButton& button) { return button.name == tokens[0]; }) ||
+             std::any_of(uiTexts.begin(), uiTexts.end(), [&](const UiText& text) { return text.name == tokens[0]; }))) {
+            auto block = std::find_if(uiBlocks.begin(), uiBlocks.end(), [&](const UiBlock& item) { return item.name == tokens[0]; });
+            auto sprite = std::find_if(uiSprites.begin(), uiSprites.end(), [&](const UiSprite& item) { return item.name == tokens[0]; });
+            auto button = std::find_if(uiButtons.begin(), uiButtons.end(), [&](const UiButton& item) { return item.name == tokens[0]; });
+            auto text = std::find_if(uiTexts.begin(), uiTexts.end(), [&](const UiText& item) { return item.name == tokens[0]; });
+            const std::string property = lower(tokens[1]);
+            const std::string raw = valueFor(tokens[2], variables);
+            if (text != uiTexts.end() && (property == "text" || property == "value")) { text->value = raw; continue; }
+            if (button != uiButtons.end() && (property == "label" || property == "text")) { button->label = raw; continue; }
+            if (property == "visible" || property == "show") {
+                const bool visible = lower(raw) == "true" || lower(raw) == "yes" || raw == "1";
+                if (block != uiBlocks.end()) block->visible = visible;
+                else if (sprite != uiSprites.end()) sprite->visible = visible;
+                else if (button != uiButtons.end()) button->visible = visible;
+                else text->visible = visible;
+                continue;
+            }
+            if (text != uiTexts.end() && property == "color") {
+                unsigned red = 0, green = 0, blue = 0;
+                if (!parseColor(raw, red, green, blue)) reportError(i + 1, "invalid text color", raw);
+                else text->color = raw;
+                continue;
+            }
+            if (text != uiTexts.end() && (property == "font" || property == "align")) {
+                const std::string value = lower(raw);
+                if (property == "font" && value != "sans" && value != "serif" && value != "mono" && value != "monospace")
+                    reportError(i + 1, "font must be sans, serif, or mono", raw);
+                else if (property == "align" && value != "left" && value != "center" && value != "right")
+                    reportError(i + 1, "text alignment must be left, center, or right", raw);
+                else if (property == "font") text->font = value == "monospace" ? "mono" : value;
+                else text->align = value;
+                continue;
+            }
+            if (property == "edges" || property == "shape") {
+                if (lower(raw) != "square" && lower(raw) != "round" && lower(raw) != "rounded") {
+                    reportError(i + 1, "UI edges must be round or square", raw); continue;
+                }
+                if (block != uiBlocks.end()) block->cornerRadius = lower(raw) == "square" ? 0 : 10;
+                else if (button != uiButtons.end()) button->cornerRadius = lower(raw) == "square" ? 0 : 7;
+                continue;
+            }
+            if (property == "color" && (block != uiBlocks.end() || button != uiButtons.end())) {
+                unsigned red = 0, green = 0, blue = 0;
+                if (!parseColor(raw, red, green, blue)) reportError(i + 1, "invalid UI color", raw);
+                else if (block != uiBlocks.end()) block->color = raw;
+                else button->color = raw;
+                continue;
+            }
+            if (property == "opacity" || property == "size") {
+                double number = 0;
+                if (!parseNumber(raw, number) || number < 0 || number > (property == "opacity" ? 1.0 : 100.0)) {
+                    reportError(i + 1, "opacity must be 0..1 and text size must be 0..100", raw); continue;
+                }
+                if (block != uiBlocks.end() && property == "opacity") block->opacity = number;
+                else if (sprite != uiSprites.end() && property == "opacity") sprite->opacity = number;
+                else if (button != uiButtons.end() && property == "opacity") button->opacity = number;
+                else if (text != uiTexts.end() && property == "opacity") text->opacity = number;
+                else if (text != uiTexts.end()) text->size = number;
+                else { reportError(i + 1, "opacity or size is not supported by this UI object", property); continue; }
+                continue;
+            }
+            if (text != uiTexts.end() && property == "bold") { text->bold = lower(raw) == "true" || raw == "1"; continue; }
+            if (button != uiButtons.end() && property == "font") {
+                const std::string value = lower(raw);
+                if (value == "sans" || value == "serif" || value == "mono" || value == "monospace") button->font = value == "monospace" ? "mono" : value;
+                else reportError(i + 1, "button font must be sans, serif, or mono", raw);
+                continue;
+            }
+            if (button != uiButtons.end() && property == "text_color") {
+                unsigned red = 0, green = 0, blue = 0;
+                if (!parseColor(raw, red, green, blue)) reportError(i + 1, "invalid button text color", raw);
+                else button->textColor = raw;
+                continue;
+            }
+            if (button != uiButtons.end() && property == "bold") { button->textBold = lower(raw) == "true" || raw == "1"; continue; }
+            if (property == "x" || property == "y" || property == "w" || property == "h" || property == "radius") {
+                double number = 0;
+                const bool relative = raw.size() > 1 && (raw[0] == '+' || raw[0] == '-');
+                if (!parseNumber(raw, number)) { reportError(i + 1, "UI position and size need a number", raw); continue; }
+                if (block != uiBlocks.end()) {
+                    if (property == "x") block->x = relative ? block->x + number : number;
+                    else if (property == "y") block->y = relative ? block->y + number : number;
+                    else if (property == "w") block->width = number;
+                    else if (property == "h") block->height = number;
+                    else block->cornerRadius = std::max(0.0, number);
+                } else if (sprite != uiSprites.end()) {
+                    if (property == "x") sprite->x = relative ? sprite->x + number : number;
+                    else if (property == "y") sprite->y = relative ? sprite->y + number : number;
+                    else if (property == "w") sprite->width = number;
+                    else if (property == "h") sprite->height = number;
+                } else if (button != uiButtons.end()) {
+                    if (property == "x") button->x = relative ? button->x + number : number;
+                    else if (property == "y") button->y = relative ? button->y + number : number;
+                    else if (property == "w") button->width = number;
+                    else if (property == "h") button->height = number;
+                    else button->cornerRadius = std::max(0.0, number);
+                } else if (text != uiTexts.end()) {
+                    if (property == "x") text->x = relative ? text->x + number : number;
+                    else if (property == "y") text->y = relative ? text->y + number : number;
+                    else { reportError(i + 1, "text only supports x, y, size, and opacity", property); continue; }
+                }
+                refreshCollisionWatches(variables, types);
+                continue;
+            }
+        }
+        if (tokens.size() == 3 && std::any_of(uiButtons.begin(), uiButtons.end(),
+                [&](const UiButton& button) { return button.name == tokens[0]; })) {
+            auto button = std::find_if(uiButtons.begin(), uiButtons.end(),
+                [&](const UiButton& item) { return item.name == tokens[0]; });
+            const std::string property = lower(tokens[1]);
+            const std::string raw = valueFor(tokens[2], variables);
+            if (property == "color") {
+                unsigned red = 0, green = 0, blue = 0;
+                if (!parseColor(raw, red, green, blue)) reportError(i + 1, "invalid UI button color", raw);
+                else button->color = raw;
+            }
+            else if (property == "edges" || property == "shape") {
+                if (lower(raw) != "square" && lower(raw) != "round" && lower(raw) != "rounded") {
+                    reportError(i + 1, "UI edges must be round or square", raw); continue;
+                }
+                button->cornerRadius = lower(raw) == "square" ? 0 : 7;
+            }
+            else {
+                double number = 0;
+                const bool relative = raw.size() > 1 && (raw[0] == '+' || raw[0] == '-');
+                if (!parseNumber(raw, number)) { reportError(i + 1, "UI button property needs a number or color", raw); continue; }
+                if (property == "x") button->x = relative ? button->x + number : number;
+                else if (property == "y") button->y = relative ? button->y + number : number;
+                else if (property == "w") button->width = number;
+                else if (property == "h") button->height = number;
+                else if (property == "radius") button->cornerRadius = std::max(0.0, number);
+                else if (property == "opacity" && number >= 0 && number <= 1) button->opacity = number;
+                else { reportError(i + 1, "unknown UI button property", property); continue; }
+            }
+            refreshCollisionWatches(variables, types);
+            continue;
+        }
+
+        if ((cmd == "show" || cmd == "hide") && tokens.size() == 2) {
+            const bool visible = cmd == "show";
+            auto group = std::find_if(uiGroups.begin(), uiGroups.end(), [&](const UiGroup& item) { return item.name == tokens[1]; });
+            if (group != uiGroups.end()) { group->visible = visible; continue; }
+            bool found = false;
+            for (UiBlock& item : uiBlocks) if (item.name == tokens[1]) { item.visible = visible; found = true; }
+            for (UiSprite& item : uiSprites) if (item.name == tokens[1]) { item.visible = visible; found = true; }
+            for (UiButton& item : uiButtons) if (item.name == tokens[1]) { item.visible = visible; found = true; }
+            for (UiText& item : uiTexts) if (item.name == tokens[1]) { item.visible = visible; found = true; }
+            for (Ui3DObject& item : ui3DObjects) if (item.name == tokens[1]) { item.visible = visible; found = true; }
+            if (!found) reportError(i + 1, "unknown UI group or object", tokens[1]);
+            continue;
+        }
+
+        
+        auto ufIt = userFunctions.find(cmd);
+        if (ufIt != userFunctions.end()) {
+            const auto& uf = ufIt->second;
+            Vars savedVars;
+            for (std::size_t p = 0; p < uf.params.size() && p + 1 < tokens.size(); ++p) {
+                const auto existing = variables.find(uf.params[p]);
+                if (existing != variables.end()) savedVars[uf.params[p]] = existing->second;
+                variables[uf.params[p]] = valueFor(tokens[p + 1], variables);
+            }
+            Flow inner;
+            executeBlock(uf.body, 0, uf.body.size(), variables, types, defaults, inner, manualMode, uiMode);
+            for (const std::string& param : uf.params) {
+                const auto saved = savedVars.find(param);
+                if (saved == savedVars.end()) variables.erase(param);
+                else variables[param] = saved->second;
+            }
+            if (inner.stopped) { flow.stopped = true; return; }
+            continue;
+        }
+        if (cmd == "define") {
+            std::size_t open = 0, close = 0;
+            if (!findBlock(program, i, end, open, close)) {
+                reportError(i + 1, "function definition needs a code block");
+                continue;
+            }
+            i = close;
+            continue;
+        }
+
+        
+        if (cmd == "say") {
+            std::string message;
+            for (std::size_t a = 1; a < tokens.size(); ++a) {
+                if (a > 1) message += ' ';
+                message += valueFor(tokens[a], variables);
+            }
+            appendOutput(message + "\r\n");
+            continue;
+        }
+        if (cmd == "wait") {
+            if (tokens.size() != 2) { reportError(i + 1, "use wait 10s or wait 100ms"); continue; }
+            std::string duration = lower(valueFor(tokens[1], variables));
+            std::chrono::milliseconds delay(0);
+            try {
+                if (duration.size() > 2 && duration.substr(duration.size() - 2) == "ms") {
+                    double value = 0;
+                    if (!parseNumber(duration.substr(0, duration.size() - 2), value) || value < 0) throw std::invalid_argument("duration");
+                    delay = std::chrono::milliseconds(static_cast<long long>(value));
+                } else {
+                    if (!duration.empty() && duration.back() == 's') duration.pop_back();
+                    double value = 0;
+                    if (!parseNumber(duration, value) || value < 0) throw std::invalid_argument("duration");
+                    delay = std::chrono::milliseconds(static_cast<long long>(value * 1000));
+                }
+            } catch (...) { reportError(i + 1, "wait duration must look like 100ms or 10s", tokens[1]); continue; }
+#ifdef __ANDROID__
+            const auto until = std::chrono::steady_clock::now() + delay;
+            while (!androidStopRequested.load() && std::chrono::steady_clock::now() < until)
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+#else
+            std::this_thread::sleep_for(delay);
+#endif
+            continue;
+        }
+        if (cmd == "play") {
+            if (tokens.size() < 2) { reportError(i + 1, "use play FILE"); continue; }
+            std::string fileName = valueFor(tokens[1], variables);
+            bool pathValid = false;
+            const std::filesystem::path mediaPath = projectFilePath(fileName, pathValid);
+            if (!pathValid || !std::filesystem::is_regular_file(mediaPath)) {
+                reportError(i + 1, "media file not found inside project folder", fileName); continue;
+            }
+            std::string ext = lower(mediaPath.extension().u8string());
+            if (ext == ".m4a" || ext == ".mp3" || ext == ".wav" || ext == ".ogg" || ext == ".aac") {
+#ifdef _WIN32
+                std::wstring wpath = mediaPath.wstring();
+                if (!PlaySoundW(wpath.c_str(), nullptr, SND_FILENAME | SND_ASYNC)) {
+                    reportError(i + 1, "could not play sound", fileName);
+                }
+#else
+                reportError(i + 1, "play sound is Windows-only", fileName);
+#endif
+            } else if (ext == ".mp4" || ext == ".webm" || ext == ".avi" || ext == ".mov") {
+#ifdef _WIN32
+                ShellExecuteW(mainWindow, L"open", mediaPath.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+#else
+                reportError(i + 1, "play video is Windows-only", fileName);
+#endif
+            } else {
+                reportError(i + 1, "unknown media type", ext);
+            }
+            continue;
+        }
+        if (cmd == "scroll") {
+            if (tokens.size() != 3) { reportError(i + 1, "use scroll X Y"); continue; }
+            double vx = 0, vy = 0;
+            if (!evaluateExpression(valueFor(tokens[1], variables), variables, vx) ||
+                !evaluateExpression(valueFor(tokens[2], variables), variables, vy)) {
+                reportError(i + 1, "scroll needs numeric X Y"); continue;
+            }
+            viewportX = vx;
+            viewportY = vy;
+            continue;
+        }
+        if (cmd == "http_get") {
+            if (!networkEnabled) { reportError(i + 1, "http_get needs add (network)"); continue; }
+            if (tokens.size() != 3 || !validName(tokens[2])) { reportError(i + 1, "use http_get URL RESULT"); continue; }
+            std::string url = valueFor(tokens[1], variables);
+            std::string error;
+            std::string response = httpGet(url, error);
+            if (!error.empty()) { reportError(i + 1, error, url); continue; }
+            variables[tokens[2]] = response;
+            types[tokens[2]] = "word";
+            continue;
+        }
+        if (cmd == "http_post") {
+            if (!networkEnabled) { reportError(i + 1, "http_post needs add (network)"); continue; }
+            if (tokens.size() != 4 || !validName(tokens[3])) { reportError(i + 1, "use http_post URL BODY RESULT"); continue; }
+            std::string url = valueFor(tokens[1], variables);
+            std::string body = valueFor(tokens[2], variables);
+            std::string error;
+            std::string response = httpPost(url, body, error);
+            if (!error.empty()) { reportError(i + 1, error, url); continue; }
+            variables[tokens[3]] = response;
+            types[tokens[3]] = "word";
+            continue;
+        }
+        if (cmd == "particle") {
+            // particle NAME X Y COLOR SPEED LIFE SIZE
+            if (tokens.size() < 7) { reportError(i + 1, "use particle NAME X Y COLOR SPEED LIFE SIZE"); continue; }
+            Particle p;
+            p.name = tokens[1];
+            if (!evaluateExpression(valueFor(tokens[2], variables), variables, p.x)) p.x = 0;
+            if (!evaluateExpression(valueFor(tokens[3], variables), variables, p.y)) p.y = 0;
+            p.color = valueFor(tokens[4], variables);
+            if (!evaluateExpression(valueFor(tokens[5], variables), variables, p.vx)) p.vx = 0;
+            p.vy = p.vx;
+            if (!evaluateExpression(valueFor(tokens[6], variables), variables, p.maxLife)) p.maxLife = 1;
+            p.life = p.maxLife;
+            p.size = 4;
+            if (tokens.size() >= 8) {
+                if (!evaluateExpression(valueFor(tokens[7], variables), variables, p.size)) p.size = 4;
+            }
+            particles.push_back(p);
+            continue;
+        }
+        if (cmd == "studio") {
+#ifdef __ANDROID__
+            if (tokens.size() != 2) {
+                reportError(i + 1, "use studio ACTION");
+            } else {
+                trgStudioActionAndroid(tokens[1]);
+            }
+#else
+            reportError(i + 1, "studio actions are only available in TRG Studio");
+#endif
+            continue;
+        }
+        if (cmd == "ask") {
+            if (tokens.size() < 3 || !validName(tokens.back())) {
+                reportError(i + 1, "ask needs a prompt and valid variable name");
+                continue;
+            }
+            const std::size_t targetIndex = tokens.size() - 1;
+            std::string prompt;
+            for (std::size_t a = 1; a < targetIndex; ++a) {
+                if (a > 1) prompt += ' ';
+                prompt += valueFor(tokens[a], variables);
+            }
+            std::string answer;
+            if (!askForInput(prompt, answer)) { reportError(i + 1, "input was cancelled"); continue; }
+            const std::string target = tokens[targetIndex];
+            if (!types.count(target)) types[target] = "word";
+            if (types[target] == "num") {
+                double numeric = 0;
+                if (!parseNumber(answer, numeric)) { reportError(i + 1, "input must be a number", answer); continue; }
+                variables[target] = numeric;
+            } else if (types[target] == "toggle") {
+                const std::string toggleValue = lower(answer);
+                if (toggleValue != "true" && toggleValue != "false") { reportError(i + 1, "input must be true or false", answer); continue; }
+                variables[target] = toggleValue == "true";
+            } else variables[target] = answer;
+            continue;
+        }
+
+        
+        
+        
+        if (cmd == "add" && tokens.size() >= 2) {
+            const std::string second = lower(tokens[1]);
+
+            
+            if (second == "global" || second == "(global)") {
+                std::size_t open = 0, close = 0;
+                if (!findBlock(program, i, end, open, close)) {
+                    reportError(i + 1, "add global needs a ( ... ) block");
+                    continue;
+                }
+                Flow inner;
+                executeBlock(program, open + 1, close, variables, types, defaults, inner, manualMode, uiMode);
+                if (inner.stopped) { flow.stopped = true; return; }
+                i = close;
+                continue;
+            }
+
+            
+            if (second == "connect" || second == "(connect)") {
+                std::string target;
+                if (second == "(connect)") {
+                    if (tokens.size() >= 3) target = tokens[2];
+                } else {
+                    target = parenContent(line);
+                }
+                if (target.empty() && tokens.size() >= 3) target = tokens[2];
+                if (target.size() >= 2 && target.front() == '(' && target.back() == ')')
+                    target = target.substr(1, target.size() - 2);
+                if (target.empty()) { reportError(i + 1, "use add connect (file.trg)"); continue; }
+                bool pathValid = false;
+                const std::filesystem::path connectedPath = projectExistingFile(target, pathValid);
+                if (!pathValid) { reportError(i + 1, "connected file must stay inside the TRG project folder", target); continue; }
+                if (executedFileKeys.count(lower(canonicalProjectPath(connectedPath).u8string()))) continue;
+                static thread_local unsigned connectDepth = 0;
+                if (connectDepth >= 16) { reportError(i + 1, "connect depth exceeded", target); continue; }
+                std::ifstream connectedFile(connectedPath, std::ios::binary);
+                if (!connectedFile) { reportError(i + 1, "could not open connected file", target); continue; }
+                const std::vector<std::string> connectedProgram = mergePrograms(readProgram(connectedFile), connectedPath, false, true, currentSourcePath);
+                LibraryState connectedLibraries;
+                scanLibraries(connectedProgram, connectedLibraries);
+                filesEnabled = filesEnabled || connectedLibraries.files;
+                jsonEnabled = jsonEnabled || connectedLibraries.json;
+                databaseEnabled = databaseEnabled || connectedLibraries.database;
+                webEnabled = webEnabled || connectedLibraries.web;
+                collisionEnabled = collisionEnabled || connectedLibraries.collision;
+                physicsEnabled = physicsEnabled || connectedLibraries.physics;
+                aiEnabled = aiEnabled || connectedLibraries.ai;
+                mathEnabled = mathEnabled || connectedLibraries.math;
+            binaryEnabled = binaryEnabled || connectedLibraries.binary;
+            regexEnabled = regexEnabled || connectedLibraries.regex;
+            compressionEnabled = compressionEnabled || connectedLibraries.compression;
+                powershellEnabled = powershellEnabled || connectedLibraries.powershell;
+                raspberryEnabled = raspberryEnabled || connectedLibraries.raspberry;
+                accessibilityEnabled = accessibilityEnabled || connectedLibraries.accessibility;
+                timeEnabled = timeEnabled || connectedLibraries.time;
+                convertEnabled = convertEnabled || connectedLibraries.convert;
+                statsEnabled = statsEnabled || connectedLibraries.stats;
+                unitsEnabled = unitsEnabled || connectedLibraries.units;
+                if (connectedLibraries.controls) initializeControls(variables, types);
+                registerFunctions(connectedProgram, false);
+                ++connectDepth;
+                Flow inner;
+                executeBlock(connectedProgram, 0, connectedProgram.size(), variables, types, defaults, inner,
+                             manualMode || connectedLibraries.manual, uiMode || connectedLibraries.ui);
+                --connectDepth;
+                if (inner.stopped) { flow.stopped = true; return; }
+                continue;
+            }
+
+            
+            if (tokens.size() == 2 && tokens[1].size() >= 6 &&
+                tokens[1].front() == '(' && tokens[1].back() == ')') {
+                const std::string moduleName = tokens[1].substr(1, tokens[1].size() - 2);
+                const std::string moduleLower = lower(moduleName);
+                if (moduleLower.size() >= 4 && moduleLower.compare(moduleLower.size() - 4, 4, ".trg") == 0) {
+                    static thread_local unsigned includeDepth = 0;
+                    if (includeDepth >= 16) { reportError(i + 1, "module include depth exceeded", tokens[1]); continue; }
+                    bool pathValid = false;
+                    const std::filesystem::path modulePath = projectExistingFile(moduleName, pathValid);
+                    if (!pathValid) { reportError(i + 1, "module must be inside the TRG project folder", moduleName); continue; }
+                    std::ifstream module(modulePath, std::ios::binary);
+                    if (!module) { reportError(i + 1, "could not open TRG module", moduleName); continue; }
+                    const std::vector<std::string> moduleProgram = readProgram(module);
+                    LibraryState moduleLibraries;
+                    scanLibraries(moduleProgram, moduleLibraries);
+                    filesEnabled = filesEnabled || moduleLibraries.files;
+                    jsonEnabled = jsonEnabled || moduleLibraries.json;
+                    databaseEnabled = databaseEnabled || moduleLibraries.database;
+                    webEnabled = webEnabled || moduleLibraries.web;
+                    collisionEnabled = collisionEnabled || moduleLibraries.collision;
+                    physicsEnabled = physicsEnabled || moduleLibraries.physics;
+                    aiEnabled = aiEnabled || moduleLibraries.ai;
+                    mathEnabled = mathEnabled || moduleLibraries.math;
+                    binaryEnabled = binaryEnabled || moduleLibraries.binary;
+                    regexEnabled = regexEnabled || moduleLibraries.regex;
+                    compressionEnabled = compressionEnabled || moduleLibraries.compression;
+                    powershellEnabled = powershellEnabled || moduleLibraries.powershell;
+                    raspberryEnabled = raspberryEnabled || moduleLibraries.raspberry;
+                    accessibilityEnabled = accessibilityEnabled || moduleLibraries.accessibility;
+                    timeEnabled = timeEnabled || moduleLibraries.time;
+                    convertEnabled = convertEnabled || moduleLibraries.convert;
+                    statsEnabled = statsEnabled || moduleLibraries.stats;
+                    unitsEnabled = unitsEnabled || moduleLibraries.units;
+                    if (moduleLibraries.controls) initializeControls(variables, types);
+                    registerFunctions(moduleProgram, false);
+                    ++includeDepth;
+                    Flow moduleFlow;
+                    executeBlock(moduleProgram, 0, moduleProgram.size(), variables, types, defaults, moduleFlow,
+                                 manualMode || moduleLibraries.manual, uiMode || moduleLibraries.ui);
+                    --includeDepth;
+                    if (moduleFlow.stopped) { flow.stopped = true; return; }
+                    continue;
+                }
+            }
+
+            
+            if (tokens.size() == 2 && tokens[1].size() >= 3 &&
+                tokens[1].front() == '(' && tokens[1].back() == ')') {
+                const std::string library = lower(tokens[1]);
+                if (library == "(files)") { filesEnabled = true; appendOutput("TRG files library enabled.\r\n"); continue; }
+                if (library == "(json)") { jsonEnabled = true; appendOutput("TRG JSON library enabled.\r\n"); continue; }
+                if (library == "(database)" || library == "(db)") { databaseEnabled = true; appendOutput("TRG Database library enabled.\r\n"); continue; }
+                if (library == "(web)") { webEnabled = true; appendOutput("TRG WebAssembly commands enabled.\r\n"); continue; }
+                if (library == "(collision)") { collisionEnabled = true; appendOutput("TRG collision helpers enabled.\r\n"); continue; }
+                if (library == "(physics)") { physicsEnabled = true; appendOutput("TRG physics library enabled.\r\n"); continue; }
+                if (library == "(manual)") { manualMode = true; continue; }
+                if (library == "(ui)" || library == "(animation)") { uiMode = true; continue; }
+                if (library == "(controls)") { initializeControls(variables, types); continue; }
+                if (library == "(network)") { networkEnabled = true; appendOutput("TRG network library enabled.\r\n"); continue; }
+                if (library == "(ai)") { aiEnabled = true; appendOutput("TRG AI library enabled.\r\n"); continue; }
+                if (library == "(math)") { mathEnabled = true; appendOutput("TRG math library enabled.\r\n"); continue; }
+                if (library == "(binary)") { binaryEnabled = true; appendOutput("TRG binary library enabled.\r\n"); continue; }
+                if (library == "(regex)") { regexEnabled = true; appendOutput("TRG regex library enabled.\r\n"); continue; }
+                if (library == "(compression)") { compressionEnabled = true; appendOutput("TRG compression library enabled.\r\n"); continue; }
+                if (library == "(powershell)") { powershellEnabled = true; appendOutput("TRG PowerShell library enabled.\r\n"); continue; }
+                if (library == "(raspberry)") { raspberryEnabled = true; appendOutput("TRG Raspberry library enabled.\r\n"); continue; }
+                if (library == "(accessibility)") { accessibilityEnabled = true; appendOutput("TRG accessibility library enabled.\r\n"); continue; }
+                if (library == "(time)") { timeEnabled = true; appendOutput("TRG time library enabled.\r\n"); continue; }
+                if (library == "(convert)") { convertEnabled = true; appendOutput("TRG convert library enabled.\r\n"); continue; }
+                if (library == "(stats)") { statsEnabled = true; appendOutput("TRG stats library enabled.\r\n"); continue; }
+                if (library == "(units)") { unitsEnabled = true; appendOutput("TRG units library enabled.\r\n"); continue; }
+                if (library == "(all)") {
+                    filesEnabled = jsonEnabled = databaseEnabled = webEnabled = collisionEnabled = physicsEnabled = networkEnabled = aiEnabled = mathEnabled = true;
+                    binaryEnabled = regexEnabled = compressionEnabled = true;
+                    powershellEnabled = raspberryEnabled = accessibilityEnabled = true;
+                    statsEnabled = unitsEnabled = true;
+                    initializeControls(variables, types);
+                    manualMode = true;
+                    uiMode = true;
+                    appendOutput("All built-in TRG libraries enabled.\r\n");
+                    continue;
+                }
+                reportError(i + 1, "unknown library", tokens[1]);
+                continue;
+            }
+
+            
+            if (!line.empty() && (line.back() == '(' || line.back() == '{')) {
+                if (line.back() == '(') {
+                    std::size_t open = 0, close = 0;
+                    if (findBlock(program, i, end, open, close)) i = close;
+                }
+                reportError(i + 1, "libraries apply to the whole file; use add (json) without a block");
+                continue;
+            }
+        }
+
+        
+        if (cmd == "run") {
+            std::string target = parenContent(line);
+            if (target.empty() && tokens.size() >= 2) {
+                target = tokens[1];
+                if (target.size() >= 2 && target.front() == '(' && target.back() == ')')
+                    target = target.substr(1, target.size() - 2);
+            }
+            if (target.empty()) { reportError(i + 1, "use run (file.trg)"); continue; }
+            bool pathValid = false;
+            const std::filesystem::path runPath = projectExistingFile(target, pathValid);
+            if (!pathValid) { reportError(i + 1, "run target must stay inside the TRG project folder", target); continue; }
+            const std::string runKey = lower(canonicalProjectPath(runPath).u8string());
+            
+            
+            
+            if (activeRunFiles.count(runKey)) continue;
+            static thread_local unsigned runDepth = 0;
+            if (runDepth >= 16) { reportError(i + 1, "run depth exceeded", target); continue; }
+            std::ifstream runFile(runPath, std::ios::binary);
+            if (!runFile) { reportError(i + 1, "could not open file to run", target); continue; }
+            const std::vector<std::string> source = readProgram(runFile);
+            std::vector<std::string> runProgram;
+            if (executedFileKeys.count(runKey)) {
+                
+                
+                std::vector<std::string> kept, globals, connects;
+                std::unordered_set<std::string> seen;
+                stripProjectDirectives(source, kept, globals, connects, true, &seen);
+                runProgram = std::move(kept);
+            } else {
+                runProgram = mergePrograms(source, runPath, false, true, currentSourcePath);
+            }
+            LibraryState runLibraries;
+            scanLibraries(runProgram, runLibraries);
+            filesEnabled = filesEnabled || runLibraries.files;
+            jsonEnabled = jsonEnabled || runLibraries.json;
+            databaseEnabled = databaseEnabled || runLibraries.database;
+            webEnabled = webEnabled || runLibraries.web;
+            collisionEnabled = collisionEnabled || runLibraries.collision;
+            if (runLibraries.controls) initializeControls(variables, types);
+            registerFunctions(runProgram, false);
+            ++runDepth;
+            activeRunFiles.insert(runKey);
+            Flow inner;
+            executeBlock(runProgram, 0, runProgram.size(), variables, types, defaults, inner,
+                         manualMode || runLibraries.manual, uiMode || runLibraries.ui);
+            activeRunFiles.erase(runKey);
+            --runDepth;
+            if (inner.stopped) { flow.stopped = true; return; }
+            continue;
+        }
+
+        
+        if (cmd == "database" || cmd == "db" || cmd == "table" || cmd == "record" || cmd == "query" || cmd == "sql") {
+            if (!databaseEnabled) { reportError(i + 1, "database commands need add (database)"); continue; }
+            const std::string action = tokens.size() > 1 ? lower(tokens[1]) : "";
+            std::string dbError;
+            if (cmd == "database" || cmd == "db") {
+                if (action == "open" && tokens.size() == 3) {
+                    bool validPath = false;
+                    const auto path = projectFilePath(valueFor(tokens[2], variables), validPath);
+                    if (!validPath) { reportError(i + 1, "database path must stay inside the TRG project folder", tokens[2]); continue; }
+                    if (std::filesystem::exists(path)) {
+                        if (!loadTrgDatabase(path, dbError)) { reportError(i + 1, dbError, tokens[2]); continue; }
+                    } else {
+                        trgDatabaseTables.clear(); trgDatabasePath = path;
+                        if (!saveTrgDatabase(dbError)) { reportError(i + 1, dbError, tokens[2]); continue; }
+                    }
+                    appendOutput("Database opened: " + path.filename().u8string() + "\r\n");
+                } else if (action == "save" && tokens.size() == 2) {
+                    if (!saveTrgDatabase(dbError)) reportError(i + 1, dbError);
+                    else appendOutput("Database saved.\r\n");
+                } else if (action == "close" && tokens.size() == 2) {
+                    trgDatabaseTables.clear(); trgDatabasePath.clear(); appendOutput("Database closed.\r\n");
+                } else if (action == "tables" && tokens.size() == 2) {
+                    std::vector<std::string> names;
+                    for (const auto& item : trgDatabaseTables) names.push_back(item.first);
+                    std::sort(names.begin(), names.end());
+                    for (const auto& name : names) appendOutput(name + "\r\n");
+                    variables["database_table_count"] = static_cast<double>(names.size()); types["database_table_count"] = "num";
+                } else reportError(i + 1, "use database open FILE, database save, database close, or database tables");
+                continue;
+            }
+            if (trgDatabasePath.empty()) { reportError(i + 1, "open a database first with database open FILE"); continue; }
+            if (cmd == "table") {
+                if (action == "create" && tokens.size() >= 4) {
+                    const std::string name = valueFor(tokens[2], variables);
+                    if (!validName(name) || trgDatabaseTables.count(name)) { reportError(i + 1, "table name is invalid or already exists", name); continue; }
+                    TrgDatabaseTable table; bool valid = true;
+                    for (std::size_t n = 3; n < tokens.size(); ++n) {
+                        const std::string column = valueFor(tokens[n], variables);
+                        if (!validName(column) || std::find(table.columns.begin(), table.columns.end(), column) != table.columns.end()) { valid = false; break; }
+                        table.columns.push_back(column);
+                    }
+                    if (!valid) { reportError(i + 1, "table columns must be unique valid names"); continue; }
+                    trgDatabaseTables.emplace(name, std::move(table));
+                    if (!saveTrgDatabase(dbError)) reportError(i + 1, dbError);
+                    else appendOutput("Created table " + name + ".\r\n");
+                } else if (action == "delete" && tokens.size() == 3) {
+                    if (!trgDatabaseTables.erase(valueFor(tokens[2], variables))) reportError(i + 1, "unknown table", tokens[2]);
+                    else if (!saveTrgDatabase(dbError)) reportError(i + 1, dbError);
+                } else if (action == "count" && tokens.size() == 4 && validName(tokens[3])) {
+                    const auto found = trgDatabaseTables.find(valueFor(tokens[2], variables));
+                    if (found == trgDatabaseTables.end()) { reportError(i + 1, "unknown table", tokens[2]); continue; }
+                    variables[tokens[3]] = static_cast<double>(found->second.rows.size()); types[tokens[3]] = "num";
+                } else reportError(i + 1, "use table create NAME COLUMN... | table delete NAME | table count NAME RESULT");
+                continue;
+            }
+            if (cmd == "record") {
+                if (action == "add" && tokens.size() >= 5 && (tokens.size() - 3) % 2 == 0) {
+                    const auto found = trgDatabaseTables.find(valueFor(tokens[2], variables));
+                    if (found == trgDatabaseTables.end()) { reportError(i + 1, "unknown table", tokens[2]); continue; }
+                    std::vector<std::string> row(found->second.columns.size()); bool valid = true;
+                    for (std::size_t n = 3; n + 1 < tokens.size(); n += 2) {
+                        const auto col = databaseColumnIndex(found->second, valueFor(tokens[n], variables));
+                        if (col == found->second.columns.size()) { valid = false; break; }
+                        row[col] = valueFor(tokens[n + 1], variables);
+                    }
