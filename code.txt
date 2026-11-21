@@ -2188,6 +2188,11 @@ void registerFunctions(const std::vector<std::string>& program, bool clearFirst 
 }
 
 
+std::string databaseEncode(const std::string& value) { return value.empty() ? "-" : hexEncode(value); }
+bool databaseDecode(const std::string& encoded, std::string& value) {
+    if (encoded == "-") { value.clear(); return true; }
+    return hexDecode(encoded, value);
+}
 std::size_t databaseColumnIndex(const TrgDatabaseTable& table, const std::string& name) {
     const auto found = std::find(table.columns.begin(), table.columns.end(), name);
     return found == table.columns.end() ? table.columns.size() : static_cast<std::size_t>(found - table.columns.begin());
@@ -2203,11 +2208,11 @@ bool saveTrgDatabase(std::string& error) {
     std::sort(names.begin(), names.end());
     for (const auto& name : names) {
         const auto& table = trgDatabaseTables.at(name);
-        out << "T\t" << hexEncode(name) << "\t" << table.columns.size() << "\t" << table.rows.size() << "\n";
-        for (const auto& column : table.columns) out << "C\t" << hexEncode(column) << "\n";
+        out << "T\t" << databaseEncode(name) << "\t" << table.columns.size() << "\t" << table.rows.size() << "\n";
+        for (const auto& column : table.columns) out << "C\t" << databaseEncode(column) << "\n";
         for (const auto& row : table.rows) {
             out << "R";
-            for (const auto& cell : row) out << "\t" << hexEncode(cell);
+            for (const auto& cell : row) out << "\t" << databaseEncode(cell);
             out << "\n";
         }
     }
@@ -2229,7 +2234,7 @@ bool loadTrgDatabase(const std::filesystem::path& path, std::string& error) {
         while (std::getline(stream, part, '\t')) parts.push_back(part);
         if (parts.size() != 4 || parts[0] != "T") { error = "corrupt database table header"; return false; }
         std::string name;
-        if (!hexDecode(parts[1], name) || name.empty()) { error = "corrupt database table name"; return false; }
+        if (!databaseDecode(parts[1], name) || name.empty()) { error = "corrupt database table name"; return false; }
         std::size_t columns = 0, rows = 0;
         try { columns = static_cast<std::size_t>(std::stoull(parts[2])); rows = static_cast<std::size_t>(std::stoull(parts[3])); }
         catch (...) { error = "corrupt database dimensions"; return false; }
@@ -2238,7 +2243,7 @@ bool loadTrgDatabase(const std::filesystem::path& path, std::string& error) {
         for (std::size_t c = 0; c < columns; ++c) {
             if (!std::getline(in, line) || line.rfind("C\t", 0) != 0) { error = "corrupt database column"; return false; }
             std::string value;
-            if (!hexDecode(line.substr(2), value) || value.empty() ||
+            if (!databaseDecode(line.substr(2), value) || value.empty() ||
                 std::find(table.columns.begin(), table.columns.end(), value) != table.columns.end()) { error = "invalid or duplicate database column"; return false; }
             table.columns.push_back(std::move(value));
         }
@@ -2250,7 +2255,7 @@ bool loadTrgDatabase(const std::filesystem::path& path, std::string& error) {
             std::vector<std::string> values;
             while (std::getline(cellsStream, cell, '\t')) {
                 std::string value;
-                if (!hexDecode(cell, value)) { error = "corrupt database value"; return false; }
+                if (!databaseDecode(cell, value)) { error = "corrupt database value"; return false; }
                 values.push_back(std::move(value));
             }
             if (values.size() != columns) { error = "database record has the wrong number of fields"; return false; }
@@ -5410,9 +5415,10 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             L"AI: add (ai); ai create, teach, train, predict, classify\n"
             L"FILES: add (files); read_file, write_file, append_file, file_exists\n"
             L"JSON: add (json); json GROUP clean RESULT / compressed RESULT\n"
+            L"DATABASE: add (database); database open/save; table create; record add/get/update/delete; query\n"
             L"UI: add (ui); text, button, rectangle, circle, image, animate\n\n"
             L"Blocks use parentheses: if score > 0 ( ... )\n"
-            L"Libraries are file-wide: add (math), add (ai), add (json), add (all).";
+            L"Libraries are file-wide: add (math), add (ai), add (json), add (database), add (all).";
         MessageBoxW(window, dictionary, L"TRG - Command Dictionary", MB_OK | MB_ICONINFORMATION);
         return 0;
     }
