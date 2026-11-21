@@ -1,0 +1,1750 @@
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <unordered_map>
+#include <unordered_set>
+#include <functional>
+#include <cmath>
+#include <random>
+#include <iomanip>
+#include <algorithm>
+#include <cctype>
+#include <chrono>
+#include <cstdint>
+#include <filesystem>
+#include <limits>
+#include <map>
+#include <numeric>
+#include <ctime>
+#include <system_error>
+#include <cstring>
+#include <cstdio>
+#include <cstdlib>
+#include <cwchar>
+#include <cwctype>
+#include <variant>
+#include <thread>
+#include <atomic>
+#include <mutex>
+#include <stdexcept>
+#include <memory>
+#include <array>
+#include <deque>
+#include <regex>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <winhttp.h>
+#pragma comment(lib, "winhttp.lib")
+#endif
+
+// The current runtime exposes Bluetooth extension declarations but does not
+// call platform Bluetooth APIs directly. Avoid requiring platform-specific
+// Bluetooth development headers just to build the interpreter.
+
+#if defined(_WIN32)
+#define TRG_NETWORK_DLL_EXPORT __declspec(dllexport)
+#define TRG_BLUETOOTH_DLL_EXPORT __declspec(dllexport)
+#else
+#define TRG_NETWORK_DLL_EXPORT __attribute__((visibility("default")))
+#define TRG_BLUETOOTH_DLL_EXPORT __attribute__((visibility("default")))
+#endif
+
+#include <string>
+
+TRG_NETWORK_DLL_EXPORT std::string httpGet(const std::string& url, std::string& error);
+TRG_NETWORK_DLL_EXPORT std::string httpPost(const std::string& url, const std::string& body, std::string& error);
+extern TRG_NETWORK_DLL_EXPORT bool networkEnabled;
+
+TRG_BLUETOOTH_DLL_EXPORT bool bluetoothConnect(std::string deviceAddress);
+TRG_BLUETOOTH_DLL_EXPORT int bluetoothSend(std::string data);
+TRG_BLUETOOTH_DLL_EXPORT std::string bluetoothReceive();
+TRG_BLUETOOTH_DLL_EXPORT bool bluetoothAvailable();
+TRG_BLUETOOTH_DLL_EXPORT std::string bluetoothGetLocalAddress();
+TRG_BLUETOOTH_DLL_EXPORT bool bluetoothEnabled = false;
+TRG_BLUETOOTH_DLL_EXPORT std::vector<std::string> bluetoothDevices;
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <commdlg.h>
+#include <shellapi.h>
+#include <gdiplus.h>
+#include <richedit.h>
+#include "resource.h"
+#elif defined(__ANDROID__)
+#include <jni.h>
+#define VK_SPACE 0x20
+#define VK_RETURN 0x0D
+#define VK_ESCAPE 0x1B
+#define VK_TAB 0x09
+#define VK_SHIFT 0x10
+#define VK_CONTROL 0x11
+#define VK_MENU 0x12
+#define VK_LEFT 0x25
+#define VK_UP 0x26
+#define VK_RIGHT 0x27
+#define VK_DOWN 0x28
+#define VK_F1 0x70
+#define VK_NUMPAD0 0x60
+#define VK_BACK 0x08
+#define VK_DELETE 0x2E
+#define VK_INSERT 0x2D
+#define VK_HOME 0x24
+#define VK_END 0x23
+#define VK_PRIOR 0x21
+#define VK_NEXT 0x22
+#define VK_CAPITAL 0x14
+#define VK_NUMLOCK 0x90
+#define VK_SCROLL 0x91
+#define VK_SNAPSHOT 0x2C
+#define VK_PAUSE 0x13
+#define VK_LWIN 0x5B
+#define VK_RWIN 0x5C
+#define VK_APPS 0x5D
+#define VK_ADD 0x6B
+#define VK_SUBTRACT 0x6D
+#define VK_MULTIPLY 0x6A
+#define VK_DIVIDE 0x6F
+#define VK_DECIMAL 0x6E
+#define VK_OEM_1 0xBA
+#define VK_OEM_PLUS 0xBB
+#define VK_OEM_COMMA 0xBC
+#define VK_OEM_MINUS 0xBD
+#define VK_OEM_PERIOD 0xBE
+#define VK_OEM_2 0xBF
+#define VK_OEM_3 0xC0
+#define VK_OEM_4 0xDB
+#define VK_OEM_5 0xDC
+#define VK_OEM_6 0xDD
+#define VK_OEM_7 0xDE
+#endif
+
+
+
+
+struct VariableValue {
+    std::variant<double, bool, std::string, std::vector<std::string>> value = std::string();
+    VariableValue() = default;
+    VariableValue(const std::string& text) : value(text) {}
+    VariableValue(std::string&& text) : value(std::move(text)) {}
+    VariableValue(const char* text) : value(std::string(text)) {}
+    VariableValue(double number) : value(number) {}
+    VariableValue(bool flag) : value(flag) {}
+    VariableValue(const std::vector<std::string>& items) : value(items) {}
+    VariableValue(std::vector<std::string>&& items) : value(std::move(items)) {}
+    VariableValue& operator=(const std::string& text) { value = text; return *this; }
+    VariableValue& operator=(std::string&& text) { value = std::move(text); return *this; }
+    VariableValue& operator=(const char* text) { value = std::string(text); return *this; }
+    VariableValue& operator=(double number) { value = number; return *this; }
+    VariableValue& operator=(bool flag) { value = flag; return *this; }
+    VariableValue& operator=(const std::vector<std::string>& items) { value = items; return *this; }
+    VariableValue& operator=(std::vector<std::string>&& items) { value = std::move(items); return *this; }
+    operator std::string() const {
+        if (const auto* text = std::get_if<std::string>(&value)) return *text;
+        if (const auto* number = std::get_if<double>(&value)) { std::ostringstream out; out << std::setprecision(15) << *number; return out.str(); }
+        if (const auto* flag = std::get_if<bool>(&value)) return *flag ? "true" : "false";
+        std::string joined;
+        for (const auto& item : std::get<std::vector<std::string>>(value)) {
+            if (!joined.empty()) joined += ", ";
+            joined += item;
+        }
+        return joined;
+    }
+    void clear() { value = std::string(); }
+};
+using Vars = std::unordered_map<std::string, VariableValue>;
+using Types = std::unordered_map<std::string, std::string>;
+
+struct Flow {
+    bool broke = false;
+    bool continued = false;
+    bool stopped = false;
+};
+
+struct EveryTask {
+    std::vector<std::string> body;
+    std::chrono::milliseconds interval{1000};
+    std::chrono::steady_clock::time_point nextRun;
+    bool manualMode = false;
+    bool uiMode = false;
+};
+
+struct CollisionWatch { std::string first; std::string second; std::string result; };
+
+struct PhysicsBody {
+    std::string name;
+    double vx = 0;
+    double vy = 0;
+    double gravity = 0;
+    double drag = 0;
+    double restitution = 1.0;
+    bool dynamic = true;
+    bool solid = true;
+    bool trigger = false;
+    bool frozen = false;
+    bool dragLaunch = false;
+    bool dragLaunching = false;
+    bool launched = false;
+    double launchSpeedLimit = 70.0;
+    double dragStartX = 0;
+    double dragStartY = 0;
+    std::string triggerKind;
+    std::string gravityDirection = "none";
+    double speedMultiplier = 1.0;
+    double launchPowerMultiplier = 1.0;
+    double ballSizeMultiplier = 1.0;
+    bool midAirLaunch = false;
+    bool immortal = false;
+    int lives = 1;
+    double spawnX = 0;
+    double spawnY = 0;
+    bool triggerStarts = false;
+    bool triggerRepeats = false;
+    bool triggerHasActivated = false;
+    int bounceCount = 0;
+};
+
+struct AiSample { std::vector<double> inputs; double expected = 0; };
+struct AiModel { std::vector<double> weights; double bias = 0; std::vector<AiSample> samples; };
+
+struct UserFunction {
+    std::string name;
+    std::vector<std::string> params;
+    std::vector<std::string> body;
+};
+
+struct UiBlock {
+    std::string name;
+    std::string group;
+    std::string color;
+    std::string shape = "square";
+    std::string glowColor = "";
+    double glowIntensity = 0;
+    int z = 0;
+    double x = 0;
+    double y = 0;
+    double width = 100;
+    double height = 100;
+    double cornerRadius = 0;
+    double opacity = 1.0;
+    bool visible = true;
+};
+
+struct Ui3DObject {
+    std::string name;
+    std::string group;
+    std::string shape = "box";
+    std::string color = "#8B5CF6";
+    double x = 0, y = 0, z = 0;
+    double width = 2, height = 2, depth = 2;
+    double rotateX = 0, rotateY = 0, rotateZ = 0;
+    double opacity = 1.0;
+    bool visible = true;
+};
+
+struct UiSprite {
+    std::string name;
+    std::string group;
+    std::string path;
+    double x = 0;
+    double y = 0;
+    double width = 10;
+    double height = 10;
+    double opacity = 1.0;
+    bool visible = true;
+};
+
+struct StructField { std::string type; std::string initial; };
+using StructDefinition = std::unordered_map<std::string, StructField>;
+
+struct UiAnimation {
+    std::string name;
+    double startX = 0;
+    double startY = 0;
+    double dx = 0;
+    double dy = 0;
+    double startTime = 0;
+    double duration = 0;
+    int fps = 60;
+};
+
+struct UiButton {
+    std::string name;
+    std::string group;
+    std::string label;
+    double x = 0;
+    double y = 0;
+    double width = 20;
+    double height = 10;
+    std::string color = "#7043BE";
+    std::string textColor = "#FFFFFF";
+    std::string font = "sans";
+    double opacity = 1.0;
+    double cornerRadius = 7;
+    double textSize = 0.34;
+    bool textBold = true;
+    bool visible = true;
+    std::vector<std::string> body;
+};
+
+struct UiText {
+    std::string name;
+    std::string group;
+    std::string value;
+    std::string color;
+    std::string font = "sans";
+    std::string align = "left";
+    double x = 0;
+    double y = 0;
+    double size = 5;
+    double opacity = 1.0;
+    bool bold = true;
+    bool visible = true;
+};
+
+struct UiGroup { std::string name; bool visible = false; std::string parent = "default"; };
+
+using Defaults = std::unordered_map<std::string, std::string>;
+
+std::unordered_map<std::string, UserFunction> userFunctions;
+std::vector<UiBlock> uiBlocks;
+std::vector<Ui3DObject> ui3DObjects;
+int uiAutoNameCounter = 1;
+int threeDAutoNameCounter = 1;
+std::vector<UiSprite> uiSprites;
+std::vector<UiAnimation> uiAnimations;
+std::vector<EveryTask> everyTasks;
+std::vector<CollisionWatch> collisionWatches;
+std::unordered_map<std::string, PhysicsBody> physicsBodies;
+std::unordered_map<std::string, AiModel> aiModels;
+std::vector<UiButton> uiButtons;
+std::vector<UiText> uiTexts;
+std::vector<UiGroup> uiGroups;
+std::string currentUiGroup = "default";
+std::unordered_map<std::string, StructDefinition> userStructs;
+std::vector<std::string> uiProgram;
+std::filesystem::path projectRoot = std::filesystem::current_path();
+bool filesEnabled = false;
+bool jsonEnabled = false;
+struct TrgDatabaseTable { std::vector<std::string> columns; std::vector<std::vector<std::string>> rows; };
+std::unordered_map<std::string, TrgDatabaseTable> trgDatabaseTables;
+std::filesystem::path trgDatabasePath;
+bool databaseEnabled = false;
+std::vector<std::string> groupStack;
+std::vector<std::unordered_set<std::string>> groupSnapshots;
+std::unordered_map<std::string, std::vector<std::string>> variableGroups;
+std::unordered_set<std::string> executedFileKeys;
+std::unordered_set<std::string> activeRunFiles;
+Vars uiVariables;
+Types uiTypes;
+Defaults uiDefaults;
+std::unordered_map<std::string, int> keyboardControls;
+std::unordered_map<std::string, unsigned> controllerControls;
+bool controlsEnabled = false;
+bool webEnabled = false;
+bool collisionEnabled = false;
+bool physicsEnabled = false;
+bool aiEnabled = false;
+bool mathEnabled = false;
+bool binaryEnabled = false;
+bool regexEnabled = false;
+bool compressionEnabled = false;
+bool timeEnabled = false;
+bool convertEnabled = false;
+bool statsEnabled = false;
+bool unitsEnabled = false;
+bool threeDEnabled = false;
+std::string webPageHtml;
+std::vector<std::string> readProgram(std::istream& source);
+std::size_t errorCount = 0;
+std::chrono::steady_clock::time_point uiStart;
+std::mt19937 trgRandomEngine(std::random_device{}());
+bool uiEntityBounds(const std::string& name, double& x, double& y, double& width, double& height);
+void refreshCollisionWatches(Vars& variables, Types& types);
+void physicsStep(double seconds, Vars& variables, Types& types);
+bool setUiEntityPosition(const std::string& name, double x, double y);
+
+// ---------------------------------------------------------
+// New features: particles, viewport, network, shapes, glows
+// ---------------------------------------------------------
+struct Particle {
+    std::string name;
+    double x = 0, y = 0;
+    double vx = 0, vy = 0;
+    double life = 0;
+    double maxLife = 0;
+    std::string color = "#FFFFFF";
+    double size = 4;
+    bool active = true;
+};
+
+std::vector<Particle> particles;
+double viewportX = 0;
+double viewportY = 0;
+bool networkEnabled = false;
+bool powershellEnabled = false;
+bool raspberryEnabled = false;
+bool accessibilityEnabled = false;
+
+struct HttpRequest {
+    std::string method;
+    std::string url;
+    std::string body;
+    std::string resultVar;
+};
+
+std::vector<HttpRequest> pendingHttpRequests;
+
+std::string httpGet(const std::string& url, std::string& error);
+std::string httpPost(const std::string& url, const std::string& body, std::string& error);
+
+// Shared by the Windows editor, Android editor bridge, and project-relative commands.
+std::filesystem::path currentSourcePath;
+
+bool uiGroupIsVisible(const std::string& name) {
+    if (name.empty() || name == "default") return true;
+    const auto group = std::find_if(uiGroups.begin(), uiGroups.end(), [&](const UiGroup& item) {
+        return item.name == name;
+    });
+    return group != uiGroups.end() && group->visible && uiGroupIsVisible(group->parent);
+}
+
+bool uiNameIsVisible(const std::string& name) {
+    for (const UiBlock& item : uiBlocks) if (item.name == name) return item.visible && uiGroupIsVisible(item.group);
+    for (const UiSprite& item : uiSprites) if (item.name == name) return item.visible && uiGroupIsVisible(item.group);
+    for (const UiButton& item : uiButtons) if (item.name == name) return item.visible && uiGroupIsVisible(item.group);
+    for (const UiText& item : uiTexts) if (item.name == name) return item.visible && uiGroupIsVisible(item.group);
+    return false;
+}
+
+#ifdef __ANDROID__
+extern std::string androidOutput;
+extern jobject trgActivity;
+extern std::unordered_map<std::string, std::string> androidMobileInputs;
+extern std::atomic<bool> androidStopRequested;
+extern std::mutex androidInputMutex;
+std::string trgAskAndroid(const std::string& prompt, bool& accepted);
+void trgStudioActionAndroid(const std::string& action);
+#endif
+
+#ifdef _WIN32
+HWND mainWindow = nullptr;
+HWND inputControl = nullptr;
+HFONT openButtonFont = nullptr;
+HFONT codeEditorFont = nullptr;
+HMODULE richEditModule = nullptr;
+bool inputFinished = false;
+bool inputAccepted = false;
+bool loadingEditorText = false;
+bool highlightingEditor = false;
+bool editorDirty = false;
+bool previewMode = false;
+std::string inputResult;
+constexpr int openButtonId = 101;
+constexpr int inputEditId = 201;
+constexpr int inputButtonId = 202;
+constexpr int saveButtonId = 102;
+constexpr int runButtonId = 103;
+constexpr int previewButtonId = 104;
+constexpr int newButtonId = 105;
+constexpr int buildButtonId = 106;
+constexpr int dictionaryButtonId = 107;
+constexpr int editor2DButtonId = 108;
+constexpr int editor3DButtonId = 109;
+constexpr int codeEditorId = 301;
+HWND openButton = nullptr;
+HWND saveButton = nullptr;
+HWND runButton = nullptr;
+HWND previewButton = nullptr;
+HWND newButton = nullptr;
+HWND buildButton = nullptr;
+HWND dictionaryButton = nullptr;
+HWND editor2DButton = nullptr;
+HWND editor3DButton = nullptr;
+HWND codeEditor = nullptr;
+std::wstring desktopPreviousSource;
+std::filesystem::path desktopPreviousPath;
+bool desktopPreviousDirty = false;
+bool desktopVisualEditorActive = false;
+std::wstring inputPrompt;
+std::wstring outputBuffer;
+ULONG_PTR gdiplusToken = 0;
+std::unordered_map<std::string, std::unique_ptr<Gdiplus::Image>> desktopSpriteCache;
+
+bool runSourceFile(const std::filesystem::path& path);
+bool loadSourceFile(const std::filesystem::path& path);
+bool saveSourceFile();
+bool runEditorSource();
+void applyEditorSyntaxHighlighting();
+bool launchDesktopVisualEditor(const std::string& fileName);
+bool returnFromDesktopVisualEditor();
+
+int windowDpi(HWND window) {
+    using GetDpiForWindowFunction = UINT (WINAPI*)(HWND);
+    static const auto getDpiForWindow = reinterpret_cast<GetDpiForWindowFunction>(
+        GetProcAddress(GetModuleHandleW(L"user32.dll"), "GetDpiForWindow"));
+    return getDpiForWindow ? static_cast<int>(getDpiForWindow(window)) : 96;
+}
+
+int scaleForDpi(HWND window, int value) {
+    return MulDiv(value, windowDpi(window), 96);
+}
+
+int systemDpi() {
+    using GetDpiForSystemFunction = UINT (WINAPI*)();
+    static const auto getDpiForSystem = reinterpret_cast<GetDpiForSystemFunction>(
+        GetProcAddress(GetModuleHandleW(L"user32.dll"), "GetDpiForSystem"));
+    if (getDpiForSystem) return static_cast<int>(getDpiForSystem());
+    HDC screen = GetDC(nullptr);
+    if (!screen) return 96;
+    const int dpi = GetDeviceCaps(screen, LOGPIXELSX);
+    ReleaseDC(nullptr, screen);
+    return dpi > 0 ? dpi : 96;
+}
+
+void enablePerMonitorDpiAwareness() {
+    using SetProcessDpiAwarenessContextFunction = BOOL (WINAPI*)(HANDLE);
+    static const auto setAwareness = reinterpret_cast<SetProcessDpiAwarenessContextFunction>(
+        GetProcAddress(GetModuleHandleW(L"user32.dll"), "SetProcessDpiAwarenessContext"));
+    if (setAwareness && setAwareness(reinterpret_cast<HANDLE>(static_cast<INT_PTR>(-4)))) return;
+    SetProcessDPIAware();
+}
+
+void setOpenButtonFont(HWND window) {
+    if (openButtonFont) DeleteObject(openButtonFont);
+    openButtonFont = CreateFontW(scaleForDpi(window, 13), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+        DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+    const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton, buildButton, dictionaryButton, editor2DButton, editor3DButton};
+    if (openButtonFont) for (HWND button : buttons) if (button)
+        SendMessageW(button, WM_SETFONT, reinterpret_cast<WPARAM>(openButtonFont), TRUE);
+    if (codeEditorFont) DeleteObject(codeEditorFont);
+    codeEditorFont = CreateFontW(-scaleForDpi(window, 15), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+        FIXED_PITCH | FF_MODERN, L"Consolas");
+    if (codeEditor && codeEditorFont) SendMessageW(codeEditor, WM_SETFONT,
+        reinterpret_cast<WPARAM>(codeEditorFont), TRUE);
+}
+
+bool openSourceDialog(std::filesystem::path& path, HWND owner) {
+    wchar_t fileName[32768] = {};
+    OPENFILENAMEW dialog = {};
+    dialog.lStructSize = sizeof(dialog);
+    dialog.hwndOwner = owner;
+    dialog.lpstrFilter = L"TRG files (*.trg)\0*.trg\0All files (*.*)\0*.*\0";
+    dialog.lpstrFile = fileName;
+    dialog.nMaxFile = static_cast<DWORD>(sizeof(fileName) / sizeof(fileName[0]));
+    dialog.lpstrDefExt = L"trg";
+    dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+    if (!GetOpenFileNameW(&dialog)) return false;
+    path = std::filesystem::path(fileName);
+    return true;
+}
+
+bool saveSourceDialog(std::filesystem::path& path, HWND owner) {
+    wchar_t fileName[32768] = {};
+    if (!path.empty()) {
+        std::wcsncpy(fileName, path.c_str(), 32767);
+        fileName[32767] = L'\0';
+    }
+    OPENFILENAMEW dialog = {};
+    dialog.lStructSize = sizeof(dialog);
+    dialog.hwndOwner = owner;
+    dialog.lpstrFilter = L"TRG files (*.trg)\0*.trg\0Text files (*.txt)\0*.txt\0All files (*.*)\0*.*\0";
+    dialog.lpstrFile = fileName;
+    dialog.nMaxFile = static_cast<DWORD>(sizeof(fileName) / sizeof(fileName[0]));
+    dialog.lpstrDefExt = L"trg";
+    dialog.Flags = OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR | OFN_OVERWRITEPROMPT;
+    if (!GetSaveFileNameW(&dialog)) return false;
+    path = std::filesystem::path(fileName);
+    return true;
+}
+
+void layoutOutputControls(HWND window) {
+    RECT client = {};
+    GetClientRect(window, &client);
+    const LONG width = std::max<LONG>(0, client.right - client.left);
+    const LONG height = std::max<LONG>(0, client.bottom - client.top);
+    const LONG headerHeight = std::min<LONG>(scaleForDpi(window, 76),
+        std::max<LONG>(scaleForDpi(window, 48), height / 5));
+    const LONG gap = scaleForDpi(window, 5);
+    const LONG margin = scaleForDpi(window, 12);
+
+    if (previewMode) {
+        const HWND controls[] = {openButton, saveButton, runButton, newButton, buildButton,
+            dictionaryButton, editor2DButton, editor3DButton};
+        for (HWND control : controls) if (control) ShowWindow(control, SW_HIDE);
+        if (previewButton) {
+            SetWindowTextW(previewButton, L"Code");
+            const LONG buttonWidth = scaleForDpi(window, 76);
+            const LONG buttonHeight = scaleForDpi(window, 34);
+            MoveWindow(previewButton, std::max<LONG>(margin, width - margin - buttonWidth),
+                margin, buttonWidth, buttonHeight, TRUE);
+            ShowWindow(previewButton, SW_SHOW);
+            SetWindowPos(previewButton, HWND_TOP, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        }
+    } else {
+        const LONG available = std::max<LONG>(scaleForDpi(window, 9 * 48 + 8 * 5),
+            width - scaleForDpi(window, 170) - margin * 2);
+        const LONG buttonWidth = std::clamp<LONG>((available - gap * 8) / 9,
+            scaleForDpi(window, 48), scaleForDpi(window, 78));
+        const LONG buttonHeight = scaleForDpi(window, 34);
+        const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton,
+            buildButton, dictionaryButton, editor2DButton, editor3DButton};
+        LONG x = width - margin - (buttonWidth + gap) * 9 + gap;
+        const LONG y = std::max<LONG>(0, (headerHeight - buttonHeight) / 2);
+        for (HWND button : buttons) {
+            if (button) {
+                MoveWindow(button, x, y, buttonWidth, buttonHeight, TRUE);
+                ShowWindow(button, SW_SHOW);
+            }
+            x += buttonWidth + gap;
+        }
+        if (previewButton) SetWindowTextW(previewButton, L"Preview");
+    }
+
+    if (codeEditor) {
+        const LONG editorMargin = scaleForDpi(window, 10);
+        const LONG top = headerHeight + editorMargin;
+        const LONG outputMinimum = scaleForDpi(window, 80);
+        const LONG canvasMinimum = scaleForDpi(window, 100);
+        const LONG panelMinimum = std::min(height, headerHeight + canvasMinimum);
+        const LONG panelMaximum = std::max(panelMinimum, height - outputMinimum);
+        const LONG panelTop = std::clamp<LONG>(height * 65 / 100, panelMinimum, panelMaximum);
+        const LONG bottom = std::max<LONG>(top + 1, panelTop - editorMargin);
+        MoveWindow(codeEditor, editorMargin, top, std::max<LONG>(1, width - editorMargin * 2), bottom - top, TRUE);
+        ShowWindow(codeEditor, previewMode ? SW_HIDE : SW_SHOW);
+    }
+}
+
+std::wstring wideFromUtf8(const std::string& value) {
+    if (value.empty()) return std::wstring();
+    const int size = MultiByteToWideChar(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0);
+    if (size <= 0) return std::wstring(value.begin(), value.end());
+    std::wstring result(static_cast<std::size_t>(size), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), &result[0], size);
+    return result;
+}
+
+std::string utf8FromWide(const std::wstring& value) {
+    if (value.empty()) return std::string();
+    const int size = WideCharToMultiByte(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
+    if (size <= 0) return std::string(value.begin(), value.end());
+    std::string result(static_cast<std::size_t>(size), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, value.data(), static_cast<int>(value.size()), &result[0], size, nullptr, nullptr);
+    return result;
+}
+
+void updateEditorWindowTitle() {
+    if (!mainWindow) return;
+    std::wstring title = L"TRG Editor - ";
+    title += currentSourcePath.empty() ? L"Untitled.trg" : currentSourcePath.filename().wstring();
+    if (editorDirty) title += L" *";
+    SetWindowTextW(mainWindow, title.c_str());
+}
+
+bool confirmDiscardEditorChanges(HWND owner) {
+    if (!editorDirty) return true;
+    return MessageBoxW(owner, L"Discard unsaved changes to this TRG file?", L"Unsaved TRG code",
+                       MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) == IDYES;
+}
+
+void appendOutput(const std::string& text) {
+#ifdef TRG_TEST_CONSOLE
+    std::cout << text;
+#else
+    outputBuffer += wideFromUtf8(text);
+    if (outputBuffer.size() > 20000) {
+        const std::size_t cutoff = outputBuffer.find(L'\n', outputBuffer.size() - 15000);
+        if (cutoff != std::wstring::npos) outputBuffer.erase(0, cutoff + 1);
+    }
+    if (mainWindow) InvalidateRect(mainWindow, nullptr, FALSE);
+#endif
+}
+#else
+void appendOutput(const std::string& text) {
+#ifdef __ANDROID__
+    androidOutput += text;
+#else
+    std::cout << text;
+#endif
+}
+#endif
+
+
+
+
+std::string trim(const std::string& s) {
+    size_t first = s.find_first_not_of(" \t\r\n");
+    if (first == std::string::npos) return "";
+    size_t last = s.find_last_not_of(" \t\r\n");
+    return s.substr(first, last - first + 1);
+}
+
+std::string htmlEscape(const std::string& value) {
+    std::string result;
+    for (char c : value) {
+        if (c == '&') result += "&amp;";
+        else if (c == '<') result += "&lt;";
+        else if (c == '>') result += "&gt;";
+        else if (c == '"') result += "&quot;";
+        else if (c == '\'') result += "&#39;";
+        else result += c;
+    }
+    return result;
+}
+
+std::string base64Encode(const std::string& input) {
+    static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string output;
+    unsigned value = 0;
+    int bits = -6;
+    for (unsigned char byte : input) {
+        value = (value << 8) | byte;
+        bits += 8;
+        while (bits >= 0) {
+            output.push_back(alphabet[(value >> bits) & 0x3f]);
+            bits -= 6;
+        }
+    }
+    if (bits > -6) output.push_back(alphabet[((value << 8) >> (bits + 8)) & 0x3f]);
+    while (output.size() % 4) output.push_back('=');
+    return output;
+}
+
+std::string base64Decode(const std::string& input, bool& valid) {
+    static const std::string alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string output; unsigned value = 0; int bits = -8; bool padding = false; valid = true;
+    for (unsigned char c : input) {
+        if (std::isspace(c)) continue;
+        if (c == '=') { padding = true; continue; }
+        if (padding) { valid = false; return {}; }
+        const std::size_t index = alphabet.find(static_cast<char>(c));
+        if (index == std::string::npos) { valid = false; return {}; }
+        value = (value << 6) | static_cast<unsigned>(index); bits += 6;
+        if (bits >= 0) { output.push_back(static_cast<char>((value >> bits) & 0xff)); bits -= 8; }
+    }
+    if (bits >= 0) valid = false;
+    return valid ? output : std::string();
+}
+std::string hexEncode(const std::string& input) {
+    static const char digits[] = "0123456789ABCDEF"; std::string output; output.reserve(input.size()*2);
+    for (unsigned char byte : input) { output.push_back(digits[byte >> 4]); output.push_back(digits[byte & 15]); }
+    return output;
+}
+bool hexDecode(const std::string& input, std::string& output) {
+    auto digit=[](char c)->int { if(c>='0'&&c<='9')return c-'0'; c=static_cast<char>(std::toupper(static_cast<unsigned char>(c))); return c>='A'&&c<='F'?c-'A'+10:-1; };
+    std::string clean; for(unsigned char c:input)if(!std::isspace(c))clean.push_back(static_cast<char>(c));
+    if(clean.size()%2)return false; output.clear();
+    for(std::size_t i=0;i<clean.size();i+=2){int h=digit(clean[i]),l=digit(clean[i+1]);if(h<0||l<0)return false;output.push_back(static_cast<char>((h<<4)|l));}
+    return true;
+}
+std::uint32_t trgCrc32(const std::string& input) {
+    std::uint32_t crc=0xffffffffu; for(unsigned char byte:input){crc^=byte;for(int bit=0;bit<8;++bit)crc=(crc>>1)^(0xedb88320u&(0u-(crc&1u)));} return ~crc;
+}
+std::string rleEncode(const std::string& input) {
+    std::string out; for(std::size_t i=0;i<input.size();){std::size_t n=1;while(i+n<input.size()&&input[i+n]==input[i]&&n<255)++n;if(!out.empty())out.push_back(';');out+=std::to_string(n)+":"+hexEncode(input.substr(i,1));i+=n;}return out;
+}
+bool rleDecode(const std::string& input,std::string& output) {
+    output.clear();if(input.empty())return true;std::stringstream stream(input);std::string part;
+    while(std::getline(stream,part,';')){auto colon=part.find(':');if(colon==std::string::npos)return false;unsigned n=0;
+        try{auto countText=part.substr(0,colon);std::size_t used=0;n=static_cast<unsigned>(std::stoul(countText,&used));if(used!=countText.size()||n==0||n>255)return false;}catch(...){return false;}
+        std::string byte;if(!hexDecode(part.substr(colon+1),byte)||byte.size()!=1||output.size()+n>16*1024*1024)return false;output.append(n,byte[0]);}
+    return true;
+}
+
+std::string lower(std::string s) {
+    for (char& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    return s;
+}
+
+std::string suggestedCommand(const std::string& input) {
+    static const std::vector<std::string> commands = {
+        "say", "print", "show", "let", "ask", "ai", "math", "word", "num", "toggle", "color", "if", "else", "loop", "every", "random",
+        "group", "define", "stop", "exit", "break", "continue", "add", "text",
+        "button", "block", "animate", "collides", "touching", "move_ui", "register", "move", "subtract", "multiply",
+        "watch_collision",
+        "divide", "write_file", "append_file", "read_file", "delete_file", "file_exists",
+        "upper", "lower", "length", "contains", "replace", "push", "get", "remove", "pop", "insert", "index_of", "split", "join", "trim", "substring", "set", "increase", "decrease",
+        "play_audio", "show_image", "play_video", "run_wasm", "web_page", "web_heading",
+        "web_text", "web_color", "web_button", "web_image", "web_show",
+        "binary", "bit", "checksum", "regex", "compress"
+    };
+    const std::string word = lower(input);
+    std::size_t bestDistance = word.size();
+    std::string best;
+    for (const std::string& candidate : commands) {
+        std::vector<std::size_t> row(candidate.size() + 1);
+        for (std::size_t j = 0; j <= candidate.size(); ++j) row[j] = j;
+        for (std::size_t i = 1; i <= word.size(); ++i) {
+            std::size_t diagonal = row[0];
+            row[0] = i;
+            for (std::size_t j = 1; j <= candidate.size(); ++j) {
+                const std::size_t previous = row[j];
+                row[j] = std::min({row[j] + 1, row[j - 1] + 1,
+                                   diagonal + (word[i - 1] == candidate[j - 1] ? 0u : 1u)});
+                diagonal = previous;
+            }
+        }
+        if (row.back() < bestDistance) { bestDistance = row.back(); best = candidate; }
+    }
+    const std::size_t threshold = std::max<std::size_t>(2, word.size() / 3);
+    return bestDistance <= threshold ? best : std::string();
+}
+
+std::string stripComment(const std::string& line) {
+    bool inQuotes = false;
+    for (std::size_t i = 0; i + 1 < line.size(); ++i) {
+        if (line[i] == '\\' && inQuotes) { ++i; continue; }
+        if (line[i] == '"') inQuotes = !inQuotes;
+        else if (!inQuotes && line[i] == '/' && line[i + 1] == '/') return line.substr(0, i);
+    }
+    return line;
+}
+
+bool validName(const std::string& name) {
+    if (name.empty()) return false;
+    if (!(std::isalpha(static_cast<unsigned char>(name[0])) || name[0] == '_')) return false;
+    for (char c : name) {
+        if (!(std::isalnum(static_cast<unsigned char>(c)) || c == '_')) return false;
+    }
+    return true;
+}
+
+bool validVariablePath(const std::string& name) {
+    const std::size_t dot = name.find('.');
+    return dot == std::string::npos ? validName(name) :
+        name.find('.', dot + 1) == std::string::npos &&
+        validName(name.substr(0, dot)) && validName(name.substr(dot + 1));
+}
+
+void reportError(std::size_t lineNumber, const std::string& reason, const std::string& part = "") {
+    std::string msg = "line " + std::to_string(lineNumber) + ": " + reason;
+    if (!part.empty()) msg += " \"" + part + "\"";
+    ++errorCount;
+    appendOutput("ERROR " + msg + "\r\n");
+}
+
+bool findBlock(const std::vector<std::string>& program, std::size_t start,
+               std::size_t end, std::size_t& open, std::size_t& close) {
+    
+    
+    std::size_t depth = 0;
+    open = std::string::npos;
+    bool opened = false;
+    for (close = start; close < end; ++close) {
+        std::string line = program[close];
+        std::size_t firstCharacter = 0;
+        if (close == start && !line.empty()) {
+            std::size_t lastCharacter = line.size();
+            while (lastCharacter > 0 && std::isspace(static_cast<unsigned char>(line[lastCharacter - 1]))) --lastCharacter;
+            if (lastCharacter > 0 && line[lastCharacter - 1] == '(') {
+                open = close;
+                depth = 1;
+                opened = true;
+                firstCharacter = lastCharacter;
+            } else {
+                const std::string header = lower(trim(line));
+                if (header == "if" || header.rfind("if ", 0) == 0 ||
+                    header == "else" || header.rfind("else ", 0) == 0 ||
+                    header == "loop" || header.rfind("loop ", 0) == 0 ||
+                    header == "every" || header.rfind("every ", 0) == 0 ||
+                    header == "group" || header.rfind("group ", 0) == 0 ||
+                    header == "record" || header.rfind("record ", 0) == 0 ||
+                    header.rfind("struct ", 0) == 0 || header.rfind("class ", 0) == 0 ||
+                    header == "define" || header.rfind("define ", 0) == 0 ||
+                    header == "add" || header.rfind("add ", 0) == 0) {
+                    firstCharacter = line.size();
+                }
+            }
+        }
+        for (std::size_t i = firstCharacter; i < line.size(); ++i) {
+            if (line[i] == '"') {
+                ++i;
+                while (i < line.size() && (line[i] != '"' || (i > 0 && line[i - 1] == '\\'))) ++i;
+                continue;
+            }
+            if (line[i] == '/' && i + 1 < line.size() && line[i + 1] == '/') break;
+            if (line[i] == '(') {
+                if (!opened) {
+                    opened = true;
+                    open = close;
+                    depth = 1;
+                } else {
+                    ++depth;
+                }
+            } else if (line[i] == ')' && opened) {
+                if (--depth == 0) return true;
+            }
+        }
+    }
+    return false;
+}
+
+Defaults standardDefaults() {
+    return {{"num", "0"}, {"word", "none"}, {"color", "#222222"}, {"toggle", "false"}};
+}
+
+std::vector<std::string> tokenize(const std::string& text) {
+    std::vector<std::string> result;
+    std::string token;
+    bool quoted = false;
+    char quote = '\0';
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        const char c = text[i];
+        if (quoted) {
+            if (c == '\\' && i + 1 < text.size()) {
+                token += text[++i];
+            } else if (c == quote) {
+                quoted = false;
+            } else {
+                token += c;
+            }
+        } else if (c == '"' || c == '\'') {
+            quoted = true;
+            quote = c;
+        } else if (std::isspace(static_cast<unsigned char>(c)) || c == ',') {
+            if (!token.empty()) {
+                result.push_back(token);
+                token.clear();
+            }
+        } else {
+            token += c;
+        }
+    }
+    if (!token.empty()) result.push_back(token);
+    return result;
+}
+
+std::string valueFor(const std::string& word, const Vars& variables) {
+    const auto it = variables.find(word);
+    return it == variables.end() ? word : static_cast<std::string>(it->second);
+}
+
+
+
+
+std::size_t positionAfterArgument(const std::string& line, const std::string& token) {
+    const std::size_t commandEnd = line.find_first_of(" \t");
+    if (commandEnd == std::string::npos) return std::string::npos;
+    const std::size_t position = line.find(token, commandEnd + 1);
+    return position == std::string::npos ? std::string::npos : position + token.size();
+}
+
+std::string unbraced(const std::string& value) {
+    if (value.size() >= 2 && value.front() == '{' && value.back() == '}') {
+        return value.substr(1, value.size() - 2);
+    }
+    return value;
+}
+
+bool parseNumber(const std::string& text, double& value) {
+    std::istringstream input(text);
+    input >> value;
+    return input && (input >> std::ws).eof();
+}
+
+bool parseDurationMilliseconds(const std::string& source, long long& milliseconds) {
+    std::string value = lower(trim(source));
+    bool useMilliseconds = false;
+    if (value.size() >= 2 && value.substr(value.size() - 2) == "ms") {
+        useMilliseconds = true;
+        value.resize(value.size() - 2);
+    } else if (!value.empty() && value.back() == 's') {
+        value.pop_back();
+    }
+    double duration = 0;
+    if (!parseNumber(value, duration) || duration < 0) return false;
+    const double result = useMilliseconds ? duration : duration * 1000.0;
+    if (result > static_cast<double>(std::numeric_limits<long long>::max())) return false;
+    milliseconds = static_cast<long long>(result);
+    return true;
+}
+
+std::filesystem::path projectFilePath(const std::string& name, bool& valid) {
+    const std::filesystem::path root = std::filesystem::absolute(projectRoot).lexically_normal();
+    const std::filesystem::path requested = std::filesystem::u8path(name);
+    
+    
+    if (name.empty() || requested.is_absolute() || requested.has_root_name() || requested.has_root_directory()) {
+        valid = false;
+        return {};
+    }
+    const std::filesystem::path target = (root / requested).lexically_normal();
+    const std::filesystem::path relative = target.lexically_relative(root);
+    valid = !relative.empty() && relative != "." && *relative.begin() != "..";
+    return target;
+}
+
+std::filesystem::path canonicalProjectPath(const std::filesystem::path& path) {
+    std::error_code error;
+    const std::filesystem::path canonical = std::filesystem::weakly_canonical(path, error);
+    return error ? std::filesystem::absolute(path).lexically_normal() : canonical;
+}
+
+
+
+std::filesystem::path projectExistingFile(const std::string& name, bool& valid) {
+    const std::filesystem::path path = projectFilePath(name, valid);
+    if (!valid) return {};
+    std::error_code error;
+    const std::filesystem::path canonical = std::filesystem::weakly_canonical(path, error);
+    if (error) { valid = false; return {}; }
+    const std::filesystem::path root = std::filesystem::weakly_canonical(projectRoot, error);
+    if (error) { valid = false; return {}; }
+    const std::filesystem::path relative = canonical.lexically_relative(root);
+    valid = !relative.empty() && relative != "." && *relative.begin() != "..";
+    return canonical;
+}
+
+std::string numberString(double value) {
+    std::ostringstream output;
+    output << std::setprecision(15) << value;
+    return output.str();
+}
+
+bool parseColor(const std::string& color, unsigned& red, unsigned& green, unsigned& blue) {
+    std::string hex = color;
+    const bool blueRedGreenFormat = hex.size() >= 2 && hex[0] == '#' && hex[1] == '#';
+    if (blueRedGreenFormat) hex.erase(0, 2);
+    else if (!hex.empty() && hex[0] == '#') hex.erase(0, 1);
+    else if (hex.size() >= 8 && hex[0] == '0' && (hex[1] == 'x' || hex[1] == 'X')) {
+        hex.erase(0, 2);
+        if (hex.size() == 8) hex.erase(0, 2);
+    }
+    else return false;
+    if (hex.size() != 6 || !std::all_of(hex.begin(), hex.end(), [](unsigned char c) { return std::isxdigit(c) != 0; })) return false;
+    try {
+        if (blueRedGreenFormat) {
+            blue = static_cast<unsigned>(std::stoul(hex.substr(0, 2), nullptr, 16));
+            red = static_cast<unsigned>(std::stoul(hex.substr(2, 2), nullptr, 16));
+            green = static_cast<unsigned>(std::stoul(hex.substr(4, 2), nullptr, 16));
+        } else {
+            red = static_cast<unsigned>(std::stoul(hex.substr(0, 2), nullptr, 16));
+            green = static_cast<unsigned>(std::stoul(hex.substr(2, 2), nullptr, 16));
+            blue = static_cast<unsigned>(std::stoul(hex.substr(4, 2), nullptr, 16));
+        }
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
+
+
+
+bool evaluateExpression(const std::string& expr, Vars& variables, double& result) {
+    std::string t = trim(expr);
+    if (t.empty()) return false;
+    std::vector<std::string> tokens;
+    for (std::size_t i = 0; i < t.size();) {
+        if (std::isspace(static_cast<unsigned char>(t[i]))) { ++i; continue; }
+        if (std::string("()+-*/%^,").find(t[i]) != std::string::npos) {
+            tokens.emplace_back(1, t[i++]);
+            continue;
+        }
+        const std::size_t start = i;
+        while (i < t.size() && !std::isspace(static_cast<unsigned char>(t[i])) &&
+               std::string("()+-*/%^,").find(t[i]) == std::string::npos) ++i;
+        tokens.push_back(t.substr(start, i - start));
+    }
+    std::size_t position = 0;
+    std::function<bool(double&)> parseSum, parseProduct, parseUnary, parsePower, parsePrimary;
+    parsePrimary = [&](double& value) {
+        if (position >= tokens.size()) return false;
+        const std::string token = tokens[position++];
+        if (token == "(") {
+            if (!parseSum(value) || position >= tokens.size() || tokens[position++] != ")") return false;
+            return true;
+        }
+        if (lower(token) == "sqrt") {
+            const bool parenthesized = position < tokens.size() && tokens[position] == "(";
+            if (parenthesized) {
+                ++position;
+                if (!parseSum(value) || position >= tokens.size() || tokens[position++] != ")") return false;
+            } else if (!parseUnary(value)) return false;
+            if (value < 0) return false;
+            value = std::sqrt(value);
+            return true;
+        }
+        const auto variable = variables.find(token);
+        return parseNumber(variable == variables.end() ? token : static_cast<std::string>(variable->second), value);
+    };
+    parsePower = [&](double& value) {
+        if (!parsePrimary(value)) return false;
+        if (position < tokens.size() && tokens[position] == "^") {
+            ++position;
+            double exponent = 0;
+            if (!parseUnary(exponent)) return false;
+            value = std::pow(value, exponent);
+        }
+        return std::isfinite(value);
+    };
+    parseUnary = [&](double& value) {
+        if (position < tokens.size() && (tokens[position] == "+" || tokens[position] == "-")) {
+            const bool negative = tokens[position++] == "-";
+            if (!parseUnary(value)) return false;
+            if (negative) value = -value;
+            return true;
+        }
+        return parsePower(value);
+    };
+    parseProduct = [&](double& value) {
+        if (!parseUnary(value)) return false;
+        while (position < tokens.size() && (tokens[position] == "*" || tokens[position] == "/" || tokens[position] == "%")) {
+            const std::string op = tokens[position++];
+            double right = 0;
+            if (!parseUnary(right) || ((op == "/" || op == "%") && right == 0)) return false;
+            if (op == "*") value *= right;
+            else if (op == "/") value /= right;
+            else value = std::fmod(value, right);
+        }
+        return std::isfinite(value);
+    };
+    parseSum = [&](double& value) {
+        if (!parseProduct(value)) return false;
+        while (position < tokens.size() && (tokens[position] == "+" || tokens[position] == "-")) {
+            const std::string op = tokens[position++];
+            double right = 0;
+            if (!parseProduct(right)) return false;
+            value = op == "+" ? value + right : value - right;
+        }
+        return std::isfinite(value);
+    };
+    return parseSum(result) && position == tokens.size();
+}
+
+bool conditionIsTrue(const std::string& cond, Vars& variables) {
+#if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
+    if (controlsEnabled) {
+        for (const auto& control : keyboardControls) {
+            variables[control.first] = (GetAsyncKeyState(control.second) & 0x8000) ? "press" : "released";
+        }
+
+        struct ControllerState {
+            unsigned long packetNumber;
+            unsigned short buttons;
+            unsigned char leftTrigger;
+            unsigned char rightTrigger;
+            short thumbLX;
+            short thumbLY;
+            short thumbRX;
+            short thumbRY;
+        };
+        using GetControllerState = unsigned long (WINAPI*)(unsigned long, ControllerState*);
+        static HMODULE controllerModule = nullptr;
+        static GetControllerState getControllerState = nullptr;
+        static bool controllerLookupDone = false;
+        if (!controllerLookupDone) {
+            controllerLookupDone = true;
+            const wchar_t* modules[] = {L"xinput1_4.dll", L"xinput1_3.dll", L"xinput9_1_0.dll"};
+            for (const wchar_t* module : modules) {
+                controllerModule = LoadLibraryW(module);
+                if (controllerModule) {
+                    const FARPROC procedure = GetProcAddress(controllerModule, "XInputGetState");
+                    static_assert(sizeof(procedure) == sizeof(getControllerState), "Windows function pointers must have equal size");
+                    std::memcpy(&getControllerState, &procedure, sizeof(procedure));
+                    if (getControllerState) break;
+                    FreeLibrary(controllerModule);
+                    controllerModule = nullptr;
+                }
+            }
+        }
+        ControllerState state = {};
+        const bool connected = getControllerState && getControllerState(0, &state) == 0;
+        for (const auto& control : controllerControls) {
+            bool pressed = false;
+            if (connected) {
+                if (control.second == 0x10000) pressed = state.leftTrigger >= 30;
+                else if (control.second == 0x20000) pressed = state.rightTrigger >= 30;
+                else pressed = (state.buttons & control.second) != 0;
+            }
+            variables[control.first] = pressed ? "press" : "released";
+        }
+        if (connected) {
+            variables["controller_left_stick_x"] = std::clamp(state.thumbLX / 32767.0, -1.0, 1.0);
+            variables["controller_left_stick_y"] = std::clamp(state.thumbLY / 32767.0, -1.0, 1.0);
+            variables["controller_right_stick_x"] = std::clamp(state.thumbRX / 32767.0, -1.0, 1.0);
+            variables["controller_right_stick_y"] = std::clamp(state.thumbRY / 32767.0, -1.0, 1.0);
+        }
+    }
+#elif defined(__ANDROID__)
+    if (controlsEnabled) {
+        std::lock_guard<std::mutex> lock(androidInputMutex);
+        for (const auto& control : androidMobileInputs) {
+            variables[control.first] = control.second;
+        }
+    }
+#endif
+    std::string t = trim(cond);
+    const auto variable = variables.find(t);
+    if (variable != variables.end()) t = static_cast<std::string>(variable->second);
+    if (lower(t) == "true") return true;
+    if (lower(t) == "false") return false;
+
+    const std::vector<std::string> operators = {"==", "!=", "<=", ">=", "=", "<", ">"};
+    for (const std::string& op : operators) {
+        const std::size_t pos = t.find(op);
+        if (pos == std::string::npos) continue;
+        const std::string leftText = trim(t.substr(0, pos));
+        const std::string rightText = trim(t.substr(pos + op.size()));
+        double left = 0, right = 0;
+        if (evaluateExpression(leftText, variables, left) && evaluateExpression(rightText, variables, right)) {
+            if (op == "==") return left == right;
+            if (op == "!=") return left != right;
+            if (op == "<=") return left <= right;
+            if (op == ">=") return left >= right;
+            if (op == "=") return left == right;
+            if (op == "<") return left < right;
+            return left > right;
+        }
+        const std::string leftValue = valueFor(leftText, variables);
+        const std::string rightValue = valueFor(rightText, variables);
+        return (op == "==" || op == "=") ? leftValue == rightValue :
+            op == "!=" ? leftValue != rightValue : false;
+    }
+    double numeric = 0;
+    if (parseNumber(t, numeric)) return numeric != 0;
+    return false;
+}
+
+bool askForInput(const std::string& prompt, std::string& answer);
+
+void initializeControls(Vars& variables, Types& types) {
+    controlsEnabled = true;
+    keyboardControls.clear();
+    controllerControls.clear();
+    const std::pair<const char*, int> keys[] = {
+        {"key_a", 'A'}, {"key_b", 'B'}, {"key_c", 'C'}, {"key_d", 'D'},
+        {"key_e", 'E'}, {"key_f", 'F'}, {"key_g", 'G'}, {"key_h", 'H'},
+        {"key_i", 'I'}, {"key_j", 'J'}, {"key_k", 'K'}, {"key_l", 'L'},
+        {"key_m", 'M'}, {"key_n", 'N'}, {"key_o", 'O'}, {"key_p", 'P'},
+        {"key_q", 'Q'}, {"key_r", 'R'}, {"key_s", 'S'}, {"key_t", 'T'},
+        {"key_u", 'U'}, {"key_v", 'V'}, {"key_w", 'W'}, {"key_x", 'X'},
+        {"key_y", 'Y'}, {"key_z", 'Z'}, {"key_0", '0'}, {"key_1", '1'},
+        {"key_2", '2'}, {"key_3", '3'}, {"key_4", '4'}, {"key_5", '5'},
+        {"key_6", '6'}, {"key_7", '7'}, {"key_8", '8'}, {"key_9", '9'},
+        {"key_space", VK_SPACE}, {"key_enter", VK_RETURN}, {"key_escape", VK_ESCAPE},
+        {"key_tab", VK_TAB}, {"key_shift", VK_SHIFT}, {"key_control", VK_CONTROL},
+        {"key_alt", VK_MENU}, {"key_left", VK_LEFT}, {"key_right", VK_RIGHT},
+        {"key_up", VK_UP}, {"key_down", VK_DOWN}
+    };
+    for (const auto& key : keys) {
+        keyboardControls[key.first] = key.second;
+        variables[key.first] = "released";
+        types[key.first] = "word";
+    }
+    const std::pair<const char*, unsigned> buttons[] = {
+        {"controller_a", 0x1000}, {"controller_b", 0x2000},
+        {"controller_x", 0x4000}, {"controller_y", 0x8000},
+        {"controller_lb", 0x0100}, {"controller_rb", 0x0200},
+        {"controller_lt", 0x10000}, {"controller_rt", 0x20000},
+        {"controller_left_stick", 0x0040}, {"controller_right_stick", 0x0080},
+        {"controller_start", 0x0010}, {"controller_back", 0x0020},
+        {"controller_dpad_up", 0x0001}, {"controller_dpad_down", 0x0002},
+        {"controller_dpad_left", 0x0004}, {"controller_dpad_right", 0x0008}
+    };
+    for (const auto& button : buttons) {
+        controllerControls[button.first] = button.second;
+        variables[button.first] = "released";
+        types[button.first] = "word";
+    }
+    for (int functionKey = 1; functionKey <= 24; ++functionKey) {
+        const std::string name = "key_f" + std::to_string(functionKey);
+        keyboardControls[name] = VK_F1 + functionKey - 1;
+        variables[name] = "released";
+        types[name] = "word";
+    }
+    for (int digit = 0; digit <= 9; ++digit) {
+        const std::string name = "key_numpad" + std::to_string(digit);
+        keyboardControls[name] = VK_NUMPAD0 + digit;
+        variables[name] = "released";
+        types[name] = "word";
+    }
+    const std::pair<const char*, int> extraKeys[] = {
+        {"key_backspace", VK_BACK}, {"key_delete", VK_DELETE}, {"key_insert", VK_INSERT},
+        {"key_home", VK_HOME}, {"key_end", VK_END}, {"key_page_up", VK_PRIOR},
+        {"key_page_down", VK_NEXT}, {"key_caps_lock", VK_CAPITAL},
+        {"key_num_lock", VK_NUMLOCK}, {"key_scroll_lock", VK_SCROLL},
+        {"key_print_screen", VK_SNAPSHOT}, {"key_pause", VK_PAUSE},
+        {"key_left_windows", VK_LWIN}, {"key_right_windows", VK_RWIN},
+        {"key_apps", VK_APPS}, {"key_numpad_add", VK_ADD},
+        {"key_numpad_subtract", VK_SUBTRACT}, {"key_numpad_multiply", VK_MULTIPLY},
+        {"key_numpad_divide", VK_DIVIDE}, {"key_numpad_decimal", VK_DECIMAL},
+        {"key_semicolon", VK_OEM_1}, {"key_equals", VK_OEM_PLUS},
+        {"key_comma", VK_OEM_COMMA}, {"key_minus", VK_OEM_MINUS},
+        {"key_period", VK_OEM_PERIOD}, {"key_slash", VK_OEM_2},
+        {"key_backtick", VK_OEM_3}, {"key_left_bracket", VK_OEM_4},
+        {"key_backslash", VK_OEM_5}, {"key_right_bracket", VK_OEM_6},
+        {"key_apostrophe", VK_OEM_7}
+    };
+    for (const auto& key : extraKeys) {
+        keyboardControls[key.first] = key.second;
+        variables[key.first] = "released";
+        types[key.first] = "word";
+    }
+    variables["pointer_x"] = 0.0;
+    variables["pointer_y"] = 0.0;
+    variables["pointer_down"] = "released";
+    types["pointer_x"] = "num";
+    types["pointer_y"] = "num";
+    types["pointer_down"] = "word";
+    const char* mobileControls[] = {
+        "mobile_tap", "mobile_hold", "mobile_swipe_left", "mobile_swipe_right",
+        "mobile_swipe_up", "mobile_swipe_down", "mobile_button_1", "mobile_button_2",
+        "mobile_button_3", "mobile_button_4", "mobile_button_5", "mobile_button_6",
+        "mobile_button_7", "mobile_button_8"
+    };
+    for (const char* control : mobileControls) {
+#ifdef __ANDROID__
+        variables[control] = "released";
+#else
+        variables[control] = "unavailable";
+#endif
+        types[control] = "word";
+    }
+#ifdef __ANDROID__
+    for (const auto& key : keyboardControls) variables[key.first] = "unavailable";
+    for (const auto& button : controllerControls) variables[button.first] = "unavailable";
+    {
+        std::lock_guard<std::mutex> lock(androidInputMutex);
+        androidMobileInputs.clear();
+        for (const char* control : mobileControls) androidMobileInputs[control] = "released";
+        androidMobileInputs["pointer_x"] = "0";
+        androidMobileInputs["pointer_y"] = "0";
+        androidMobileInputs["pointer_down"] = "released";
+    }
+#endif
+    const char* controllerAxes[] = {
+        "controller_left_stick_x", "controller_left_stick_y",
+        "controller_right_stick_x", "controller_right_stick_y"
+    };
+    for (const char* axis : controllerAxes) {
+        variables[axis] = 0.0;
+        types[axis] = "num";
+    }
+}
+
+
+
+
+std::string jsonEscape(const std::string& text) {
+    std::string out;
+    out.reserve(text.size() + 8);
+    for (unsigned char c : text) {
+        switch (c) {
+            case '"': out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\b': out += "\\b"; break;
+            case '\f': out += "\\f"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default:
+                if (c < 0x20) {
+                    char buffer[8];
+                    std::snprintf(buffer, sizeof(buffer), "\\u%04x", static_cast<unsigned>(c));
+                    out += buffer;
+                } else {
+                    out += static_cast<char>(c);
+                }
+        }
+    }
+    return out;
+}
+
+struct JsonNode {
+    enum Kind { Null, Number, Boolean, String, Array, Object } kind = Null;
+    double number = 0;
+    bool boolean = false;
+    std::string text;
+    std::vector<JsonNode> items;
+    std::vector<std::pair<std::string, JsonNode>> members;
+};
+
+void appendUtf8(std::string& out, unsigned codePoint) {
+    if (codePoint <= 0x7F) out += static_cast<char>(codePoint);
+    else if (codePoint <= 0x7FF) {
+        out += static_cast<char>(0xC0 | (codePoint >> 6));
+        out += static_cast<char>(0x80 | (codePoint & 0x3F));
+    } else if (codePoint <= 0xFFFF) {
+        out += static_cast<char>(0xE0 | (codePoint >> 12));
+        out += static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F));
+        out += static_cast<char>(0x80 | (codePoint & 0x3F));
+    } else {
+        out += static_cast<char>(0xF0 | (codePoint >> 18));
+        out += static_cast<char>(0x80 | ((codePoint >> 12) & 0x3F));
+        out += static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F));
+        out += static_cast<char>(0x80 | (codePoint & 0x3F));
+    }
+}
+
+class JsonParser {
+public:
+    explicit JsonParser(const std::string& source) : source(source) {}
+    bool parse(JsonNode& result) {
+        skipSpace();
+        if (!parseValue(result)) return false;
+        skipSpace();
+        return position == source.size();
+    }
+private:
+    const std::string& source;
+    std::size_t position = 0;
+
+    void skipSpace() {
+        while (position < source.size() && std::isspace(static_cast<unsigned char>(source[position]))) ++position;
+    }
+    bool parseValue(JsonNode& result) {
+        skipSpace();
+        if (position >= source.size()) return false;
+        const char c = source[position];
+        if (c == '{') return parseObject(result);
+        if (c == '[') return parseArray(result);
+        if (c == '"') {
+            result.kind = JsonNode::String;
+            return parseString(result.text);
+        }
+        if (source.compare(position, 4, "true") == 0) {
+            position += 4; result.kind = JsonNode::Boolean; result.boolean = true; return true;
+        }
+        if (source.compare(position, 5, "false") == 0) {
+            position += 5; result.kind = JsonNode::Boolean; result.boolean = false; return true;
+        }
+        if (source.compare(position, 4, "null") == 0) {
+            position += 4; result.kind = JsonNode::Null; return true;
+        }
+        return parseNumber(result);
+    }
+    bool parseString(std::string& result) {
+        if (position >= source.size() || source[position] != '"') return false;
+        ++position;
+        result.clear();
+        while (position < source.size()) {
+            const char c = source[position++];
+            if (c == '"') return true;
+            if (c != '\\') { result += c; continue; }
+            if (position >= source.size()) return false;
+            const char escape = source[position++];
+            switch (escape) {
+                case '"': result += '"'; break;
+                case '\\': result += '\\'; break;
+                case '/': result += '/'; break;
+                case 'b': result += '\b'; break;
+                case 'f': result += '\f'; break;
+                case 'n': result += '\n'; break;
+                case 'r': result += '\r'; break;
+                case 't': result += '\t'; break;
+                case 'u': {
+                    if (position + 4 > source.size()) return false;
+                    unsigned codePoint = 0;
+                    for (int digit = 0; digit < 4; ++digit) {
+                        const char hex = source[position++];
+                        codePoint <<= 4;
+                        if (hex >= '0' && hex <= '9') codePoint |= static_cast<unsigned>(hex - '0');
+                        else if (hex >= 'a' && hex <= 'f') codePoint |= static_cast<unsigned>(hex - 'a' + 10);
+                        else if (hex >= 'A' && hex <= 'F') codePoint |= static_cast<unsigned>(hex - 'A' + 10);
+                        else return false;
+                    }
+                    appendUtf8(result, codePoint);
+                    break;
+                }
+                default: return false;
+            }
+        }
+        return false;
+    }
+    bool parseNumber(JsonNode& result) {
+        const std::size_t start = position;
+        if (position < source.size() && source[position] == '-') ++position;
+        while (position < source.size() && std::isdigit(static_cast<unsigned char>(source[position]))) ++position;
+        if (position < source.size() && source[position] == '.') {
+            ++position;
+            while (position < source.size() && std::isdigit(static_cast<unsigned char>(source[position]))) ++position;
+        }
+        if (position < source.size() && (source[position] == 'e' || source[position] == 'E')) {
+            ++position;
+            if (position < source.size() && (source[position] == '+' || source[position] == '-')) ++position;
+            while (position < source.size() && std::isdigit(static_cast<unsigned char>(source[position]))) ++position;
+        }
+        if (position == start) return false;
+        const std::string number = source.substr(start, position - start);
+        char* end = nullptr;
+        const double value = std::strtod(number.c_str(), &end);
+        if (!end || *end != '\0') return false;
+        result.kind = JsonNode::Number;
+        result.number = value;
+        return true;
+    }
+    bool parseArray(JsonNode& result) {
+        ++position;
+        result.kind = JsonNode::Array;
+        skipSpace();
+        if (position < source.size() && source[position] == ']') { ++position; return true; }
+        while (position < source.size()) {
+            JsonNode item;
+            if (!parseValue(item)) return false;
+            result.items.push_back(std::move(item));
+            skipSpace();
+            if (position < source.size() && source[position] == ',') { ++position; continue; }
+            if (position < source.size() && source[position] == ']') { ++position; return true; }
+            return false;
+        }
+        return false;
+    }
+    bool parseObject(JsonNode& result) {
+        ++position;
+        result.kind = JsonNode::Object;
+        skipSpace();
+        if (position < source.size() && source[position] == '}') { ++position; return true; }
+        while (position < source.size()) {
+            skipSpace();
+            std::string key;
+            if (!parseString(key)) return false;
+            skipSpace();
+            if (position >= source.size() || source[position] != ':') return false;
+            ++position;
+            JsonNode value;
+            if (!parseValue(value)) return false;
+            result.members.emplace_back(std::move(key), std::move(value));
+            skipSpace();
+            if (position < source.size() && source[position] == ',') { ++position; continue; }
+            if (position < source.size() && source[position] == '}') { ++position; return true; }
+            return false;
+        }
+        return false;
+    }
+};
+
+std::string jsonNodeCompact(const JsonNode& node) {
+    switch (node.kind) {
+        case JsonNode::Null: return "null";
+        case JsonNode::Number: return numberString(node.number);
+        case JsonNode::Boolean: return node.boolean ? "true" : "false";
+        case JsonNode::String: return "\"" + jsonEscape(node.text) + "\"";
+        case JsonNode::Array: {
+            std::string out = "[";
+            for (std::size_t i = 0; i < node.items.size(); ++i) {
+                if (i) out += ',';
+                out += jsonNodeCompact(node.items[i]);
+            }
+            out += ']';
+            return out;
+        }
+        case JsonNode::Object: {
+            std::string out = "{";
+            for (std::size_t i = 0; i < node.members.size(); ++i) {
+                if (i) out += ',';
+                out += "\"" + jsonEscape(node.members[i].first) + "\":" + jsonNodeCompact(node.members[i].second);
+            }
+            out += '}';
+            return out;
+        }
+    }
+    return "null";
+}
+
+std::string jsonValueText(const VariableValue& value) {
+    if (const auto* number = std::get_if<double>(&value.value)) return numberString(*number);
+    if (const auto* flag = std::get_if<bool>(&value.value)) return *flag ? "true" : "false";
+    if (const auto* text = std::get_if<std::string>(&value.value)) return "\"" + jsonEscape(*text) + "\"";
+    const auto& items = std::get<std::vector<std::string>>(value.value);
+    std::string out = "[";
+    for (std::size_t i = 0; i < items.size(); ++i) {
+        if (i) out += ',';
+        out += "\"" + jsonEscape(items[i]) + "\"";
+    }
+    out += ']';
+    return out;
+}
+
+std::string serializeJsonObject(const std::vector<std::pair<std::string, VariableValue>>& entries, bool clean) {
+    std::vector<std::pair<std::string, VariableValue>> sorted = entries;
+    
+    std::sort(sorted.begin(), sorted.end(), [](const auto& left, const auto& right) {
+        if (left.first.size() != right.first.size()) return left.first.size() > right.first.size();
+        return left.first < right.first;
+    });
+    if (sorted.empty()) return "{}";
+    std::string out;
+    if (clean) {
+        out = "{\n";
+        for (std::size_t i = 0; i < sorted.size(); ++i) {
+            out += "  \"" + jsonEscape(sorted[i].first) + "\": " + jsonValueText(sorted[i].second);
+            if (i + 1 < sorted.size()) out += ',';
+            out += '\n';
+        }
+        out += '}';
+    } else {
+        out = "{";
+        for (std::size_t i = 0; i < sorted.size(); ++i) {
+            if (i) out += ',';
+            out += "\"" + jsonEscape(sorted[i].first) + "\":" + jsonValueText(sorted[i].second);
+        }
+        out += '}';
+    }
+    return out;
+}
+
+void flattenJson(const JsonNode& node, const std::string& name, Vars& variables, Types& types) {
+    if (node.kind == JsonNode::Object) {
+        for (const auto& member : node.members) {
+            const std::string key = name.empty() ? member.first : name + "." + member.first;
+            flattenJson(member.second, key, variables, types);
+        }
+        return;
+    }
+    if (name.empty()) return;
+    switch (node.kind) {
+        case JsonNode::Number:
+            variables[name] = node.number;
+            types[name] = "num";
+            break;
+        case JsonNode::Boolean:
+            variables[name] = node.boolean;
+            types[name] = "toggle";
+            break;
+        case JsonNode::Null:
+            variables[name] = std::string();
+            types[name] = "word";
+            break;
+        case JsonNode::String:
+            variables[name] = node.text;
+            types[name] = "word";
+            break;
+        case JsonNode::Array: {
+            std::vector<std::string> items;
+            for (const auto& item : node.items) {
+                if (item.kind == JsonNode::String) items.push_back(item.text);
+                else items.push_back(jsonNodeCompact(item));
+            }
+            variables[name] = std::move(items);
+            types[name] = "list";
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+bool readJsonIntoVariables(const std::filesystem::path& path, Vars& variables, Types& types, std::string& error) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) { error = "could not read JSON file"; return false; }
+    std::ostringstream content;
+    content << input.rdbuf();
+    std::string source = content.str();
+    if (source.size() >= 3 && static_cast<unsigned char>(source[0]) == 0xEF &&
+        static_cast<unsigned char>(source[1]) == 0xBB && static_cast<unsigned char>(source[2]) == 0xBF)
+        source.erase(0, 3);
+    JsonNode root;
+    JsonParser parser(source);
+    if (!parser.parse(root)) { error = "invalid JSON"; return false; }
+    flattenJson(root, "", variables, types);
+    return true;
+}
+
+// ---------------------------------------------------------
+// HTTP / network implementation (add (network))
+// ---------------------------------------------------------
+#ifdef _WIN32
+std::string httpGet(const std::string& url, std::string& error) {
+    error.clear();
+    std::string result;
+    std::string scheme, host, path;
+    std::size_t schemeEnd = url.find("://");
+    if (schemeEnd != std::string::npos) {
+        scheme = url.substr(0, schemeEnd);
+        std::size_t pathStart = url.find('/', schemeEnd + 3);
+        if (pathStart != std::string::npos) {
+            host = url.substr(schemeEnd + 3, pathStart - schemeEnd - 3);
+            path = url.substr(pathStart);
+        } else {
+            host = url.substr(schemeEnd + 3);
+            path = "/";
+        }
+    } else {
+        error = "invalid URL";
+        return {};
+    }
+
+    HINTERNET session = WinHttpOpen(L"TRG/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                    WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!session) { error = "could not open WinHTTP session"; return {}; }
+
+    std::wstring whost = wideFromUtf8(host);
+    std::wstring wpath = wideFromUtf8(path);
+    INTERNET_PORT port = (lower(scheme) == "https") ? INTERNET_DEFAULT_HTTPS_PORT : INTERNET_DEFAULT_HTTP_PORT;
+    DWORD flag = (lower(scheme) == "https") ? WINHTTP_FLAG_SECURE : 0;
+
+    HINTERNET connect = WinHttpConnect(session, whost.c_str(), port, 0);
+    if (!connect) { WinHttpCloseHandle(session); error = "could not connect"; return {}; }
+
+    HINTERNET request = WinHttpOpenRequest(connect, L"GET", wpath.c_str(),
+                                           nullptr, WINHTTP_NO_REFERER,
+                                           WINHTTP_DEFAULT_ACCEPT_TYPES, flag);
+    if (!request) { WinHttpCloseHandle(connect); WinHttpCloseHandle(session); error = "could not open request"; return {}; }
+
+    if (!WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+                            WINHTTP_NO_REQUEST_DATA, 0, 0, 0)) {
+        DWORD err = GetLastError();
+        WinHttpCloseHandle(request); WinHttpCloseHandle(connect); WinHttpCloseHandle(session);
+        error = "send request failed: " + std::to_string(err);
+        return {};
+    }
+    if (!WinHttpReceiveResponse(request, nullptr)) {
+        DWORD err = GetLastError();
+        WinHttpCloseHandle(request); WinHttpCloseHandle(connect); WinHttpCloseHandle(session);
+        error = "receive response failed: " + std::to_string(err);
+        return {};
+    }
+
+    DWORD size = 0;
+    do {
+        size = 0;
+        if (!WinHttpQueryDataAvailable(request, &size)) break;
+        if (size == 0) break;
+        std::vector<char> buffer(size + 1);
+        DWORD read = 0;
+        if (!WinHttpReadData(request, buffer.data(), size, &read)) break;
+        buffer[read] = '\0';
+        result += buffer.data();
+    } while (size > 0);
+
+    WinHttpCloseHandle(request);
+    WinHttpCloseHandle(connect);
+    WinHttpCloseHandle(session);
+    return result;
+}
+#else
+std::string httpGet(const std::string& url, std::string& error) { error = "network only on Windows"; return {}; }
+#endif
+
+#ifdef _WIN32
+std::string httpPost(const std::string& url, const std::string& body, std::string& error) {
+    error.clear();
+    std::string result;
+    std::string scheme, host, path;
+    std::size_t schemeEnd = url.find("://");
+    if (schemeEnd != std::string::npos) {
+        scheme = url.substr(0, schemeEnd);
+        std::size_t pathStart = url.find('/', schemeEnd + 3);
+        if (pathStart != std::string::npos) {
+            host = url.substr(schemeEnd + 3, pathStart - schemeEnd - 3);
+            path = url.substr(pathStart);
+        } else {
+            host = url.substr(schemeEnd + 3);
+            path = "/";
+        }
+    } else {
+        error = "invalid URL";
+        return {};
+    }
+
+    HINTERNET session = WinHttpOpen(L"TRG/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                    WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
