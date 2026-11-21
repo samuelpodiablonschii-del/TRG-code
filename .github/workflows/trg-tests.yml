@@ -1,0 +1,31 @@
+name: TRG language regression tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "TRG.cpp"
+      - "tests/**"
+      - ".github/workflows/trg-tests.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "TRG.cpp"
+      - "tests/**"
+      - ".github/workflows/trg-tests.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    name: Build interpreter and run TRG tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install C++ compiler
+        run: sudo apt-get update && sudo apt-get install -y g++
+      - name: Run regression suite
+        run: python3 tests/run-tests.py
