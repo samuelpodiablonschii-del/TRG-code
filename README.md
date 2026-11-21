@@ -171,6 +171,35 @@ Use `wait 10s` or `wait 100ms` to pause. Durations are seconds by default; add `
 
 `every 1s ( ... )` and `every 100ms ( ... )` schedule a block to repeat at that interval while the program UI stays responsive. Use `stop` to end all scheduled work or `break` in a repeating block to remove that repeating task.
 
+### Database
+
+TRG includes a portable embedded database engine. It needs no external server or database package and stores data in a compact project-local `.trgdb` file. Tables have named columns and records; values are stored as text so a program can choose its own types. Changes are saved automatically, with an explicit save command available too.
+
+```text
+add (database)
+database open "game.trgdb"
+table create players name score level
+record add players name "Alex" score 120 level 3
+record add players name "Jordan" score 95 level 2
+record get players 0 name player_name
+say "First player:" player_name
+query players score >= 100 winners
+say "Matching rows:" query_count
+record update players 0 score 150
+record delete players 1
+database save
+```
+
+Commands:
+- `database open FILE`, `database save`, `database close`, `database tables`
+- `table create NAME COLUMN...`, `table delete NAME`, `table count NAME RESULT`
+- `record add TABLE FIELD VALUE...`, `record get TABLE INDEX FIELD RESULT`
+- `record update TABLE INDEX FIELD VALUE`, `record delete TABLE INDEX`
+- `query TABLE FIELD OP VALUE RESULT` where OP is `=`, `!=`, `>`, `<`, `>=`, or `<=`
+- SQL-like query: `sql select from TABLE where FIELD OP VALUE into RESULT`
+
+Query results are a list of matching row indexes; `query_count` contains the number of matches. Database files are restricted to the current TRG project folder. This is TRG's own embedded engine, not a drop-in implementation of SQLite, Oracle SQL, Firebase, or a network database server. Cloud sync and remote backends can be added as optional adapters.
+
 ### Records
 
 `record` declares a beginner-friendly field container. `struct` and `class` are kept as aliases for older programs, and `new` creates a named instance. Fields can be read or updated with dot notation:
