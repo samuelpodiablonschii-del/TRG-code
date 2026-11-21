@@ -715,3 +715,14 @@ loop true (
 ## Repository hygiene
 
 Generated Windows executables, DLLs, object/resource files, Android Gradle caches, CMake intermediates, APKs, and machine-specific `local.properties` are ignored by Git. Build them locally with the scripts above or the Gradle wrapper; do not commit generated outputs.
+
+
+## TRG test runner
+
+Run the language regression suite from the repository root:
+
+```sh
+python3 tests/run-tests.py
+```
+
+The runner builds a separate console-mode test executable from `TRG.cpp`, runs each marked regression script, checks for its expected pass marker, and fails the process if a script reports an interpreter error. It is also run automatically by the **TRG language regression tests** GitHub Actions workflow on changes to the interpreter or tests. The test executable is kept in `.test-build/` and is not the desktop application.
