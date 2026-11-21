@@ -38,8 +38,10 @@ button save_scene "SAVE" x 67 y 1.5 w 9 h 5 color #343B50 (
 )
 button new_scene "NEW" x 87 y 1.5 w 10 h 5 color #5743A0 (
     3d clear
-    clear objects
-    objectCount = 0
+    loop objectCount > 0 (
+        remove objects 0
+        objectCount = objectCount - 1
+    )
     selectedIndex = 0
     selectedName = ""
     set_text selected_name "Nothing selected"
