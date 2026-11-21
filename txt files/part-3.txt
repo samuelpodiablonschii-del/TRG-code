@@ -1,0 +1,1037 @@
+                    if (!valid) { reportError(i + 1, "record contains an unknown field", tokens[2]); continue; }
+                    found->second.rows.push_back(std::move(row));
+                    if (!saveTrgDatabase(dbError)) reportError(i + 1, dbError);
+                    else { variables["last_record"] = static_cast<double>(found->second.rows.size() - 1); types["last_record"] = "num"; }
+                } else if (action == "get" && tokens.size() == 6 && validName(tokens[5])) {
+                    const auto found = trgDatabaseTables.find(valueFor(tokens[2], variables)); double index = 0;
+                    if (found == trgDatabaseTables.end() || !parseNumber(valueFor(tokens[3], variables), index) || index < 0 ||
+                        index >= (found == trgDatabaseTables.end() ? 0.0 : static_cast<double>(found->second.rows.size())) || std::floor(index) != index) {
+                        reportError(i + 1, "record get needs a valid table and row index"); continue;
+                    }
+                    const auto col = databaseColumnIndex(found->second, valueFor(tokens[4], variables));
+                    if (col == found->second.columns.size()) { reportError(i + 1, "unknown record field", tokens[4]); continue; }
+                    variables[tokens[5]] = found->second.rows[static_cast<std::size_t>(index)][col]; types[tokens[5]] = "word";
+                } else if (action == "update" && tokens.size() == 6) {
+                    const auto found = trgDatabaseTables.find(valueFor(tokens[2], variables)); double index = 0;
+                    if (found == trgDatabaseTables.end() || !parseNumber(valueFor(tokens[3], variables), index) || index < 0 ||
+                        index >= (found == trgDatabaseTables.end() ? 0.0 : static_cast<double>(found->second.rows.size())) || std::floor(index) != index) {
+                        reportError(i + 1, "record update needs a valid table and row index"); continue;
+                    }
+                    const auto col = databaseColumnIndex(found->second, valueFor(tokens[4], variables));
+                    if (col == found->second.columns.size()) { reportError(i + 1, "unknown record field", tokens[4]); continue; }
+                    found->second.rows[static_cast<std::size_t>(index)][col] = valueFor(tokens[5], variables);
+                    if (!saveTrgDatabase(dbError)) reportError(i + 1, dbError);
+                } else if (action == "delete" && tokens.size() == 4) {
+                    const auto found = trgDatabaseTables.find(valueFor(tokens[2], variables)); double index = 0;
+                    if (found == trgDatabaseTables.end() || !parseNumber(valueFor(tokens[3], variables), index) || index < 0 ||
+                        index >= (found == trgDatabaseTables.end() ? 0.0 : static_cast<double>(found->second.rows.size())) || std::floor(index) != index) {
+                        reportError(i + 1, "record delete needs a valid table and row index"); continue;
+                    }
+                    found->second.rows.erase(found->second.rows.begin() + static_cast<std::ptrdiff_t>(index));
+                    if (!saveTrgDatabase(dbError)) reportError(i + 1, dbError);
+                } else reportError(i + 1, "use record add TABLE FIELD VALUE... | record get TABLE INDEX FIELD RESULT | record update TABLE INDEX FIELD VALUE | record delete TABLE INDEX");
+                continue;
+            }
+            if (cmd == "query" || cmd == "sql") {
+                const bool sqlMode = cmd == "sql";
+                const std::size_t tableAt = sqlMode ? 3 : 1;
+                const std::size_t fieldAt = sqlMode ? 5 : 2;
+                const std::size_t opAt = fieldAt + 1, valueAt = fieldAt + 2, resultAt = sqlMode ? 9 : 5;
+                if ((sqlMode && (tokens.size() != 10 || action != "select" || lower(tokens[2]) != "from" ||
+                                 lower(tokens[4]) != "where" || lower(tokens[8]) != "into")) ||
+                    (!sqlMode && tokens.size() != 6) || resultAt >= tokens.size() || !validName(tokens[resultAt])) {
+                    reportError(i + 1, sqlMode ? "use sql select from TABLE where FIELD OP VALUE into RESULT" : "use query TABLE FIELD OP VALUE RESULT"); continue;
+                }
+                const auto found = trgDatabaseTables.find(valueFor(tokens[tableAt], variables));
+                if (found == trgDatabaseTables.end()) { reportError(i + 1, "unknown table", tokens[tableAt]); continue; }
+                const auto col = databaseColumnIndex(found->second, valueFor(tokens[fieldAt], variables));
+                if (col == found->second.columns.size()) { reportError(i + 1, "unknown query field", tokens[fieldAt]); continue; }
+                const std::string op = tokens[opAt], wanted = valueFor(tokens[valueAt], variables);
+                if (op != "=" && op != "!=" && op != ">" && op != "<" && op != ">=" && op != "<=") {
+                    reportError(i + 1, "unsupported query operator", op); continue;
+                }
+                std::vector<std::string> matches;
+                for (std::size_t n = 0; n < found->second.rows.size(); ++n) {
+                    const std::string actual = found->second.rows[n][col]; double a = 0, b = 0;
+                    const bool numeric = parseNumber(actual, a) && parseNumber(wanted, b);
+                    const bool match = op == "=" ? actual == wanted : op == "!=" ? actual != wanted :
+                        op == ">" ? (numeric ? a > b : actual > wanted) : op == "<" ? (numeric ? a < b : actual < wanted) :
+                        op == ">=" ? (numeric ? a >= b : actual >= wanted) : (numeric ? a <= b : actual <= wanted);
+                    if (match) matches.push_back(std::to_string(n));
+                }
+                const std::size_t count = matches.size();
+                variables[tokens[resultAt]] = std::move(matches); types[tokens[resultAt]] = "list";
+                variables["query_count"] = static_cast<double>(count); types["query_count"] = "num";
+                continue;
+            }
+        }
+
+        if (cmd == "json") {
+            if (!jsonEnabled) { reportError(i + 1, "JSON commands need add (json)"); continue; }
+            if (tokens.size() >= 2 && lower(tokens[1]) == "read") {
+                std::string target = parenContent(line);
+                if (target.empty() && tokens.size() >= 3) {
+                    target = tokens[2];
+                    if (target.size() >= 2 && target.front() == '(' && target.back() == ')')
+                        target = target.substr(1, target.size() - 2);
+                }
+                if (target.empty()) { reportError(i + 1, "use json read (file.json)"); continue; }
+                bool pathValid = false;
+                const std::filesystem::path jsonPath = projectExistingFile(target, pathValid);
+                if (!pathValid) { reportError(i + 1, "JSON file must stay inside the TRG project folder", target); continue; }
+                std::string jsonError;
+                if (!readJsonIntoVariables(jsonPath, variables, types, jsonError)) {
+                    reportError(i + 1, jsonError, target);
+                    continue;
+                }
+                continue;
+            }
+            if (tokens.size() < 4) { reportError(i + 1, "use json GROUP clean|compressed RESULT"); continue; }
+            const std::string groupName = tokens[1];
+            const std::string format = lower(tokens[2]);
+            const std::string resultName = tokens.back();
+            if (format != "clean" && format != "compressed") {
+                reportError(i + 1, "json format must be clean or compressed", tokens[2]);
+                continue;
+            }
+            if (!validName(resultName)) {
+                reportError(i + 1, "json needs a valid result variable", resultName);
+                continue;
+            }
+            std::vector<std::pair<std::string, VariableValue>> entries;
+            std::unordered_set<std::string> included;
+            auto include = [&](const std::string& name) {
+                if (!included.insert(name).second) return;
+                const auto it = variables.find(name);
+                if (it != variables.end()) entries.push_back({it->first, it->second});
+            };
+            for (const auto& item : variables) {
+                const auto membership = variableGroups.find(item.first);
+                if (membership == variableGroups.end()) continue;
+                if (std::find(membership->second.begin(), membership->second.end(), groupName) == membership->second.end()) continue;
+                include(item.first);
+            }
+            
+            
+            for (std::size_t level = 0; level < groupStack.size() && level < groupSnapshots.size(); ++level) {
+                if (groupStack[level] != groupName) continue;
+                for (const auto& item : variables)
+                    if (!groupSnapshots[level].count(item.first)) include(item.first);
+            }
+            variables[resultName] = serializeJsonObject(entries, format == "clean");
+            types[resultName] = "word";
+            continue;
+        }
+
+        
+        if (cmd == "create") {
+            if (!filesEnabled && !jsonEnabled) { reportError(i + 1, "create needs add (files) or add (json)"); continue; }
+            if (tokens.size() < 3) { reportError(i + 1, "use create FILE (LOCATION) RESULT"); continue; }
+            const std::string fileName = tokens[1];
+            const std::string location = parenContent(line);
+            const std::string resultName = tokens.back();
+            if (!validName(resultName)) { reportError(i + 1, "create needs a valid result variable", resultName); continue; }
+            const auto result = variables.find(resultName);
+            if (result == variables.end()) { reportError(i + 1, "create needs an existing variable holding JSON", resultName); continue; }
+            const std::string content = static_cast<std::string>(result->second);
+            const std::string relative = location.empty() ? fileName : location + "/" + fileName;
+            bool pathValid = false;
+            const std::filesystem::path outputPath = projectFilePath(relative, pathValid);
+            if (!pathValid) { reportError(i + 1, "file must stay inside the TRG project folder", relative); continue; }
+            std::error_code directoryError;
+            if (!outputPath.parent_path().empty())
+                std::filesystem::create_directories(outputPath.parent_path(), directoryError);
+            std::ofstream output(outputPath, std::ios::binary | std::ios::trunc);
+            if (!output) { reportError(i + 1, "could not write JSON file", relative); continue; }
+            output << content;
+            continue;
+        }
+
+        if (cmd == "ai") {
+            if (!aiEnabled) { reportError(i + 1, "AI commands need add (ai)"); continue; }
+            if (tokens.size() < 2) { reportError(i + 1, "use ai create, teach, train, predict, or classify"); continue; }
+            const std::string action = lower(tokens[1]);
+            if (action == "create") {
+                if (tokens.size() != 4 || !validName(tokens[2])) {
+                    reportError(i + 1, "use ai create MODEL INPUT_COUNT");
+                    continue;
+                }
+                double inputCount = 0;
+                if (!parseNumber(tokens[3], inputCount) || inputCount < 1 || inputCount > 64 ||
+                    std::floor(inputCount) != inputCount) {
+                    reportError(i + 1, "AI input count must be a whole number from 1 to 64", tokens[3]);
+                    continue;
+                }
+                AiModel model;
+                model.weights.resize(static_cast<std::size_t>(inputCount), 0.0);
+                std::uniform_real_distribution<double> initialWeight(-0.05, 0.05);
+                for (double& weight : model.weights) weight = initialWeight(trgRandomEngine);
+                aiModels[tokens[2]] = std::move(model);
+                appendOutput("Created AI model " + tokens[2] + " with " + tokens[3] + " inputs.\r\n");
+                continue;
+            }
+            if (action == "teach") {
+                if (tokens.size() != 5 || !aiModels.count(tokens[2])) {
+                    reportError(i + 1, "use ai teach MODEL INPUTS EXPECTED (create the model first)");
+                    continue;
+                }
+                std::vector<double> inputValues;
+                std::stringstream inputStream(tokens[3]);
+                std::string inputPart;
+                bool validInputs = true;
+                while (std::getline(inputStream, inputPart, ';')) {
+                    double value = 0;
+                    if (!parseNumber(trim(inputPart), value) || !std::isfinite(value)) { validInputs = false; break; }
+                    inputValues.push_back(value);
+                }
+                double expected = 0;
+                AiModel& model = aiModels[tokens[2]];
+                if (!validInputs || inputValues.size() != model.weights.size() ||
+                    !parseNumber(tokens[4], expected) || (expected != 0.0 && expected != 1.0)) {
+                    reportError(i + 1, "AI examples need the correct number of semicolon-separated inputs and an output of 0 or 1");
+                    continue;
+                }
+                model.samples.push_back({std::move(inputValues), expected});
+                appendOutput("Added training example to " + tokens[2] + ".\r\n");
+                continue;
+            }
+            if (action == "train") {
+                if ((tokens.size() != 4 && tokens.size() != 5) || !aiModels.count(tokens[2])) {
+                    reportError(i + 1, "use ai train MODEL EPOCHS [LEARNING_RATE]");
+                    continue;
+                }
+                AiModel& model = aiModels[tokens[2]];
+                double epochsValue = 0, learningRate = 0.1;
+                if (model.samples.empty() || !parseNumber(tokens[3], epochsValue) ||
+                    epochsValue < 1 || epochsValue > 100000 || std::floor(epochsValue) != epochsValue ||
+                    (tokens.size() == 5 && !parseNumber(tokens[4], learningRate)) ||
+                    learningRate <= 0 || learningRate > 1) {
+                    reportError(i + 1, "training needs examples, 1-100000 epochs, and a learning rate above 0 and at most 1");
+                    continue;
+                }
+                for (int epoch = 0; epoch < static_cast<int>(epochsValue); ++epoch) {
+                    for (const AiSample& sample : model.samples) {
+                        double total = model.bias;
+                        for (std::size_t index = 0; index < model.weights.size(); ++index)
+                            total += model.weights[index] * sample.inputs[index];
+                        total = std::clamp(total, -30.0, 30.0);
+                        const double prediction = 1.0 / (1.0 + std::exp(-total));
+                        const double error = prediction - sample.expected;
+                        for (std::size_t index = 0; index < model.weights.size(); ++index)
+                            model.weights[index] -= learningRate * error * sample.inputs[index];
+                        model.bias -= learningRate * error;
+                    }
+                }
+                appendOutput("Trained " + tokens[2] + " using " + std::to_string(model.samples.size()) +
+                    " examples for " + tokens[3] + " epochs.\r\n");
+                continue;
+            }
+            if (action == "predict" || action == "classify") {
+                if (tokens.size() != 5 || !validName(tokens[4]) || !aiModels.count(tokens[2])) {
+                    reportError(i + 1, "use ai predict MODEL INPUTS RESULT or ai classify MODEL INPUTS RESULT");
+                    continue;
+                }
+                AiModel& model = aiModels[tokens[2]];
+                std::vector<double> inputValues;
+                std::stringstream inputStream(tokens[3]);
+                std::string inputPart;
+                bool validInputs = true;
+                while (std::getline(inputStream, inputPart, ';')) {
+                    double value = 0;
+                    if (!parseNumber(trim(inputPart), value) || !std::isfinite(value)) { validInputs = false; break; }
+                    inputValues.push_back(value);
+                }
+                if (!validInputs || inputValues.size() != model.weights.size()) {
+                    reportError(i + 1, "AI input count does not match the model");
+                    continue;
+                }
+                double total = model.bias;
+                for (std::size_t index = 0; index < model.weights.size(); ++index)
+                    total += model.weights[index] * inputValues[index];
+                total = std::clamp(total, -30.0, 30.0);
+                const double prediction = 1.0 / (1.0 + std::exp(-total));
+                if (action == "predict") {
+                    variables[tokens[4]] = prediction;
+                    types[tokens[4]] = "num";
+                } else {
+                    variables[tokens[4]] = prediction >= 0.5;
+                    types[tokens[4]] = "toggle";
+                }
+                continue;
+            }
+            reportError(i + 1, "unknown AI action; use create, teach, train, predict, or classify", action);
+            continue;
+        }
+
+        if (cmd == "find" || cmd == "find_position" || cmd == "replace_text" ||
+            cmd == "count_text" || cmd == "starts_with" || cmd == "ends_with") {
+            const std::string source = tokens.size() > 1 ? valueFor(tokens[1], variables) : std::string();
+            const std::string search = tokens.size() > 2 ? valueFor(tokens[2], variables) : std::string();
+            if (cmd == "replace_text") {
+                if (tokens.size() != 5 || !validName(tokens[4])) { reportError(i + 1, "use replace_text TEXT OLD_TEXT NEW_TEXT RESULT"); continue; }
+                std::string result = source;
+                if (!search.empty()) {
+                    const std::string replacement = valueFor(tokens[3], variables);
+                    std::size_t position = 0;
+                    while ((position = result.find(search, position)) != std::string::npos) {
+                        result.replace(position, search.size(), replacement);
+                        position += replacement.size();
+                    }
+                }
+                variables[tokens[4]] = result; types[tokens[4]] = "word";
+            } else {
+                if (tokens.size() != 4 || !validName(tokens[3])) {
+                    reportError(i + 1, "use find TEXT SEARCH RESULT, find_position TEXT SEARCH RESULT, count_text TEXT SEARCH RESULT, starts_with TEXT PREFIX RESULT, or ends_with TEXT SUFFIX RESULT");
+                    continue;
+                }
+                if (cmd == "find") { variables[tokens[3]] = source.find(search) != std::string::npos; types[tokens[3]] = "toggle"; }
+                else if (cmd == "find_position") { const auto p = source.find(search); variables[tokens[3]] = p == std::string::npos ? -1.0 : static_cast<double>(p); types[tokens[3]] = "num"; }
+                else if (cmd == "count_text") {
+                    std::size_t count = 0, position = 0;
+                    if (!search.empty()) while ((position = source.find(search, position)) != std::string::npos) { ++count; position += search.size(); }
+                    variables[tokens[3]] = static_cast<double>(count); types[tokens[3]] = "num";
+                } else if (cmd == "starts_with") { variables[tokens[3]] = source.rfind(search, 0) == 0; types[tokens[3]] = "toggle"; }
+                else { variables[tokens[3]] = source.size() >= search.size() && source.compare(source.size() - search.size(), search.size(), search) == 0; types[tokens[3]] = "toggle"; }
+            }
+            continue;
+        }
+
+        if (cmd == "add_numbers" || cmd == "subtract_numbers" || cmd == "multiply_numbers" ||
+            cmd == "divide_numbers" || cmd == "square_root" || cmd == "round_number" ||
+            cmd == "absolute_number" || cmd == "minimum" || cmd == "maximum" ||
+            cmd == "distance_between") {
+            const bool two = cmd == "add_numbers" || cmd == "subtract_numbers" ||
+                cmd == "multiply_numbers" || cmd == "divide_numbers" || cmd == "minimum" || cmd == "maximum";
+            const bool distance = cmd == "distance_between";
+            const std::size_t expected = distance ? 6u : (two ? 4u : 3u);
+            if (tokens.size() != expected || !validName(tokens.back())) {
+                reportError(i + 1, "check the numbers and result name in this command");
+                continue;
+            }
+            std::vector<double> values;
+            bool valid = true;
+            for (std::size_t index = 1; index + 1 < tokens.size(); ++index) {
+                double value = 0;
+                if (!evaluateExpression(valueFor(tokens[index], variables), variables, value)) { valid = false; break; }
+                values.push_back(value);
+            }
+            if (!valid) { reportError(i + 1, "this command needs valid numbers"); continue; }
+            double result = 0;
+            if (cmd == "add_numbers") result = values[0] + values[1];
+            else if (cmd == "subtract_numbers") result = values[0] - values[1];
+            else if (cmd == "multiply_numbers") result = values[0] * values[1];
+            else if (cmd == "divide_numbers") {
+                if (values[1] == 0) { reportError(i + 1, "cannot divide by zero"); continue; }
+                result = values[0] / values[1];
+            } else if (cmd == "square_root") {
+                if (values[0] < 0) { reportError(i + 1, "square_root needs a number of zero or greater"); continue; }
+                result = std::sqrt(values[0]);
+            } else if (cmd == "round_number") result = std::round(values[0]);
+            else if (cmd == "absolute_number") result = std::abs(values[0]);
+            else if (cmd == "minimum") result = (std::min)(values[0], values[1]);
+            else if (cmd == "maximum") result = (std::max)(values[0], values[1]);
+            else result = std::hypot(values[2] - values[0], values[3] - values[1]);
+            if (!std::isfinite(result)) { reportError(i + 1, "the answer is outside the supported number range"); continue; }
+            variables[tokens.back()] = result; types[tokens.back()] = "num";
+            continue;
+        }
+
+        if (cmd == "binary") {
+            if (!binaryEnabled) { reportError(i + 1, "binary commands need add (binary)"); continue; }
+            if (tokens.size()!=4) { reportError(i+1,"use binary to_bin|from_bin|to_hex|from_hex|base64_encode|base64_decode VALUE RESULT"); continue; }
+            const std::string action=lower(tokens[1]), source=valueFor(tokens[2],variables);
+            if(!validName(tokens[3])){reportError(i+1,"binary needs a valid result variable");continue;}
+            if(action=="to_bin"){double n=0;if(!parseNumber(source,n)||n<0||n>9007199254740991.0||std::floor(n)!=n){reportError(i+1,"to_bin needs a whole number from 0 to 9007199254740991");continue;}std::uint64_t v=static_cast<std::uint64_t>(n);std::string out;do{out.insert(out.begin(),(v&1u)?'1':'0');v>>=1;}while(v);variables[tokens[3]]=out;types[tokens[3]]="word";}
+            else if(action=="from_bin"){if(source.empty()||source.size()>53||source.find_first_not_of("01")!=std::string::npos){reportError(i+1,"from_bin needs 1 to 53 binary digits");continue;}std::uint64_t v=0;for(char b:source)v=(v<<1)|static_cast<unsigned>(b-'0');variables[tokens[3]]=static_cast<double>(v);types[tokens[3]]="num";}
+            else if(action=="to_hex"){variables[tokens[3]]=hexEncode(source);types[tokens[3]]="word";}
+            else if(action=="from_hex"){std::string out;if(!hexDecode(source,out)){reportError(i+1,"from_hex needs pairs of hexadecimal digits");continue;}variables[tokens[3]]=out;types[tokens[3]]="word";}
+            else if(action=="base64_encode"){variables[tokens[3]]=base64Encode(source);types[tokens[3]]="word";}
+            else if(action=="base64_decode"){bool ok=false;std::string out=base64Decode(source,ok);if(!ok){reportError(i+1,"invalid Base64 input");continue;}variables[tokens[3]]=out;types[tokens[3]]="word";}
+            else reportError(i+1,"unknown binary action",action);
+            continue;
+        }
+        if (cmd == "bit") {
+            if(!binaryEnabled){reportError(i+1,"bit commands need add (binary)");continue;}
+            if(tokens.size()<4||tokens.size()>5){reportError(i+1,"use bit and|or|xor|not|shift_left|shift_right A [B] RESULT");continue;}
+            const std::string action=lower(tokens[1]);const bool unary=action=="not";
+            if(tokens.size()!=(unary?4u:5u)||!validName(tokens.back())){reportError(i+1,"invalid bit operation arguments");continue;}
+            auto read=[&](const std::string& t,std::uint32_t& v){double n=0;if(!parseNumber(valueFor(t,variables),n)||n<0||n>4294967295.0||std::floor(n)!=n)return false;v=static_cast<std::uint32_t>(n);return true;};
+            std::uint32_t a=0,b=0;if(!read(tokens[2],a)||(!unary&&!read(tokens[3],b))){reportError(i+1,"bit operations need unsigned 32-bit whole numbers");continue;}
+            std::uint32_t out=0;if(action=="and")out=a&b;else if(action=="or")out=a|b;else if(action=="xor")out=a^b;else if(action=="not")out=~a;
+            else if(action=="shift_left"||action=="shift_right"){if(b>31){reportError(i+1,"shift amount must be 0 to 31");continue;}out=action=="shift_left"?static_cast<std::uint32_t>(a<<b):static_cast<std::uint32_t>(a>>b);}
+            else{reportError(i+1,"unknown bit operation",action);continue;}variables[tokens.back()]=static_cast<double>(out);types[tokens.back()]="num";continue;
+        }
+        if (cmd == "checksum") {
+            if(!binaryEnabled){reportError(i+1,"checksum needs add (binary)");continue;}
+            if(tokens.size()!=4||!validName(tokens[3])){reportError(i+1,"use checksum crc32|fnv1a TEXT RESULT");continue;}
+            const std::string action=lower(tokens[1]),source=valueFor(tokens[2],variables);std::uint32_t h=0;
+            if(action=="crc32")h=trgCrc32(source);else if(action=="fnv1a"){h=2166136261u;for(unsigned char c:source){h^=c;h*=16777619u;}}else{reportError(i+1,"use crc32 or fnv1a",action);continue;}
+            variables[tokens[3]]=static_cast<double>(h);types[tokens[3]]="num";continue;
+        }
+        if (cmd == "regex") {
+            if(!regexEnabled){reportError(i+1,"regex commands need add (regex)");continue;}
+            if(tokens.size()<5||tokens.size()>6||!validName(tokens.back())){reportError(i+1,"use regex match|search TEXT PATTERN RESULT or regex replace TEXT PATTERN REPLACEMENT RESULT");continue;}
+            const std::string action=lower(tokens[1]),source=valueFor(tokens[2],variables),pattern=valueFor(tokens[3],variables);
+            try{const std::regex re(pattern);
+                if(action=="match"&&tokens.size()==5){variables[tokens[4]]=std::regex_search(source,re);types[tokens[4]]="toggle";}
+                else if(action=="search"&&tokens.size()==5){std::smatch m;variables[tokens[4]]=std::regex_search(source,m,re)?static_cast<double>(m.position()):-1.0;types[tokens[4]]="num";}
+                else if(action=="replace"&&tokens.size()==6){variables[tokens[5]]=std::regex_replace(source,re,valueFor(tokens[4],variables));types[tokens[5]]="word";}
+                else reportError(i+1,"invalid regex action or arguments");
+            }catch(const std::regex_error&){reportError(i+1,"invalid regular expression",pattern);}continue;
+        }
+        if (cmd == "compress") {
+            if(!compressionEnabled){reportError(i+1,"compression commands need add (compression)");continue;}
+            if(tokens.size()!=4||!validName(tokens[3])){reportError(i+1,"use compress encode|decode TEXT RESULT");continue;}
+            const std::string action=lower(tokens[1]),source=valueFor(tokens[2],variables);
+            if(action=="encode"){variables[tokens[3]]=rleEncode(source);types[tokens[3]]="word";}
+            else if(action=="decode"){std::string out;if(!rleDecode(source,out)){reportError(i+1,"invalid or oversized RLE data");continue;}variables[tokens[3]]=out;types[tokens[3]]="word";}
+            else reportError(i+1,"unknown compression action",action);continue;
+        }
+
+        if (cmd == "math") {
+            if (!mathEnabled) { reportError(i + 1, "math commands need add (math)"); continue; }
+            if (tokens.size() < 4) {
+                reportError(i + 1, "use math sin/cos/tan/abs/floor/ceil/round/sqrt VALUE RESULT, min/max A B RESULT, clamp VALUE MIN MAX RESULT, or distance X1 Y1 X2 Y2 RESULT");
+                continue;
+            }
+            const std::string operation = lower(tokens[1]);
+            const std::size_t expected = operation == "min" || operation == "max" ? 5 :
+                (operation == "distance" ? 7 : (operation == "clamp" ? 6 : 4));
+            if (tokens.size() != expected || !validName(tokens.back())) {
+                reportError(i + 1, "invalid arguments for math " + operation);
+                continue;
+            }
+            std::vector<double> values;
+            bool validValues = true;
+            for (std::size_t index = 2; index + 1 < tokens.size(); ++index) {
+                double value = 0;
+                if (!evaluateExpression(valueFor(tokens[index], variables), variables, value)) {
+                    validValues = false;
+                    break;
+                }
+                values.push_back(value);
+            }
+            if (!validValues) { reportError(i + 1, "math needs valid numeric inputs"); continue; }
+            double result = 0;
+            if (operation == "sin") result = std::sin(values[0]);
+            else if (operation == "cos") result = std::cos(values[0]);
+            else if (operation == "tan") result = std::tan(values[0]);
+            else if (operation == "abs") result = std::abs(values[0]);
+            else if (operation == "floor") result = std::floor(values[0]);
+            else if (operation == "ceil") result = std::ceil(values[0]);
+            else if (operation == "round") result = std::round(values[0]);
+            else if (operation == "sqrt") {
+                if (values[0] < 0) { reportError(i + 1, "sqrt needs a value of zero or greater"); continue; }
+                result = std::sqrt(values[0]);
+            } else if (operation == "min") result = (std::min)(values[0], values[1]);
+            else if (operation == "max") result = (std::max)(values[0], values[1]);
+            else if (operation == "clamp") {
+                if (values[1] > values[2]) { reportError(i + 1, "clamp minimum must not exceed maximum"); continue; }
+                result = std::clamp(values[0], values[1], values[2]);
+            } else if (operation == "distance") {
+                result = std::hypot(values[2] - values[0], values[3] - values[1]);
+            } else {
+                reportError(i + 1, "unknown math operation", operation);
+                continue;
+            }
+            if (!std::isfinite(result)) { reportError(i + 1, "math result is outside the supported numeric range"); continue; }
+            variables[tokens.back()] = result;
+            types[tokens.back()] = "num";
+            continue;
+        }
+
+        if (cmd == "time") {
+            if (!timeEnabled) { reportError(i + 1, "time commands need add (time)"); continue; }
+            if (tokens.size() != 3 || !validName(tokens[2])) { reportError(i + 1, "use time unix|milliseconds|year|month|day|hour|minute|second RESULT"); continue; }
+            const auto now = std::chrono::system_clock::now();
+            const auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+            const std::time_t rawTime = std::chrono::system_clock::to_time_t(now); std::tm parts{};
+            #ifdef _WIN32
+            localtime_s(&parts, &rawTime);
+            #else
+            localtime_r(&rawTime, &parts);
+            #endif
+            const std::string action = lower(tokens[1]);
+            if (action == "unix") variables[tokens[2]] = static_cast<double>(milliseconds / 1000);
+            else if (action == "milliseconds") variables[tokens[2]] = static_cast<double>(milliseconds);
+            else if (action == "year") variables[tokens[2]] = static_cast<double>(parts.tm_year + 1900);
+            else if (action == "month") variables[tokens[2]] = static_cast<double>(parts.tm_mon + 1);
+            else if (action == "day") variables[tokens[2]] = static_cast<double>(parts.tm_mday);
+            else if (action == "hour") variables[tokens[2]] = static_cast<double>(parts.tm_hour);
+            else if (action == "minute") variables[tokens[2]] = static_cast<double>(parts.tm_min);
+            else if (action == "second") variables[tokens[2]] = static_cast<double>(parts.tm_sec);
+            else { reportError(i + 1, "unknown time action", action); continue; }
+            types[tokens[2]] = "num"; continue;
+        }
+
+        if (cmd == "convert") {
+            if (!convertEnabled) { reportError(i + 1, "convert commands need add (convert)"); continue; }
+            if (tokens.size() != 4 || !validName(tokens[3])) { reportError(i + 1, "use convert number|text|bool VALUE RESULT"); continue; }
+            const std::string action = lower(tokens[1]), source = valueFor(tokens[2], variables);
+            if (action == "number") { double number = 0; if (!parseNumber(source, number)) { reportError(i + 1, "value cannot be converted to a number", source); continue; } variables[tokens[3]] = number; types[tokens[3]] = "num"; }
+            else if (action == "text") { variables[tokens[3]] = source; types[tokens[3]] = "word"; }
+            else if (action == "bool") { const std::string value = lower(trim(source)); if (value == "true" || value == "1" || value == "yes" || value == "on") variables[tokens[3]] = true; else if (value == "false" || value == "0" || value == "no" || value == "off") variables[tokens[3]] = false; else { reportError(i + 1, "value cannot be converted to bool", source); continue; } types[tokens[3]] = "toggle"; }
+            else { reportError(i + 1, "unknown conversion", action); }
+            continue;
+        }
+        if (cmd == "stats") {
+            if (!statsEnabled) { reportError(i + 1, "stats commands need add (stats)"); continue; }
+            if (tokens.size() != 4 || !validName(tokens[3]) || !variables.count(tokens[2]) || types[tokens[2]] != "list") { reportError(i + 1, "use stats sum|average|min|max|median|range LIST RESULT"); continue; }
+            const auto* items = std::get_if<std::vector<std::string>>(&variables[tokens[2]].value);
+            if (!items || items->empty()) { reportError(i + 1, "stats needs a non-empty list"); continue; }
+            std::vector<double> values; values.reserve(items->size());
+            for (const auto& item : *items) { double number = 0; if (!parseNumber(valueFor(item, variables), number)) { reportError(i + 1, "stats list must contain only numbers", item); values.clear(); break; } values.push_back(number); }
+            if (values.empty()) continue;
+            const std::string action = lower(tokens[1]); double result = 0;
+            if (action == "sum") result = std::accumulate(values.begin(), values.end(), 0.0);
+            else if (action == "average") result = std::accumulate(values.begin(), values.end(), 0.0) / static_cast<double>(values.size());
+            else if (action == "min") result = *std::min_element(values.begin(), values.end());
+            else if (action == "max") result = *std::max_element(values.begin(), values.end());
+            else if (action == "range") result = *std::max_element(values.begin(), values.end()) - *std::min_element(values.begin(), values.end());
+            else if (action == "median") { std::sort(values.begin(), values.end()); const std::size_t middle = values.size() / 2; result = values.size() % 2 ? values[middle] : (values[middle - 1] + values[middle]) / 2.0; }
+            else { reportError(i + 1, "unknown stats operation", action); continue; }
+            variables[tokens[3]] = result; types[tokens[3]] = "num"; continue;
+        }
+
+        if (cmd == "units") {
+            if (!unitsEnabled) { reportError(i + 1, "units commands need add (units)"); continue; }
+            if (tokens.size() != 4 || !validName(tokens[3])) { reportError(i + 1, "use units c_to_f|f_to_c|km_to_mi|mi_to_km|m_to_ft|ft_to_m|kg_to_lb|lb_to_kg VALUE RESULT"); continue; }
+            double value = 0; if (!evaluateExpression(tokens[2], variables, value)) { reportError(i + 1, "units needs a numeric value", tokens[2]); continue; }
+            const std::string action = lower(tokens[1]); double result = 0;
+            if (action == "c_to_f") result = value * 9.0 / 5.0 + 32.0;
+            else if (action == "f_to_c") result = (value - 32.0) * 5.0 / 9.0;
+            else if (action == "km_to_mi") result = value * 0.621371192237334;
+            else if (action == "mi_to_km") result = value / 0.621371192237334;
+            else if (action == "m_to_ft") result = value * 3.28083989501312;
+            else if (action == "ft_to_m") result = value / 3.28083989501312;
+            else if (action == "kg_to_lb") result = value * 2.20462262184878;
+            else if (action == "lb_to_kg") result = value / 2.20462262184878;
+            else { reportError(i + 1, "unknown unit conversion", action); continue; }
+            variables[tokens[3]] = result; types[tokens[3]] = "num"; continue;
+        }
+        if (cmd == "random") {
+            if (tokens.size() != 4 || !validName(tokens[3])) {
+                reportError(i + 1, "use random MIN MAX RESULT");
+                continue;
+            }
+            double minimum = 0, maximum = 0;
+            if (!evaluateExpression(tokens[1], variables, minimum) ||
+                !evaluateExpression(tokens[2], variables, maximum) || minimum > maximum) {
+                reportError(i + 1, "random needs numeric bounds with MIN no greater than MAX");
+                continue;
+            }
+            if (std::floor(minimum) == minimum && std::floor(maximum) == maximum &&
+                minimum >= static_cast<double>(std::numeric_limits<int>::min()) &&
+                maximum <= static_cast<double>(std::numeric_limits<int>::max())) {
+                std::uniform_int_distribution<int> distribution(static_cast<int>(minimum), static_cast<int>(maximum));
+                variables[tokens[3]] = static_cast<double>(distribution(trgRandomEngine));
+            } else {
+                std::uniform_real_distribution<double> distribution(minimum, maximum);
+                variables[tokens[3]] = distribution(trgRandomEngine);
+            }
+            types[tokens[3]] = "num";
+            continue;
+        }
+
+        if (cmd == "collides" || cmd == "touching") {
+            if (!collisionEnabled) { reportError(i + 1, "collision helpers need add (collision)"); continue; }
+            if (tokens.size() != 4 || !validName(tokens[3])) {
+                reportError(i + 1, "use collides OBJECT_A OBJECT_B RESULT");
+                continue;
+            }
+            double ax = 0, ay = 0, aw = 0, ah = 0, bx = 0, by = 0, bw = 0, bh = 0;
+            if (!uiEntityBounds(tokens[1], ax, ay, aw, ah) || !uiEntityBounds(tokens[2], bx, by, bw, bh)) {
+                reportError(i + 1, "collision checks need two named UI blocks, buttons, or sprites");
+                continue;
+            }
+            const bool overlap = ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
+            variables[tokens[3]] = overlap;
+            types[tokens[3]] = "toggle";
+            continue;
+        }
+        if (cmd == "watch_collision") {
+            if (!collisionEnabled) { reportError(i + 1, "collision helpers need add (collision)"); continue; }
+            if (tokens.size() != 4 || !validName(tokens[3])) {
+                reportError(i + 1, "use watch_collision OBJECT_A OBJECT_B RESULT");
+                continue;
+            }
+            double x = 0, y = 0, w = 0, h = 0;
+            if (!uiEntityBounds(tokens[1], x, y, w, h) || !uiEntityBounds(tokens[2], x, y, w, h)) {
+                reportError(i + 1, "watch_collision needs two named UI blocks, buttons, or sprites");
+                continue;
+            }
+            collisionWatches.push_back({tokens[1], tokens[2], tokens[3]});
+            types[tokens[3]] = "toggle";
+            refreshCollisionWatches(variables, types);
+            continue;
+        }
+        if (cmd == "move_ui") {
+            if (!collisionEnabled) { reportError(i + 1, "game movement helpers need add (collision)"); continue; }
+            if (tokens.size() != 6 || lower(tokens[2]) != "x" || lower(tokens[4]) != "y") {
+                reportError(i + 1, "use move_ui OBJECT x DX y DY");
+                continue;
+            }
+            double dx = 0, dy = 0;
+            if (!parseNumber(valueFor(tokens[3], variables), dx) || !parseNumber(valueFor(tokens[5], variables), dy)) {
+                reportError(i + 1, "move_ui needs numeric x and y amounts");
+                continue;
+            }
+            auto block = std::find_if(uiBlocks.begin(), uiBlocks.end(), [&](const UiBlock& item) { return item.name == tokens[1]; });
+            auto sprite = std::find_if(uiSprites.begin(), uiSprites.end(), [&](const UiSprite& item) { return item.name == tokens[1]; });
+            auto button = std::find_if(uiButtons.begin(), uiButtons.end(), [&](const UiButton& item) { return item.name == tokens[1]; });
+            if (block != uiBlocks.end()) { block->x += dx; block->y += dy; }
+            else if (sprite != uiSprites.end()) { sprite->x += dx; sprite->y += dy; }
+            else if (button != uiButtons.end()) { button->x += dx; button->y += dy; }
+            else { reportError(i + 1, "unknown game object", tokens[1]); continue; }
+            refreshCollisionWatches(variables, types);
+            continue;
+        }
+
+        if (cmd == "set_text" || cmd == "set_color") {
+            if (!uiMode || tokens.size() != 3) { reportError(i + 1, "use set_text NAME VALUE or set_color NAME #RRGGBB"); continue; }
+            const std::string value = valueFor(tokens[2], variables);
+            bool changed = false;
+            if (cmd == "set_text") {
+                for (UiText& item : uiTexts) if (item.name == tokens[1]) { item.value = value; changed = true; }
+                for (UiButton& item : uiButtons) if (item.name == tokens[1]) { item.label = value; changed = true; }
+            } else {
+                unsigned red = 0, green = 0, blue = 0;
+                if (!parseColor(value, red, green, blue)) { reportError(i + 1, "set_color needs a valid color", value); continue; }
+                for (UiBlock& item : uiBlocks) if (item.name == tokens[1]) { item.color = value; changed = true; }
+                for (UiButton& item : uiButtons) if (item.name == tokens[1]) { item.color = value; changed = true; }
+            }
+            if (!changed) reportError(i + 1, "unknown UI element", tokens[1]);
+            continue;
+        }
+
+
+        if (cmd == "physics") {
+            if (!physicsEnabled) { reportError(i + 1, "physics commands need add (physics)"); continue; }
+            if (tokens.size() < 2) { reportError(i + 1, "use physics body|solid|trigger|velocity|gravity|drag|bounce|position|drag_launch|reset|freeze|unfreeze|remove|step"); continue; }
+            const std::string action = lower(tokens[1]);
+            if (action == "body" || action == "solid" || action == "trigger") {
+                if (tokens.size() != 3 || !validName(tokens[2])) {
+                    reportError(i + 1, "use physics body|solid|trigger OBJECT");
+                    continue;
+                }
+                double x = 0, y = 0, w = 0, h = 0;
+                if (!uiEntityBounds(tokens[2], x, y, w, h)) {
+                    reportError(i + 1, "physics needs an existing named UI block, button, or sprite", tokens[2]);
+                    continue;
+                }
+                PhysicsBody body;
+                body.name = tokens[2];
+                body.dynamic = action == "body";
+                body.solid = action == "solid" || action == "body";
+                body.trigger = action == "trigger";
+                physicsBodies[body.name] = body;
+                continue;
+            }
+            if (action == "reset") {
+                if (tokens.size() != 3 || !physicsBodies.count(tokens[2])) {
+                    reportError(i + 1, "use physics reset BODY");
+                    continue;
+                }
+                PhysicsBody& body = physicsBodies[tokens[2]];
+                body.vx = body.vy = 0;
+                body.frozen = false;
+                body.dragLaunching = false;
+                body.launched = false;
+                body.bounceCount = 0;
+                continue;
+            }
+            if (action == "drag_launch") {
+                if (tokens.size() != 4 || !physicsBodies.count(tokens[2]) || !physicsBodies[tokens[2]].dynamic) {
+                    reportError(i + 1, "use physics drag_launch BODY MAX_SPEED");
+                    continue;
+                }
+                double limit = 0;
+                if (!evaluateExpression(tokens[3], variables, limit) || !std::isfinite(limit) || limit <= 0) {
+                    reportError(i + 1, "drag launch speed limit must be greater than zero");
+                    continue;
+                }
+                PhysicsBody& body = physicsBodies[tokens[2]];
+                body.dragLaunch = true;
+                body.launchSpeedLimit = limit;
+                body.launched = false;
+                body.dragLaunching = false;
+                body.vx = body.vy = 0;
+                continue;
+            }
+            if (action == "freeze" || action == "unfreeze") {
+                if (tokens.size() != 3 || !physicsBodies.count(tokens[2])) {
+                    reportError(i + 1, "use physics freeze|unfreeze BODY");
+                    continue;
+                }
+                PhysicsBody& body = physicsBodies[tokens[2]];
+                body.frozen = action == "freeze";
+                if (body.frozen) body.vx = body.vy = 0;
+                continue;
+            }
+            if (action == "remove") {
+                if (tokens.size() != 3) { reportError(i + 1, "use physics remove OBJECT"); continue; }
+                physicsBodies.erase(tokens[2]);
+                continue;
+            }
+            if (action == "position") {
+                if (tokens.size() != 5 || !physicsBodies.count(tokens[2])) {
+                    reportError(i + 1, "use physics position BODY X Y");
+                    continue;
+                }
+                double x = 0, y = 0;
+                if (!evaluateExpression(tokens[3], variables, x) || !evaluateExpression(tokens[4], variables, y) ||
+                    !setUiEntityPosition(tokens[2], x, y)) {
+                    reportError(i + 1, "physics position needs a registered UI body and numeric coordinates");
+                    continue;
+                }
+                refreshCollisionWatches(variables, types);
+                continue;
+            }
+            if (action == "step" || action == "update") {
+                if (tokens.size() != 3) { reportError(i + 1, "use physics step SECONDS"); continue; }
+                double seconds = 0;
+                if (!evaluateExpression(tokens[2], variables, seconds) || !std::isfinite(seconds) || seconds <= 0 || seconds > 0.1) {
+                    reportError(i + 1, "physics step needs a time greater than 0 and no more than 0.1 seconds");
+                    continue;
+                }
+                physicsStep(seconds, variables, types);
+                continue;
+            }
+            if (tokens.size() < 4 || !physicsBodies.count(tokens[2])) {
+                reportError(i + 1, "physics setting needs a registered body; use physics body or physics solid first", tokens.size() > 2 ? tokens[2] : "");
+                continue;
+            }
+            PhysicsBody& body = physicsBodies[tokens[2]];
+            if (action == "velocity") {
+                if (tokens.size() != 5 || !body.dynamic) { reportError(i + 1, "use physics velocity BODY VX VY on a dynamic body"); continue; }
+                if (!evaluateExpression(tokens[3], variables, body.vx) || !evaluateExpression(tokens[4], variables, body.vy)) {
+                    reportError(i + 1, "physics velocity needs numeric VX and VY"); continue;
+                }
+            } else if (action == "gravity" || action == "drag" || action == "bounce") {
+                if (tokens.size() != 4) { reportError(i + 1, "use physics gravity|drag|bounce BODY VALUE"); continue; }
+                double value = 0;
+                if (!evaluateExpression(tokens[3], variables, value) || !std::isfinite(value)) {
+                    reportError(i + 1, "physics setting needs a finite number"); continue;
+                }
+                if (action == "gravity") body.gravity = value;
+                else if (action == "drag" && value >= 0) body.drag = value;
+                else if (action == "bounce" && value >= 0) body.restitution = value;
+                else { reportError(i + 1, "physics drag and bounce must be zero or greater"); continue; }
+            } else {
+                reportError(i + 1, "unknown physics operation", action);
+            }
+            continue;
+        }
+
+        if (cmd == "list") {
+            if (tokens.size() < 2 || !validName(tokens[1])) { reportError(i + 1, "use list NAME [VALUE, VALUE]", "list"); continue; }
+            std::vector<std::string> items;
+            const std::size_t namePosition = positionAfterArgument(line, tokens[1]);
+            if (namePosition == std::string::npos) { reportError(i + 1, "list needs a valid name", tokens[1]); continue; }
+            std::string initial = trim(line.substr(namePosition));
+            if (!initial.empty() && initial.front() == '=') {
+                initial = trim(initial.substr(1));
+                items = tokenize(initial);
+            }
+            variables[tokens[1]] = std::move(items);
+            types[tokens[1]] = "list";
+            continue;
+        }
+
+        if (cmd == "push" || cmd == "get" || cmd == "remove") {
+            if (tokens.size() != (cmd == "get" ? 4u : 3u) || !variables.count(tokens[1]) || types[tokens[1]] != "list") {
+                reportError(i + 1, cmd == "push" ? "use push LIST VALUE" : (cmd == "get" ? "use get LIST INDEX VARIABLE" : "use remove LIST INDEX"));
+                continue;
+            }
+            auto* items = std::get_if<std::vector<std::string>>(&variables[tokens[1]].value);
+            if (!items) { reportError(i + 1, "variable is not a list", tokens[1]); continue; }
+            if (cmd == "push") items->push_back(valueFor(tokens[2], variables));
+            else {
+                double parsedIndex = 0;
+                if (!parseNumber(valueFor(tokens[2], variables), parsedIndex) || parsedIndex < 0 ||
+                    parsedIndex >= static_cast<double>(items->size())) { reportError(i + 1, "list index is out of range", tokens[2]); continue; }
+                const std::size_t index = static_cast<std::size_t>(parsedIndex);
+                if (cmd == "get") {
+                    if (!validName(tokens[3])) { reportError(i + 1, "get needs a valid destination variable", tokens[3]); continue; }
+                    variables[tokens[3]] = (*items)[index];
+                    if (!types.count(tokens[3])) types[tokens[3]] = "word";
+                } else items->erase(items->begin() + static_cast<std::ptrdiff_t>(index));
+            }
+            continue;
+        }
+
+        if (cmd == "pop" || cmd == "insert" || cmd == "index_of" || cmd == "split" || cmd == "join" || cmd == "trim" || cmd == "substring") {
+            const std::size_t expected = cmd == "pop" || cmd == "trim" ? 3 :
+                (cmd == "insert" || cmd == "index_of" || cmd == "split" ? 4 :
+                 (cmd == "substring" ? 5 : 4));
+            if (tokens.size() != expected || (cmd != "insert" && !validName(tokens.back()))) {
+                reportError(i + 1, "invalid arguments for " + cmd, cmd);
+                continue;
+            }
+
+            if (cmd == "pop" || cmd == "insert" || cmd == "join") {
+                if (!variables.count(tokens[1]) || types[tokens[1]] != "list") {
+                    reportError(i + 1, cmd + " needs a list variable", tokens[1]);
+                    continue;
+                }
+                auto* items = std::get_if<std::vector<std::string>>(&variables[tokens[1]].value);
+                if (!items) { reportError(i + 1, "variable is not a list", tokens[1]); continue; }
+                if (cmd == "pop") {
+                    if (items->empty()) { reportError(i + 1, "cannot pop an empty list", tokens[1]); continue; }
+                    variables[tokens[2]] = items->back();
+                    types[tokens[2]] = "word";
+                    items->pop_back();
+                } else if (cmd == "insert") {
+                    double parsedIndex = 0;
+                    if (!parseNumber(valueFor(tokens[2], variables), parsedIndex) || parsedIndex < 0 ||
+                        parsedIndex > static_cast<double>(items->size()) || std::floor(parsedIndex) != parsedIndex) {
+                        reportError(i + 1, "insert index must be a whole number from 0 to list length", tokens[2]);
+                        continue;
+                    }
+                    items->insert(items->begin() + static_cast<std::ptrdiff_t>(parsedIndex), valueFor(tokens[3], variables));
+                } else {
+                    const std::string delimiter = valueFor(tokens[2], variables);
+                    std::string joined;
+                    for (std::size_t n = 0; n < items->size(); ++n) {
+                        if (n) joined += delimiter;
+                        joined += (*items)[n];
+                    }
+                    variables[tokens[3]] = joined;
+                    types[tokens[3]] = "word";
+                }
+                continue;
+            }
+
+            if (cmd == "index_of") {
+                const std::string source = valueFor(tokens[1], variables);
+                const std::string search = valueFor(tokens[2], variables);
+                const auto found = source.find(search);
+                variables[tokens[3]] = found == std::string::npos ? -1.0 : static_cast<double>(found);
+                types[tokens[3]] = "num";
+                continue;
+            }
+
+            if (cmd == "split") {
+                const std::string source = valueFor(tokens[1], variables);
+                const std::string delimiter = valueFor(tokens[2], variables);
+                if (delimiter.empty()) { reportError(i + 1, "split delimiter cannot be empty", tokens[2]); continue; }
+                std::vector<std::string> parts;
+                std::size_t begin = 0;
+                std::size_t found = 0;
+                while ((found = source.find(delimiter, begin)) != std::string::npos) {
+                    parts.push_back(source.substr(begin, found - begin));
+                    begin = found + delimiter.size();
+                }
+                parts.push_back(source.substr(begin));
+                variables[tokens[3]] = std::move(parts);
+                types[tokens[3]] = "list";
+                continue;
+            }
+
+            if (cmd == "trim") {
+                variables[tokens[2]] = trim(valueFor(tokens[1], variables));
+                types[tokens[2]] = "word";
+                continue;
+            }
+
+            if (cmd == "substring") {
+                const std::string source = valueFor(tokens[1], variables);
+                double startValue = 0, lengthValue = 0;
+                if (!parseNumber(valueFor(tokens[2], variables), startValue) ||
+                    !parseNumber(valueFor(tokens[3], variables), lengthValue) ||
+                    startValue < 0 || lengthValue < 0 ||
+                    std::floor(startValue) != startValue || std::floor(lengthValue) != lengthValue ||
+                    startValue > static_cast<double>(source.size())) {
+                    reportError(i + 1, "substring needs non-negative whole-number START and LENGTH values", cmd);
+                    continue;
+                }
+                variables[tokens[4]] = source.substr(static_cast<std::size_t>(startValue), static_cast<std::size_t>(lengthValue));
+                types[tokens[4]] = "word";
+                continue;
+            }
+        }
+
+        if (cmd == "upper" || cmd == "lower" || cmd == "length" || cmd == "contains" || cmd == "replace") {
+            const std::size_t expected = cmd == "replace" ? 5 : (cmd == "contains" ? 4 : 3);
+            if (tokens.size() != expected || !validName(tokens.back())) {
+                reportError(i + 1, cmd == "replace" ? "use replace VALUE SEARCH REPLACEMENT RESULT" :
+                    (cmd == "contains" ? "use contains VALUE SEARCH RESULT" : "use " + cmd + " VALUE RESULT"));
+                continue;
+            }
+            const std::string source = valueFor(tokens[1], variables);
+            std::string result;
+            if (cmd == "upper") { result = source; std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) { return static_cast<char>(std::toupper(c)); }); }
+            else if (cmd == "lower") result = lower(source);
+            else if (cmd == "length") {
+                const auto variable = variables.find(tokens[1]);
+                const auto* listValue = variable == variables.end() ? nullptr : std::get_if<std::vector<std::string>>(&variable->second.value);
+                result = std::to_string(listValue ? listValue->size() : source.size());
+            } else if (cmd == "contains") result = source.find(valueFor(tokens[2], variables)) == std::string::npos ? "false" : "true";
+            else {
+                const std::string search = valueFor(tokens[2], variables);
+                const std::string replacement = valueFor(tokens[3], variables);
+                if (!search.empty()) {
+                    result = source;
+                    std::size_t position = 0;
+                    while ((position = result.find(search, position)) != std::string::npos) {
+                        result.replace(position, search.size(), replacement);
+                        position += replacement.size();
+                    }
+                } else result = source;
+            }
+            if (cmd == "contains") { variables[tokens.back()] = result == "true"; types[tokens.back()] = "toggle"; }
+            else if (cmd == "length" && !(variables.count(tokens[1]) && types[tokens[1]] == "list")) {
+                double numeric = 0; parseNumber(result, numeric); variables[tokens.back()] = numeric; types[tokens.back()] = "num";
+            } else if (cmd == "length") { double numeric = 0; parseNumber(result, numeric); variables[tokens.back()] = numeric; types[tokens.back()] = "num"; }
+            else { variables[tokens.back()] = result; if (!types.count(tokens.back())) types[tokens.back()] = "word"; }
+            continue;
+        }
+
+        if (cmd == "read_file" || cmd == "write_file" || cmd == "append_file" || cmd == "delete_file" || cmd == "file_exists") {
+            const std::size_t minimum = cmd == "write_file" || cmd == "append_file" ? 3 :
+                (cmd == "read_file" || cmd == "file_exists" ? 3 : 2);
+            if (!filesEnabled) { reportError(i + 1, "enable file commands with add (files)"); continue; }
+            if (tokens.size() < minimum) { reportError(i + 1, "missing file command arguments", cmd); continue; }
+            bool pathValid = false;
+            const std::filesystem::path filePath = projectFilePath(valueFor(tokens[1], variables), pathValid);
+            if (!pathValid) { reportError(i + 1, "file path must stay inside the TRG project folder", tokens[1]); continue; }
+            try {
+                if (cmd == "read_file") {
+                    if (!validName(tokens[2])) { reportError(i + 1, "read_file needs a destination variable", tokens[2]); continue; }
+                    std::ifstream input(filePath, std::ios::binary);
+                    if (!input) { reportError(i + 1, "could not read file", tokens[1]); continue; }
+                    std::ostringstream content; content << input.rdbuf();
+                    variables[tokens[2]] = content.str();
+                    types[tokens[2]] = "word";
+                } else if (cmd == "file_exists") {
+                    if (!validName(tokens[2])) { reportError(i + 1, "file_exists needs a destination variable", tokens[2]); continue; }
+                    variables[tokens[2]] = std::filesystem::exists(filePath);
+                    types[tokens[2]] = "toggle";
+                } else if (cmd == "delete_file") {
+                    if (!std::filesystem::remove(filePath)) reportError(i + 1, "file does not exist", tokens[1]);
+                } else {
+                    std::ofstream output(filePath, std::ios::binary | (cmd == "append_file" ? std::ios::app : std::ios::trunc));
+                    if (!output) { reportError(i + 1, "could not write file", tokens[1]); continue; }
+                    for (std::size_t n = 2; n < tokens.size(); ++n) { if (n > 2) output << ' '; output << valueFor(tokens[n], variables); }
+                    output << '\n';
+                    if (!output) reportError(i + 1, "failed while writing file", tokens[1]);
+                }
+            } catch (const std::filesystem::filesystem_error& error) { reportError(i + 1, error.what(), tokens[1]); }
+            continue;
+        }
+
+        if (cmd == "play_audio" || cmd == "show_image" || cmd == "play_video") {
+            if (tokens.size() != 2) { reportError(i + 1, "use " + cmd + " PROJECT_FILE"); continue; }
+            bool pathValid = false;
+            const std::filesystem::path mediaPath = projectFilePath(valueFor(tokens[1], variables), pathValid);
+            if (!pathValid || !std::filesystem::is_regular_file(mediaPath)) {
+                reportError(i + 1, "media file must exist inside the TRG project folder", tokens[1]);
+                continue;
+            }
+#ifdef __ANDROID__
+            trgStudioActionAndroid("media:" + cmd + ":" + mediaPath.u8string());
+#elif defined(_WIN32)
+            const std::wstring widePath = mediaPath.wstring();
+            const HINSTANCE result = ShellExecuteW(mainWindow, L"open", widePath.c_str(), nullptr,
+                                                    projectRoot.wstring().c_str(), SW_SHOWNORMAL);
+            if (reinterpret_cast<INT_PTR>(result) <= 32) reportError(i + 1, "could not open media file", tokens[1]);
+#else
+            reportError(i + 1, "media playback is not supported on this platform", tokens[1]);
+#endif
+            continue;
+        }
+
+        if (cmd == "web_page") {
+            if (!webEnabled) { reportError(i + 1, "enable TRG Web with add (web)"); continue; }
+            if (tokens.size() < 2) { reportError(i + 1, "use web_page TITLE"); continue; }
+            std::string title;
+            for (std::size_t n = 1; n < tokens.size(); ++n) { if (n > 1) title += ' '; title += valueFor(tokens[n], variables); }
+            const std::string safeTitle = htmlEscape(title);
+            webPageHtml = "<!doctype html><html><head><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>" + safeTitle +
+                "</title><style>body{margin:0;padding:24px;font:18px system-ui;background:#20202a;color:#f3f0fa}button{padding:12px 20px;border:0;border-radius:8px;background:#7043be;color:white;font-size:16px}</style></head><body><h1>" + safeTitle + "</h1>";
+            continue;
+        }
+
+        if (cmd == "web_text" || cmd == "web_heading") {
+            if (!webEnabled || webPageHtml.empty()) { reportError(i + 1, "start a TRG Web page with add (web) and web_page TITLE"); continue; }
+            if (tokens.size() < 2) { reportError(i + 1, "web text needs a value"); continue; }
+            std::string value;
+            for (std::size_t n = 1; n < tokens.size(); ++n) { if (n > 1) value += ' '; value += valueFor(tokens[n], variables); }
+            const std::string escaped = htmlEscape(value);
+            webPageHtml += cmd == "web_heading" ? "<h2>" + escaped + "</h2>" : "<p>" + escaped + "</p>";
+            continue;
+        }
+
+        if (cmd == "web_button") {
+            if (!webEnabled || webPageHtml.empty() || tokens.size() < 2) { reportError(i + 1, "use web_button LABEL [MESSAGE] after web_page"); continue; }
+            const std::string label = htmlEscape(valueFor(tokens[1], variables));
+            const std::string message = htmlEscape(tokens.size() > 2 ? valueFor(tokens[2], variables) : valueFor(tokens[1], variables));
+            webPageHtml += "<button data-message=\"" + message + "\" onclick=\"alert(this.dataset.message)\">" + label + "</button> ";
+            continue;
+        }
+
+        if (cmd == "web_color") {
+            if (!webEnabled || webPageHtml.empty() || tokens.size() != 2) { reportError(i + 1, "use web_color COLOR after web_page"); continue; }
+            unsigned red = 0, green = 0, blue = 0;
+            const std::string color = valueFor(tokens[1], variables);
+            if (!parseColor(color, red, green, blue)) { reportError(i + 1, "invalid TRG Web background color", color); continue; }
+            const std::size_t styleEnd = webPageHtml.find("</style>");
+            if (styleEnd != std::string::npos) webPageHtml.insert(styleEnd, "body{background:" + color + ";}");
+            continue;
+        }
+
+        if (cmd == "web_image") {
+            if (!webEnabled || webPageHtml.empty() || tokens.size() != 2) { reportError(i + 1, "use web_image PROJECT_FILE after web_page"); continue; }
+            bool pathValid = false;
+            const auto imagePath = projectFilePath(valueFor(tokens[1], variables), pathValid);
+            if (!pathValid || !std::filesystem::is_regular_file(imagePath)) { reportError(i + 1, "image must be inside the TRG project folder", tokens[1]); continue; }
+            std::ifstream imageFile(imagePath, std::ios::binary);
+            std::ostringstream bytes; bytes << imageFile.rdbuf();
+            const std::string extension = lower(imagePath.extension().u8string());
+            const std::string mime = extension == ".png" ? "image/png" : extension == ".gif" ? "image/gif" :
+                extension == ".webp" ? "image/webp" : "image/jpeg";
+            webPageHtml += "<img style=\"max-width:100%;height:auto\" src=\"data:" + mime + ";base64," + base64Encode(bytes.str()) + "\">";
+            continue;
+        }
+
+        if (cmd == "web_show") {
+            if (!webEnabled || webPageHtml.empty()) { reportError(i + 1, "create a TRG Web page before web_show"); continue; }
+            const std::string html = webPageHtml + "</body></html>";
+#ifdef __ANDROID__
+            trgStudioActionAndroid("webpage:" + html);
+#elif defined(_WIN32)
+            const std::filesystem::path previewPath = std::filesystem::temp_directory_path() / "trg_web_preview.html";
+            { std::ofstream previewFile(previewPath, std::ios::binary); previewFile << html; }
+            const HINSTANCE opened = ShellExecuteW(mainWindow, L"open", previewPath.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+            if (reinterpret_cast<INT_PTR>(opened) <= 32) reportError(i + 1, "could not open the TRG Web preview");
+#else
+            appendOutput("TRG Web preview is available in TRG Studio.\r\n");
+#endif
+            continue;
+        }
+
+        if (cmd == "run_wasm") {
+            if (!webEnabled) { reportError(i + 1, "enable WebAssembly with add (web)"); continue; }
+            if (tokens.size() != 2) { reportError(i + 1, "use run_wasm PROJECT_FILE"); continue; }
+            bool pathValid = false;
+            const std::filesystem::path wasmPath = projectFilePath(valueFor(tokens[1], variables), pathValid);
+            if (!pathValid || !std::filesystem::is_regular_file(wasmPath) || lower(wasmPath.extension().u8string()) != ".wasm") {
+                reportError(i + 1, "run_wasm needs an existing .wasm file inside the TRG project folder", tokens[1]);
+                continue;
+            }
+#ifdef __ANDROID__
+            trgStudioActionAndroid("wasm:" + wasmPath.u8string());
+#elif defined(_WIN32)
+            std::ifstream moduleFile(wasmPath, std::ios::binary);
+            std::ostringstream moduleBytes; moduleBytes << moduleFile.rdbuf();
+            const std::string encoded = base64Encode(moduleBytes.str());
+            const std::string html = "<!doctype html><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><body style=\"background:#20202a;color:#fff;font:16px sans-serif;padding:24px\"><h2>TRG WebAssembly</h2><p>" +
+                htmlEscape(wasmPath.filename().u8string()) + "</p><pre id=\"status\">Loading module…</pre><script>try{const b=Uint8Array.from(atob('" + encoded +
+                "'),c=>c.charCodeAt(0));WebAssembly.instantiate(b,{env:{}}).then(r=>{window.trgWasm=r.instance;document.getElementById('status').textContent='Module loaded and its start function ran.';}).catch(e=>document.getElementById('status').textContent='Module error: '+e)}catch(e){document.getElementById('status').textContent='Module error: '+e}</script></body>";
+            const auto previewPath = std::filesystem::temp_directory_path() / "trg_wasm_preview.html";
+            { std::ofstream previewFile(previewPath, std::ios::binary); previewFile << html; }
+            const HINSTANCE opened = ShellExecuteW(mainWindow, L"open", previewPath.wstring().c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+            if (reinterpret_cast<INT_PTR>(opened) <= 32) reportError(i + 1, "could not open the WebAssembly preview");
+#else
+            reportError(i + 1, "WebAssembly preview is not supported on this platform", tokens[1]);
+#endif
