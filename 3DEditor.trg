@@ -36,11 +36,6 @@ text "SCENE EDITOR" x 6 y 4.7 size 1.55 color #AAB3C5
 button save_scene "SAVE" x 67 y 1.5 w 9 h 5 color #343B50 (
     3d save "scenes/level.trgscene"
 )
-button load_scene "LOAD" x 77 y 1.5 w 9 h 5 color #343B50 (
-    3d load "scenes/level.trgscene"
-    clear objects
-    length ui3DObjects objectCount
-)
 button new_scene "NEW" x 87 y 1.5 w 10 h 5 color #5743A0 (
     3d clear
     clear objects
@@ -54,7 +49,7 @@ button new_scene "NEW" x 87 y 1.5 w 10 h 5 color #5743A0 (
 // Hierarchy
 text "HIERARCHY" x 2 y 12 size 1.6 color #E6EAF2
 text "SCENE" x 2 y 16 size 1.15 color #8994A8
-text object_count x 16 y 16 size 1.1 color #8994A8
+text object_count "2 objects" x 14 y 16 size 1.1 color #8994A8 align right
 button select_cube "▣  Cube" x 1 y 19 w 16 h 5 color #34314B (
     if objectCount > 0 (
         selectedIndex = 0
@@ -81,7 +76,7 @@ text "3D VIEWPORT" x 49 y 77 size 1.1 color #8994A8 align center
 
 // Inspector
 text "INSPECTOR" x 82 y 12 size 1.6 color #E6EAF2
-text selected_name x 82 y 17 size 1.35 color #BCA8FF
+text selected_name "Nothing selected" x 82 y 17 size 1.35 color #BCA8FF
 text "TRANSFORM" x 82 y 24 size 1.15 color #8994A8
 text "Position" x 82 y 29 size 1.15 color #D8DEEA
 button move_object "EDIT POSITION" x 82 y 31 w 16 h 5 color #343B50 (
@@ -224,5 +219,3 @@ selectedIndex = 0
 get objects selectedIndex selectedName
 set_text selected_name selectedName
 set_text object_count objectCount
-text selected_name "Cube" x 82 y 17 size 1.35 color #BCA8FF
-text object_count "2 objects" x 2 y 16 size 1.1 color #8994A8
