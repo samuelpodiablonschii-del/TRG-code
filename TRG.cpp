@@ -4620,7 +4620,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 if (directoryError) { reportError(i + 1, "could not create the scene directory", directoryError.message()); continue; }
                 std::ofstream sceneFile(scenePath, std::ios::binary | std::ios::trunc);
                 if (!sceneFile) { reportError(i + 1, "could not write the 3D scene", scenePath.string()); continue; }
-                sceneFile << "TRGSCENE 1\\n" << ui3DObjects.size() << "\\n";
+                sceneFile << "TRGSCENE 1\n" << ui3DObjects.size() << "\n";
                 for (const Ui3DObject& item : ui3DObjects) {
                     sceneFile << std::quoted(item.name) << ' ' << std::quoted(item.group) << ' '
                               << std::quoted(item.shape) << ' ' << std::quoted(item.color) << ' '
@@ -4628,10 +4628,10 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                               << item.x << ' ' << item.y << ' ' << item.z << ' '
                               << item.width << ' ' << item.height << ' ' << item.depth << ' '
                               << item.rotateX << ' ' << item.rotateY << ' ' << item.rotateZ << ' '
-                              << item.opacity << ' ' << (item.visible ? 1 : 0) << '\\n';
+                              << item.opacity << ' ' << (item.visible ? 1 : 0) << '\n';
                 }
                 if (!sceneFile) { reportError(i + 1, "failed while writing the 3D scene", scenePath.string()); continue; }
-                appendOutput("Saved 3D scene: " + scenePath.string() + "\\r\\n");
+                appendOutput("Saved 3D scene: " + scenePath.string() + "\r\n");
                 continue;
             }
             if (action == "load" && tokens.size() == 3) {
@@ -4681,7 +4681,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     reportError(i + 1, "3D scene contains invalid or incomplete object data", scenePath.string()); continue;
                 }
                 ui3DObjects = std::move(loadedObjects);
-                appendOutput("Loaded 3D scene: " + scenePath.string() + "\\r\\n");
+                appendOutput("Loaded 3D scene: " + scenePath.string() + "\r\n");
                 continue;
             }
             if (action == "clear" && tokens.size() == 2) { ui3DObjects.clear(); continue; }
