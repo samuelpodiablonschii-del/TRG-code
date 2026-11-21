@@ -5025,31 +5025,31 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
     if (message == WM_CREATE) {
         mainWindow = window;
         openButton = CreateWindowExW(0, L"BUTTON", L"Open",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(openButtonId), GetModuleHandleW(nullptr), nullptr);
         saveButton = CreateWindowExW(0, L"BUTTON", L"Save",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(saveButtonId), GetModuleHandleW(nullptr), nullptr);
         runButton = CreateWindowExW(0, L"BUTTON", L"Run",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(runButtonId), GetModuleHandleW(nullptr), nullptr);
         previewButton = CreateWindowExW(0, L"BUTTON", L"Preview",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(previewButtonId), GetModuleHandleW(nullptr), nullptr);
         newButton = CreateWindowExW(0, L"BUTTON", L"New",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(newButtonId), GetModuleHandleW(nullptr), nullptr);
         buildButton = CreateWindowExW(0, L"BUTTON", L"Compile",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(buildButtonId), GetModuleHandleW(nullptr), nullptr);
         dictionaryButton = CreateWindowExW(0, L"BUTTON", L"Dictionary",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(dictionaryButtonId), GetModuleHandleW(nullptr), nullptr);
         editor2DButton = CreateWindowExW(0, L"BUTTON", L"2D Editor",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(editor2DButtonId), GetModuleHandleW(nullptr), nullptr);
         editor3DButton = CreateWindowExW(0, L"BUTTON", L"3D Editor",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(editor3DButtonId), GetModuleHandleW(nullptr), nullptr);
         richEditModule = LoadLibraryW(L"Msftedit.dll");
         const wchar_t* editorClass = richEditModule ? MSFTEDIT_CLASS : L"EDIT";
@@ -5061,13 +5061,13 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         SendMessageW(codeEditor, EM_SETLIMITTEXT, 8 * 1024 * 1024, 0);
         setOpenButtonFont(window);
         if (codeEditor && richEditModule) {
-            SendMessageW(codeEditor, EM_SETBKGNDCOLOR, 0, RGB(38, 38, 38));
+            SendMessageW(codeEditor, EM_SETBKGNDCOLOR, 0, RGB(13, 22, 33));
             CHARFORMAT2W baseFormat = {};
             baseFormat.cbSize = sizeof(baseFormat);
             baseFormat.dwMask = CFM_COLOR | CFM_FACE | CFM_SIZE | CFM_BOLD;
-            baseFormat.crTextColor = RGB(220, 220, 220);
+            baseFormat.crTextColor = RGB(220, 234, 243);
             baseFormat.yHeight = 195;
-            baseFormat.dwEffects = CFE_BOLD;
+            baseFormat.dwEffects = 0;
             std::wcsncpy(baseFormat.szFaceName, L"Consolas", LF_FACESIZE - 1);
             baseFormat.szFaceName[LF_FACESIZE - 1] = L'\0';
             SendMessageW(codeEditor, EM_SETCHARFORMAT, SCF_ALL, reinterpret_cast<LPARAM>(&baseFormat));
@@ -5075,6 +5075,57 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         layoutOutputControls(window);
         updateEditorWindowTitle();
         return 0;
+    }
+    if (message == WM_DRAWITEM) {
+        auto* item = reinterpret_cast<DRAWITEMSTRUCT*>(lParam);
+        if (item && item->CtlType == ODT_BUTTON) {
+            COLORREF fill = RGB(29, 48, 65);
+            COLORREF textColor = RGB(226, 239, 246);
+            switch (item->CtlID) {
+                case runButtonId: fill = RGB(20, 119, 111); break;
+                case previewButtonId: fill = RGB(35, 76, 91); break;
+                case buildButtonId: fill = RGB(35, 63, 82); break;
+                case newButtonId: fill = RGB(47, 56, 72); break;
+                case dictionaryButtonId: fill = RGB(35, 48, 65); break;
+                case editor2DButtonId:
+                case editor3DButtonId: fill = RGB(27, 59, 72); break;
+                default: break;
+            }
+            if (item->itemState & ODS_SELECTED) {
+                fill = RGB(GetRValue(fill) * 3 / 4, GetGValue(fill) * 3 / 4,
+                    GetBValue(fill) * 3 / 4);
+            }
+            RECT area = item->rcItem;
+            HBRUSH brush = CreateSolidBrush(fill);
+            HPEN pen = CreatePen(PS_SOLID, 1, RGB(48, 76, 94));
+            HGDIOBJ oldBrush = SelectObject(item->hDC, brush);
+            HGDIOBJ oldPen = SelectObject(item->hDC, pen);
+            RoundRect(item->hDC, area.left + 1, area.top + 1, area.right - 1,
+                area.bottom - 1, scaleForDpi(window, 10), scaleForDpi(window, 10));
+            SelectObject(item->hDC, oldBrush);
+            SelectObject(item->hDC, oldPen);
+            DeleteObject(brush);
+            DeleteObject(pen);
+            SetBkMode(item->hDC, TRANSPARENT);
+            SetTextColor(item->hDC, textColor);
+            HFONT font = CreateFontW(-scaleForDpi(window, 11), 0, 0, 0, FW_BOLD,
+                FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+                CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS,
+                L"Segoe UI");
+            HGDIOBJ oldFont = SelectObject(item->hDC, font);
+            wchar_t label[128] = {};
+            GetWindowTextW(item->hwndItem, label, 127);
+            InflateRect(&area, -scaleForDpi(window, 3), 0);
+            DrawTextW(item->hDC, label, -1, &area,
+                DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+            SelectObject(item->hDC, oldFont);
+            DeleteObject(font);
+            if (item->itemState & ODS_FOCUS) {
+                InflateRect(&area, -scaleForDpi(window, 3), -scaleForDpi(window, 3));
+                DrawFocusRect(item->hDC, &area);
+            }
+            return TRUE;
+        }
     }
     if (message == WM_SIZE) {
         layoutOutputControls(window);
@@ -5277,9 +5328,15 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         DeleteObject(background);
         const DesktopLayout layout = desktopLayout(window, client);
         RECT header = {0, 0, layout.width, layout.headerHeight};
-        HBRUSH purple = CreateSolidBrush(RGB(91, 52, 170));
-        FillRect(dc, &header, purple);
-        DeleteObject(purple);
+        HBRUSH headerBrush = CreateSolidBrush(RGB(10, 16, 25));
+        FillRect(dc, &header, headerBrush);
+        DeleteObject(headerBrush);
+        if (layout.headerHeight > 0) {
+            RECT accentBar = {0, 0, layout.width, scaleForDpi(window, 4)};
+            HBRUSH accentBrush = CreateSolidBrush(RGB(85, 214, 190));
+            FillRect(dc, &accentBar, accentBrush);
+            DeleteObject(accentBrush);
+        }
         SetBkMode(dc, TRANSPARENT);
         SetTextColor(dc, RGB(255, 255, 255));
         HFONT titleFont = CreateFontW(-scaleForDpi(window, 32), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
@@ -5295,7 +5352,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         DeleteObject(titleFont);
         const LONG panelTop = layout.panelTop;
         RECT canvas = {0, layout.headerHeight, layout.width, panelTop};
-        HBRUSH canvasBrush = CreateSolidBrush(RGB(38, 36, 44));
+        HBRUSH canvasBrush = CreateSolidBrush(RGB(12, 20, 30));
         FillRect(dc, &canvas, canvasBrush);
         DeleteObject(canvasBrush);
         HFONT bodyFont = CreateFontW(-scaleForDpi(window, 13), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
