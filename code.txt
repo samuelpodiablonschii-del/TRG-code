@@ -331,6 +331,10 @@ std::vector<std::string> uiProgram;
 std::filesystem::path projectRoot = std::filesystem::current_path();
 bool filesEnabled = false;
 bool jsonEnabled = false;
+struct TrgDatabaseTable { std::vector<std::string> columns; std::vector<std::vector<std::string>> rows; };
+std::unordered_map<std::string, TrgDatabaseTable> trgDatabaseTables;
+std::filesystem::path trgDatabasePath;
+bool databaseEnabled = false;
 std::vector<std::string> groupStack;
 std::vector<std::unordered_set<std::string>> groupSnapshots;
 std::unordered_map<std::string, std::vector<std::string>> variableGroups;
@@ -570,18 +574,41 @@ void layoutOutputControls(HWND window) {
         std::max<LONG>(scaleForDpi(window, 48), height / 5));
     const LONG gap = scaleForDpi(window, 5);
     const LONG margin = scaleForDpi(window, 12);
-    const LONG desiredWidth = scaleForDpi(window, 88);
-    const LONG available = std::max<LONG>(scaleForDpi(window, 9 * 48 + 8 * 5), width - scaleForDpi(window, 170) - margin * 2);
-    const LONG buttonWidth = std::clamp<LONG>((available - gap * 8) / 9,
-        scaleForDpi(window, 48), scaleForDpi(window, 78));
-    const LONG buttonHeight = scaleForDpi(window, 34);
-    const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton, buildButton, dictionaryButton};
-    LONG x = width - margin - (buttonWidth + gap) * 9 + gap;
-    const LONG y = std::max<LONG>(0, (headerHeight - buttonHeight) / 2);
-    for (HWND button : buttons) {
-        if (button) MoveWindow(button, x, y, buttonWidth, buttonHeight, TRUE);
-        x += buttonWidth + gap;
+
+    if (previewMode) {
+        const HWND controls[] = {openButton, saveButton, runButton, newButton, buildButton,
+            dictionaryButton, editor2DButton, editor3DButton};
+        for (HWND control : controls) if (control) ShowWindow(control, SW_HIDE);
+        if (previewButton) {
+            SetWindowTextW(previewButton, L"Code");
+            const LONG buttonWidth = scaleForDpi(window, 76);
+            const LONG buttonHeight = scaleForDpi(window, 34);
+            MoveWindow(previewButton, std::max<LONG>(margin, width - margin - buttonWidth),
+                margin, buttonWidth, buttonHeight, TRUE);
+            ShowWindow(previewButton, SW_SHOW);
+            SetWindowPos(previewButton, HWND_TOP, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        }
+    } else {
+        const LONG available = std::max<LONG>(scaleForDpi(window, 9 * 48 + 8 * 5),
+            width - scaleForDpi(window, 170) - margin * 2);
+        const LONG buttonWidth = std::clamp<LONG>((available - gap * 8) / 9,
+            scaleForDpi(window, 48), scaleForDpi(window, 78));
+        const LONG buttonHeight = scaleForDpi(window, 34);
+        const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton,
+            buildButton, dictionaryButton, editor2DButton, editor3DButton};
+        LONG x = width - margin - (buttonWidth + gap) * 9 + gap;
+        const LONG y = std::max<LONG>(0, (headerHeight - buttonHeight) / 2);
+        for (HWND button : buttons) {
+            if (button) {
+                MoveWindow(button, x, y, buttonWidth, buttonHeight, TRUE);
+                ShowWindow(button, SW_SHOW);
+            }
+            x += buttonWidth + gap;
+        }
+        if (previewButton) SetWindowTextW(previewButton, L"Preview");
     }
+
     if (codeEditor) {
         const LONG editorMargin = scaleForDpi(window, 10);
         const LONG top = headerHeight + editorMargin;
@@ -1832,6 +1859,7 @@ std::string psExecuteSafe(const std::string& code, std::string& error) {
 struct LibraryState {
     bool files = false;
     bool json = false;
+    bool database = false;
     bool web = false;
     bool collision = false;
     bool manual = false;
@@ -1943,7 +1971,7 @@ void scanLibraries(const std::vector<std::string>& program, LibraryState& librar
         if (second.size() < 3 || second.front() != '(' || second.back() != ')') continue;
         const std::string name = lower(second.substr(1, second.size() - 2));
         if (name == "all") {
-            libraries.files = libraries.json = libraries.web = libraries.collision = true;
+            libraries.files = libraries.json = libraries.database = libraries.web = libraries.collision = true;
             libraries.manual = libraries.ui = libraries.controls = libraries.network = libraries.ai = libraries.math = true;
             libraries.binary = libraries.regex = libraries.compression = true;
             libraries.powershell = libraries.raspberry = libraries.accessibility = true;
@@ -1953,6 +1981,7 @@ void scanLibraries(const std::vector<std::string>& program, LibraryState& librar
             libraries.bouncyballs = true;
         } else if (name == "files") libraries.files = true;
         else if (name == "json") libraries.json = true;
+        else if (name == "database" || name == "db") libraries.database = true;
         else if (name == "web") libraries.web = true;
         else if (name == "collision") libraries.collision = true;
         else if (name == "physics") libraries.physics = true;
@@ -2156,6 +2185,82 @@ void registerFunctions(const std::vector<std::string>& program, bool clearFirst 
                                          program.begin() + static_cast<std::ptrdiff_t>(close))};
         }
     }
+}
+
+
+std::size_t databaseColumnIndex(const TrgDatabaseTable& table, const std::string& name) {
+    const auto found = std::find(table.columns.begin(), table.columns.end(), name);
+    return found == table.columns.end() ? table.columns.size() : static_cast<std::size_t>(found - table.columns.begin());
+}
+bool saveTrgDatabase(std::string& error) {
+    error.clear();
+    if (trgDatabasePath.empty()) { error = "open a database first"; return false; }
+    std::ofstream out(trgDatabasePath, std::ios::binary | std::ios::trunc);
+    if (!out) { error = "could not write database file"; return false; }
+    out << "TRGDB1\n";
+    std::vector<std::string> names;
+    for (const auto& item : trgDatabaseTables) names.push_back(item.first);
+    std::sort(names.begin(), names.end());
+    for (const auto& name : names) {
+        const auto& table = trgDatabaseTables.at(name);
+        out << "T\t" << hexEncode(name) << "\t" << table.columns.size() << "\t" << table.rows.size() << "\n";
+        for (const auto& column : table.columns) out << "C\t" << hexEncode(column) << "\n";
+        for (const auto& row : table.rows) {
+            out << "R";
+            for (const auto& cell : row) out << "\t" << hexEncode(cell);
+            out << "\n";
+        }
+    }
+    if (!out) { error = "database write failed"; return false; }
+    return true;
+}
+bool loadTrgDatabase(const std::filesystem::path& path, std::string& error) {
+    error.clear();
+    std::ifstream in(path, std::ios::binary);
+    if (!in) { error = "could not read database file"; return false; }
+    std::string line;
+    if (!std::getline(in, line) || line != "TRGDB1") { error = "not a supported TRG database file"; return false; }
+    std::unordered_map<std::string, TrgDatabaseTable> loaded;
+    while (std::getline(in, line)) {
+        if (line.empty()) continue;
+        std::vector<std::string> parts;
+        std::istringstream stream(line);
+        std::string part;
+        while (std::getline(stream, part, '\t')) parts.push_back(part);
+        if (parts.size() != 4 || parts[0] != "T") { error = "corrupt database table header"; return false; }
+        std::string name;
+        if (!hexDecode(parts[1], name) || name.empty()) { error = "corrupt database table name"; return false; }
+        std::size_t columns = 0, rows = 0;
+        try { columns = static_cast<std::size_t>(std::stoull(parts[2])); rows = static_cast<std::size_t>(std::stoull(parts[3])); }
+        catch (...) { error = "corrupt database dimensions"; return false; }
+        if (columns > 1024 || rows > 1000000) { error = "database dimensions exceed safety limits"; return false; }
+        TrgDatabaseTable table;
+        for (std::size_t c = 0; c < columns; ++c) {
+            if (!std::getline(in, line) || line.rfind("C\t", 0) != 0) { error = "corrupt database column"; return false; }
+            std::string value;
+            if (!hexDecode(line.substr(2), value) || value.empty() ||
+                std::find(table.columns.begin(), table.columns.end(), value) != table.columns.end()) { error = "invalid or duplicate database column"; return false; }
+            table.columns.push_back(std::move(value));
+        }
+        for (std::size_t r = 0; r < rows; ++r) {
+            if (!std::getline(in, line)) { error = "incomplete database records"; return false; }
+            std::istringstream cellsStream(line);
+            std::string cell;
+            if (!std::getline(cellsStream, cell, '\t') || cell != "R") { error = "corrupt database record"; return false; }
+            std::vector<std::string> values;
+            while (std::getline(cellsStream, cell, '\t')) {
+                std::string value;
+                if (!hexDecode(cell, value)) { error = "corrupt database value"; return false; }
+                values.push_back(std::move(value));
+            }
+            if (values.size() != columns) { error = "database record has the wrong number of fields"; return false; }
+            table.rows.push_back(std::move(values));
+        }
+        if (!loaded.emplace(name, std::move(table)).second) { error = "duplicate database table"; return false; }
+    }
+    trgDatabaseTables = std::move(loaded);
+    trgDatabasePath = path;
+    return true;
 }
 
 void executeBlock(const std::vector<std::string>& program, std::size_t begin, std::size_t end,
@@ -2682,6 +2787,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 scanLibraries(connectedProgram, connectedLibraries);
                 filesEnabled = filesEnabled || connectedLibraries.files;
                 jsonEnabled = jsonEnabled || connectedLibraries.json;
+                databaseEnabled = databaseEnabled || connectedLibraries.database;
                 webEnabled = webEnabled || connectedLibraries.web;
                 collisionEnabled = collisionEnabled || connectedLibraries.collision;
                 physicsEnabled = physicsEnabled || connectedLibraries.physics;
@@ -2726,6 +2832,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     scanLibraries(moduleProgram, moduleLibraries);
                     filesEnabled = filesEnabled || moduleLibraries.files;
                     jsonEnabled = jsonEnabled || moduleLibraries.json;
+                    databaseEnabled = databaseEnabled || moduleLibraries.database;
                     webEnabled = webEnabled || moduleLibraries.web;
                     collisionEnabled = collisionEnabled || moduleLibraries.collision;
                     physicsEnabled = physicsEnabled || moduleLibraries.physics;
@@ -2779,7 +2886,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 if (library == "(stats)") { statsEnabled = true; appendOutput("TRG stats library enabled.\r\n"); continue; }
                 if (library == "(units)") { unitsEnabled = true; appendOutput("TRG units library enabled.\r\n"); continue; }
                 if (library == "(all)") {
-                    filesEnabled = jsonEnabled = webEnabled = collisionEnabled = physicsEnabled = networkEnabled = aiEnabled = mathEnabled = true;
+                    filesEnabled = jsonEnabled = databaseEnabled = webEnabled = collisionEnabled = physicsEnabled = networkEnabled = aiEnabled = mathEnabled = true;
                     binaryEnabled = regexEnabled = compressionEnabled = true;
                     powershellEnabled = raspberryEnabled = accessibilityEnabled = true;
                     statsEnabled = unitsEnabled = true;
@@ -2841,6 +2948,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             scanLibraries(runProgram, runLibraries);
             filesEnabled = filesEnabled || runLibraries.files;
             jsonEnabled = jsonEnabled || runLibraries.json;
+            databaseEnabled = databaseEnabled || runLibraries.database;
             webEnabled = webEnabled || runLibraries.web;
             collisionEnabled = collisionEnabled || runLibraries.collision;
             if (runLibraries.controls) initializeControls(variables, types);
@@ -2857,6 +2965,139 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
         }
 
         
+        if (cmd == "database" || cmd == "db" || cmd == "table" || cmd == "record" || cmd == "query" || cmd == "sql") {
+            if (!databaseEnabled) { reportError(i + 1, "database commands need add (database)"); continue; }
+            const std::string action = tokens.size() > 1 ? lower(tokens[1]) : "";
+            std::string dbError;
+            if (cmd == "database" || cmd == "db") {
+                if (action == "open" && tokens.size() == 3) {
+                    bool validPath = false;
+                    const auto path = projectFilePath(valueFor(tokens[2], variables), validPath);
+                    if (!validPath) { reportError(i + 1, "database path must stay inside the TRG project folder", tokens[2]); continue; }
+                    if (std::filesystem::exists(path)) {
+                        if (!loadTrgDatabase(path, dbError)) { reportError(i + 1, dbError, tokens[2]); continue; }
+                    } else {
+                        trgDatabaseTables.clear(); trgDatabasePath = path;
+                        if (!saveTrgDatabase(dbError)) { reportError(i + 1, dbError, tokens[2]); continue; }
+                    }
+                    appendOutput("Database opened: " + path.filename().u8string() + "\\r\\n");
+                } else if (action == "save" && tokens.size() == 2) {
+                    if (!saveTrgDatabase(dbError)) reportError(i + 1, dbError);
+                    else appendOutput("Database saved.\\r\\n");
+                } else if (action == "close" && tokens.size() == 2) {
+                    trgDatabaseTables.clear(); trgDatabasePath.clear(); appendOutput("Database closed.\\r\\n");
+                } else if (action == "tables" && tokens.size() == 2) {
+                    std::vector<std::string> names;
+                    for (const auto& item : trgDatabaseTables) names.push_back(item.first);
+                    std::sort(names.begin(), names.end());
+                    for (const auto& name : names) appendOutput(name + "\\r\\n");
+                    variables["database_table_count"] = static_cast<double>(names.size()); types["database_table_count"] = "num";
+                } else reportError(i + 1, "use database open FILE, database save, database close, or database tables");
+                continue;
+            }
+            if (trgDatabasePath.empty()) { reportError(i + 1, "open a database first with database open FILE"); continue; }
+            if (cmd == "table") {
+                if (action == "create" && tokens.size() >= 4) {
+                    const std::string name = valueFor(tokens[2], variables);
+                    if (!validName(name) || trgDatabaseTables.count(name)) { reportError(i + 1, "table name is invalid or already exists", name); continue; }
+                    TrgDatabaseTable table; bool valid = true;
+                    for (std::size_t n = 3; n < tokens.size(); ++n) {
+                        const std::string column = valueFor(tokens[n], variables);
+                        if (!validName(column) || std::find(table.columns.begin(), table.columns.end(), column) != table.columns.end()) { valid = false; break; }
+                        table.columns.push_back(column);
+                    }
+                    if (!valid) { reportError(i + 1, "table columns must be unique valid names"); continue; }
+                    trgDatabaseTables.emplace(name, std::move(table));
+                    if (!saveTrgDatabase(dbError)) reportError(i + 1, dbError);
+                    else appendOutput("Created table " + name + ".\\r\\n");
+                } else if (action == "delete" && tokens.size() == 3) {
+                    if (!trgDatabaseTables.erase(valueFor(tokens[2], variables))) reportError(i + 1, "unknown table", tokens[2]);
+                    else if (!saveTrgDatabase(dbError)) reportError(i + 1, dbError);
+                } else if (action == "count" && tokens.size() == 4 && validName(tokens[3])) {
+                    const auto found = trgDatabaseTables.find(valueFor(tokens[2], variables));
+                    if (found == trgDatabaseTables.end()) { reportError(i + 1, "unknown table", tokens[2]); continue; }
+                    variables[tokens[3]] = static_cast<double>(found->second.rows.size()); types[tokens[3]] = "num";
+                } else reportError(i + 1, "use table create NAME COLUMN... | table delete NAME | table count NAME RESULT");
+                continue;
+            }
+            if (cmd == "record") {
+                if (action == "add" && tokens.size() >= 5 && (tokens.size() - 3) % 2 == 0) {
+                    const auto found = trgDatabaseTables.find(valueFor(tokens[2], variables));
+                    if (found == trgDatabaseTables.end()) { reportError(i + 1, "unknown table", tokens[2]); continue; }
+                    std::vector<std::string> row(found->second.columns.size()); bool valid = true;
+                    for (std::size_t n = 3; n + 1 < tokens.size(); n += 2) {
+                        const auto col = databaseColumnIndex(found->second, valueFor(tokens[n], variables));
+                        if (col == found->second.columns.size()) { valid = false; break; }
+                        row[col] = valueFor(tokens[n + 1], variables);
+                    }
+                    if (!valid) { reportError(i + 1, "record contains an unknown field", tokens[2]); continue; }
+                    found->second.rows.push_back(std::move(row));
+                    if (!saveTrgDatabase(dbError)) reportError(i + 1, dbError);
+                    else { variables["last_record"] = static_cast<double>(found->second.rows.size() - 1); types["last_record"] = "num"; }
+                } else if (action == "get" && tokens.size() == 6 && validName(tokens[5])) {
+                    const auto found = trgDatabaseTables.find(valueFor(tokens[2], variables)); double index = 0;
+                    if (found == trgDatabaseTables.end() || !parseNumber(valueFor(tokens[3], variables), index) || index < 0 ||
+                        index >= (found == trgDatabaseTables.end() ? 0.0 : static_cast<double>(found->second.rows.size())) || std::floor(index) != index) {
+                        reportError(i + 1, "record get needs a valid table and row index"); continue;
+                    }
+                    const auto col = databaseColumnIndex(found->second, valueFor(tokens[4], variables));
+                    if (col == found->second.columns.size()) { reportError(i + 1, "unknown record field", tokens[4]); continue; }
+                    variables[tokens[5]] = found->second.rows[static_cast<std::size_t>(index)][col]; types[tokens[5]] = "word";
+                } else if (action == "update" && tokens.size() == 6) {
+                    const auto found = trgDatabaseTables.find(valueFor(tokens[2], variables)); double index = 0;
+                    if (found == trgDatabaseTables.end() || !parseNumber(valueFor(tokens[3], variables), index) || index < 0 ||
+                        index >= (found == trgDatabaseTables.end() ? 0.0 : static_cast<double>(found->second.rows.size())) || std::floor(index) != index) {
+                        reportError(i + 1, "record update needs a valid table and row index"); continue;
+                    }
+                    const auto col = databaseColumnIndex(found->second, valueFor(tokens[4], variables));
+                    if (col == found->second.columns.size()) { reportError(i + 1, "unknown record field", tokens[4]); continue; }
+                    found->second.rows[static_cast<std::size_t>(index)][col] = valueFor(tokens[5], variables);
+                    if (!saveTrgDatabase(dbError)) reportError(i + 1, dbError);
+                } else if (action == "delete" && tokens.size() == 4) {
+                    const auto found = trgDatabaseTables.find(valueFor(tokens[2], variables)); double index = 0;
+                    if (found == trgDatabaseTables.end() || !parseNumber(valueFor(tokens[3], variables), index) || index < 0 ||
+                        index >= (found == trgDatabaseTables.end() ? 0.0 : static_cast<double>(found->second.rows.size())) || std::floor(index) != index) {
+                        reportError(i + 1, "record delete needs a valid table and row index"); continue;
+                    }
+                    found->second.rows.erase(found->second.rows.begin() + static_cast<std::ptrdiff_t>(index));
+                    if (!saveTrgDatabase(dbError)) reportError(i + 1, dbError);
+                } else reportError(i + 1, "use record add TABLE FIELD VALUE... | record get TABLE INDEX FIELD RESULT | record update TABLE INDEX FIELD VALUE | record delete TABLE INDEX");
+                continue;
+            }
+            if (cmd == "query" || cmd == "sql") {
+                const bool sqlMode = cmd == "sql";
+                const std::size_t tableAt = sqlMode ? 3 : 1;
+                const std::size_t fieldAt = sqlMode ? 5 : 2;
+                const std::size_t opAt = fieldAt + 1, valueAt = fieldAt + 2, resultAt = sqlMode ? 9 : 5;
+                if ((sqlMode && (tokens.size() != 10 || action != "select" || lower(tokens[2]) != "from" ||
+                                 lower(tokens[4]) != "where" || lower(tokens[8]) != "into")) ||
+                    (!sqlMode && tokens.size() != 6) || resultAt >= tokens.size() || !validName(tokens[resultAt])) {
+                    reportError(i + 1, sqlMode ? "use sql select from TABLE where FIELD OP VALUE into RESULT" : "use query TABLE FIELD OP VALUE RESULT"); continue;
+                }
+                const auto found = trgDatabaseTables.find(valueFor(tokens[tableAt], variables));
+                if (found == trgDatabaseTables.end()) { reportError(i + 1, "unknown table", tokens[tableAt]); continue; }
+                const auto col = databaseColumnIndex(found->second, valueFor(tokens[fieldAt], variables));
+                if (col == found->second.columns.size()) { reportError(i + 1, "unknown query field", tokens[fieldAt]); continue; }
+                const std::string op = tokens[opAt], wanted = valueFor(tokens[valueAt], variables);
+                if (op != "=" && op != "!=" && op != ">" && op != "<" && op != ">=" && op != "<=") {
+                    reportError(i + 1, "unsupported query operator", op); continue;
+                }
+                std::vector<std::string> matches;
+                for (std::size_t n = 0; n < found->second.rows.size(); ++n) {
+                    const std::string actual = found->second.rows[n][col]; double a = 0, b = 0;
+                    const bool numeric = parseNumber(actual, a) && parseNumber(wanted, b);
+                    const bool match = op == "=" ? actual == wanted : op == "!=" ? actual != wanted :
+                        op == ">" ? (numeric ? a > b : actual > wanted) : op == "<" ? (numeric ? a < b : actual < wanted) :
+                        op == ">=" ? (numeric ? a >= b : actual >= wanted) : (numeric ? a <= b : actual <= wanted);
+                    if (match) matches.push_back(std::to_string(n));
+                }
+                const std::size_t count = matches.size();
+                variables[tokens[resultAt]] = std::move(matches); types[tokens[resultAt]] = "list";
+                variables["query_count"] = static_cast<double>(count); types["query_count"] = "num";
+                continue;
+            }
+        }
+
         if (cmd == "json") {
             if (!jsonEnabled) { reportError(i + 1, "JSON commands need add (json)"); continue; }
             if (tokens.size() >= 2 && lower(tokens[1]) == "read") {
@@ -4979,56 +5220,54 @@ struct DesktopLayout {
 DesktopLayout desktopLayout(HWND window, const RECT& client) {
     const LONG width = std::max<LONG>(0, client.right - client.left);
     const LONG height = std::max<LONG>(0, client.bottom - client.top);
+    const LONG margin = scaleForDpi(window, 20);
+    if (previewMode) {
+        return {width, height, 0, height, std::max<LONG>(1, height),
+            margin, height, height};
+    }
     const LONG headerHeight = std::min<LONG>(scaleForDpi(window, 76),
         std::max<LONG>(scaleForDpi(window, 48), height / 5));
-    const LONG margin = scaleForDpi(window, 20);
     const LONG outputMinimum = scaleForDpi(window, 80);
     const LONG canvasMinimum = scaleForDpi(window, 100);
     const LONG panelMinimum = std::min(height, headerHeight + canvasMinimum);
     const LONG panelMaximum = std::max(panelMinimum, height - outputMinimum);
     const LONG panelTop = std::clamp<LONG>(height * 65 / 100, panelMinimum, panelMaximum);
-    return {
-        width,
-        height,
-        headerHeight,
-        panelTop,
-        std::max<LONG>(1, panelTop - headerHeight),
-        margin,
+    return {width, height, headerHeight, panelTop,
+        std::max<LONG>(1, panelTop - headerHeight), margin,
         panelTop + scaleForDpi(window, 10),
         std::max<LONG>(panelTop + scaleForDpi(window, 10),
-                       height - scaleForDpi(window, 16))
-    };
+                       height - scaleForDpi(window, 16))};
 }
 
 LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     if (message == WM_CREATE) {
         mainWindow = window;
         openButton = CreateWindowExW(0, L"BUTTON", L"Open",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(openButtonId), GetModuleHandleW(nullptr), nullptr);
         saveButton = CreateWindowExW(0, L"BUTTON", L"Save",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(saveButtonId), GetModuleHandleW(nullptr), nullptr);
         runButton = CreateWindowExW(0, L"BUTTON", L"Run",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(runButtonId), GetModuleHandleW(nullptr), nullptr);
         previewButton = CreateWindowExW(0, L"BUTTON", L"Preview",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(previewButtonId), GetModuleHandleW(nullptr), nullptr);
         newButton = CreateWindowExW(0, L"BUTTON", L"New",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(newButtonId), GetModuleHandleW(nullptr), nullptr);
         buildButton = CreateWindowExW(0, L"BUTTON", L"Compile",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(buildButtonId), GetModuleHandleW(nullptr), nullptr);
         dictionaryButton = CreateWindowExW(0, L"BUTTON", L"Dictionary",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(dictionaryButtonId), GetModuleHandleW(nullptr), nullptr);
         editor2DButton = CreateWindowExW(0, L"BUTTON", L"2D Editor",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(editor2DButtonId), GetModuleHandleW(nullptr), nullptr);
         editor3DButton = CreateWindowExW(0, L"BUTTON", L"3D Editor",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 100, 32, window,
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(editor3DButtonId), GetModuleHandleW(nullptr), nullptr);
         richEditModule = LoadLibraryW(L"Msftedit.dll");
         const wchar_t* editorClass = richEditModule ? MSFTEDIT_CLASS : L"EDIT";
@@ -5040,13 +5279,13 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         SendMessageW(codeEditor, EM_SETLIMITTEXT, 8 * 1024 * 1024, 0);
         setOpenButtonFont(window);
         if (codeEditor && richEditModule) {
-            SendMessageW(codeEditor, EM_SETBKGNDCOLOR, 0, RGB(38, 38, 38));
+            SendMessageW(codeEditor, EM_SETBKGNDCOLOR, 0, RGB(13, 22, 33));
             CHARFORMAT2W baseFormat = {};
             baseFormat.cbSize = sizeof(baseFormat);
             baseFormat.dwMask = CFM_COLOR | CFM_FACE | CFM_SIZE | CFM_BOLD;
-            baseFormat.crTextColor = RGB(220, 220, 220);
+            baseFormat.crTextColor = RGB(220, 234, 243);
             baseFormat.yHeight = 195;
-            baseFormat.dwEffects = CFE_BOLD;
+            baseFormat.dwEffects = 0;
             std::wcsncpy(baseFormat.szFaceName, L"Consolas", LF_FACESIZE - 1);
             baseFormat.szFaceName[LF_FACESIZE - 1] = L'\0';
             SendMessageW(codeEditor, EM_SETCHARFORMAT, SCF_ALL, reinterpret_cast<LPARAM>(&baseFormat));
@@ -5054,6 +5293,57 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         layoutOutputControls(window);
         updateEditorWindowTitle();
         return 0;
+    }
+    if (message == WM_DRAWITEM) {
+        auto* item = reinterpret_cast<DRAWITEMSTRUCT*>(lParam);
+        if (item && item->CtlType == ODT_BUTTON) {
+            COLORREF fill = RGB(29, 48, 65);
+            COLORREF textColor = RGB(226, 239, 246);
+            switch (item->CtlID) {
+                case runButtonId: fill = RGB(20, 119, 111); break;
+                case previewButtonId: fill = RGB(35, 76, 91); break;
+                case buildButtonId: fill = RGB(35, 63, 82); break;
+                case newButtonId: fill = RGB(47, 56, 72); break;
+                case dictionaryButtonId: fill = RGB(35, 48, 65); break;
+                case editor2DButtonId:
+                case editor3DButtonId: fill = RGB(27, 59, 72); break;
+                default: break;
+            }
+            if (item->itemState & ODS_SELECTED) {
+                fill = RGB(GetRValue(fill) * 3 / 4, GetGValue(fill) * 3 / 4,
+                    GetBValue(fill) * 3 / 4);
+            }
+            RECT area = item->rcItem;
+            HBRUSH brush = CreateSolidBrush(fill);
+            HPEN pen = CreatePen(PS_SOLID, 1, RGB(48, 76, 94));
+            HGDIOBJ oldBrush = SelectObject(item->hDC, brush);
+            HGDIOBJ oldPen = SelectObject(item->hDC, pen);
+            RoundRect(item->hDC, area.left + 1, area.top + 1, area.right - 1,
+                area.bottom - 1, scaleForDpi(window, 10), scaleForDpi(window, 10));
+            SelectObject(item->hDC, oldBrush);
+            SelectObject(item->hDC, oldPen);
+            DeleteObject(brush);
+            DeleteObject(pen);
+            SetBkMode(item->hDC, TRANSPARENT);
+            SetTextColor(item->hDC, textColor);
+            HFONT font = CreateFontW(-scaleForDpi(window, 11), 0, 0, 0, FW_BOLD,
+                FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+                CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS,
+                L"Segoe UI");
+            HGDIOBJ oldFont = SelectObject(item->hDC, font);
+            wchar_t label[128] = {};
+            GetWindowTextW(item->hwndItem, label, 127);
+            InflateRect(&area, -scaleForDpi(window, 3), 0);
+            DrawTextW(item->hDC, label, -1, &area,
+                DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+            SelectObject(item->hDC, oldFont);
+            DeleteObject(font);
+            if (item->itemState & ODS_FOCUS) {
+                InflateRect(&area, -scaleForDpi(window, 3), -scaleForDpi(window, 3));
+                DrawFocusRect(item->hDC, &area);
+            }
+            return TRUE;
+        }
     }
     if (message == WM_SIZE) {
         layoutOutputControls(window);
@@ -5256,9 +5546,15 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         DeleteObject(background);
         const DesktopLayout layout = desktopLayout(window, client);
         RECT header = {0, 0, layout.width, layout.headerHeight};
-        HBRUSH purple = CreateSolidBrush(RGB(91, 52, 170));
-        FillRect(dc, &header, purple);
-        DeleteObject(purple);
+        HBRUSH headerBrush = CreateSolidBrush(RGB(10, 16, 25));
+        FillRect(dc, &header, headerBrush);
+        DeleteObject(headerBrush);
+        if (layout.headerHeight > 0) {
+            RECT accentBar = {0, 0, layout.width, scaleForDpi(window, 4)};
+            HBRUSH accentBrush = CreateSolidBrush(RGB(85, 214, 190));
+            FillRect(dc, &accentBar, accentBrush);
+            DeleteObject(accentBrush);
+        }
         SetBkMode(dc, TRANSPARENT);
         SetTextColor(dc, RGB(255, 255, 255));
         HFONT titleFont = CreateFontW(-scaleForDpi(window, 32), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
@@ -5274,7 +5570,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         DeleteObject(titleFont);
         const LONG panelTop = layout.panelTop;
         RECT canvas = {0, layout.headerHeight, layout.width, panelTop};
-        HBRUSH canvasBrush = CreateSolidBrush(RGB(38, 36, 44));
+        HBRUSH canvasBrush = CreateSolidBrush(RGB(12, 20, 30));
         FillRect(dc, &canvas, canvasBrush);
         DeleteObject(canvasBrush);
         HFONT bodyFont = CreateFontW(-scaleForDpi(window, 13), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
@@ -5770,6 +6066,9 @@ void executeProgram(const std::vector<std::string>& program) {
     controlsEnabled = false;
     filesEnabled = false;
     jsonEnabled = false;
+    databaseEnabled = false;
+    trgDatabaseTables.clear();
+    trgDatabasePath.clear();
     webEnabled = false;
     collisionEnabled = false;
     physicsEnabled = false;
@@ -5807,6 +6106,7 @@ void executeProgram(const std::vector<std::string>& program) {
     scanLibraries(uiProgram, libraries);
     filesEnabled = libraries.files;
     jsonEnabled = libraries.json;
+    databaseEnabled = libraries.database;
     webEnabled = libraries.web;
     collisionEnabled = libraries.collision;
     physicsEnabled = libraries.physics;
