@@ -10,6 +10,7 @@ BUILD_DIR = ROOT / ".test-build"
 BINARY = BUILD_DIR / ("trg-tests.exe" if os.name == "nt" else "trg-tests")
 TESTS = [
     ("beginner_syntax.trg", "TRG_BEGINNER_TESTS_PASSED"),
+    ("else_if.trg", "TRG_ELSE_IF_TEST_PASSED"),
     ("collections_strings.trg", "TRG_FEATURE_TESTS_PASSED"),
     ("advanced_libraries.trg", "TRG_ADVANCED_LIBRARIES_PASSED"),
     ("math_library.trg", "TRG_MATH_TESTS_PASSED"),
