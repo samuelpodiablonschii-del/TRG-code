@@ -4275,7 +4275,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
         }
 
         
-        if (cmd == "group" || cmd == "if" || cmd == "loop" || cmd == "every") {
+        if (cmd == "group" || cmd == "if" || cmd == "loop" || cmd == "every" || cmd == "for") {
             std::size_t open = 0, close = 0;
             if (!findBlock(program, i, end, open, close)) { reportError(i + 1, "missing block"); continue; }
             if (cmd == "group") {
@@ -4312,6 +4312,49 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 }
                 if (inner.stopped) { flow.stopped = true; return; }
                 if (inner.returned) { flow.returned = true; flow.returnValue = inner.returnValue; return; }
+            } else if (cmd == "for") {
+                if (tokens.size() != 6 || lower(tokens[1]) != "each" ||
+                    !validName(tokens[2]) || lower(tokens[3]) != "in" ||
+                    !variables.count(tokens[4]) || types[tokens[4]] != "list") {
+                    reportError(i + 1, "use for each ITEM in LIST ( ... )");
+                    i = close;
+                    continue;
+                }
+                const auto* sourceItems = std::get_if<std::vector<std::string>>(&variables[tokens[4]].value);
+                if (!sourceItems) {
+                    reportError(i + 1, "for each needs a list of values", tokens[4]);
+                    i = close;
+                    continue;
+                }
+                const std::vector<std::string> items = *sourceItems;
+                const std::string itemName = tokens[2];
+                const auto previousValue = variables.find(itemName);
+                const bool hadPreviousValue = previousValue != variables.end();
+                VariableValue savedValue;
+                if (hadPreviousValue) savedValue = previousValue->second;
+                const auto previousType = types.find(itemName);
+                const bool hadPreviousType = previousType != types.end();
+                const std::string savedType = hadPreviousType ? previousType->second : "";
+                for (const std::string& item : items) {
+                    variables[itemName] = item;
+                    types[itemName] = "word";
+                    Flow iteration;
+                    executeBlock(program, open + 1, close, variables, types, defaults,
+                                 iteration, manualMode, uiMode);
+                    if (iteration.stopped) { flow.stopped = true; break; }
+                    if (iteration.returned) {
+                        flow.returned = true;
+                        flow.returnValue = iteration.returnValue;
+                        break;
+                    }
+                    if (iteration.broke) break;
+                    // continue intentionally advances to the next item.
+                }
+                if (hadPreviousValue) variables[itemName] = savedValue;
+                else variables.erase(itemName);
+                if (hadPreviousType) types[itemName] = savedType;
+                else types.erase(itemName);
+                if (flow.stopped || flow.returned) return;
             } else if (cmd == "every") {
                 long long interval = 0;
                 if (tokens.size() < 2 || !parseDurationMilliseconds(valueFor(tokens[1], variables), interval) || interval <= 0) {
