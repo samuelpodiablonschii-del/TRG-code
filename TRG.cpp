@@ -6677,6 +6677,7 @@ void applyEditorSyntaxHighlighting() {
     GetWindowTextW(codeEditor, source.data(), length + 1);
     source.resize(static_cast<std::size_t>(length));
     highlightingEditor = true;
+    SendMessageW(codeEditor, WM_SETREDRAW, FALSE, 0);
     DWORD selectionStart = 0, selectionEnd = 0;
     SendMessageW(codeEditor, EM_GETSEL, reinterpret_cast<WPARAM>(&selectionStart),
                  reinterpret_cast<LPARAM>(&selectionEnd));
@@ -6742,6 +6743,8 @@ void applyEditorSyntaxHighlighting() {
     }
     SendMessageW(codeEditor, EM_SETSEL, selectionStart, selectionEnd);
     highlightingEditor = false;
+    SendMessageW(codeEditor, WM_SETREDRAW, TRUE, 0);
+    InvalidateRect(codeEditor, nullptr, FALSE);
 }
 
 bool loadSourceFile(const std::filesystem::path& path) {
