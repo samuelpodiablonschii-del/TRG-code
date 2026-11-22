@@ -5415,8 +5415,21 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
         
         const std::size_t eqPos = line.find('=');
         if (eqPos != std::string::npos) {
-            const std::string name = trim(line.substr(0, eqPos));
-            const std::string rawValue = trim(line.substr(eqPos + 1));
+            std::string name = trim(line.substr(0, eqPos));
+            std::string rawValue = trim(line.substr(eqPos + 1));
+
+            // Support both assignment styles:
+            //   variable = expression
+            //   expression = variable
+            // If the right side is an existing variable and the left side is
+            // not an existing variable path, treat the right side as the target.
+            if ((!validVariablePath(name) || !variables.count(name)) &&
+                validVariablePath(rawValue) && variables.count(rawValue)) {
+                const std::string expression = name;
+                name = rawValue;
+                rawValue = expression;
+            }
+
             if (validVariablePath(name) && variables.count(name)) {
                 const std::string type = types.count(name) ? types[name] : "word";
                 const std::string value = valueFor(rawValue, variables);
