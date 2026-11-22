@@ -2373,6 +2373,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
         if (tokens.empty()) continue;
         std::string cmd = lower(tokens[0]);
         if (cmd == "print" || cmd == "show") cmd = "say";
+        if (cmd == "ttrim") cmd = "trim";
 
 
         
