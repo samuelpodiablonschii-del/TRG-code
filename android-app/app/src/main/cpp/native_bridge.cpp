@@ -1,5 +1,6 @@
 #define TRG_ANDROID_BRIDGE
 #include "../../../../../TRG.cpp"
+#include "../../../../../EditorSources.h"
 
 #include <atomic>
 #include <iomanip>
@@ -217,6 +218,11 @@ Java_com_trg_studio_MainActivity_nativeInitialize(JNIEnv* env, jclass, jobject a
     if (directory) env->DeleteLocalRef(directory);
     if (activityClass) env->DeleteLocalRef(activityClass);
     if (env->ExceptionCheck()) env->ExceptionClear();
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_trg_studio_MainActivity_nativeGetEditorSource(JNIEnv* env, jclass, jboolean threeD) {
+    return toJavaString(env, threeD == JNI_TRUE ? trg_builtin::editor3D : trg_builtin::editor2D);
 }
 
 extern "C" JNIEXPORT jstring JNICALL
