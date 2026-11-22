@@ -30,13 +30,13 @@ else (
     say "ERROR function lost typed list argument"
 )
 
-dictionary source_dictionary
-dict_set source_dictionary score 10
+dictionary player
+dict_set player score 10
 define pass_dictionary value (
     return value
 )
-pass_dictionary source_dictionary -> returned_dictionary
-dict_get returned_dictionary score dictionary_score
+pass_dictionary player -> copied_player
+dict_get copied_player score dictionary_score
 if dictionary_score = 10 (
     say "TRG_TYPED_DICTIONARY_ARGUMENT_PASSED"
 )
