@@ -20,6 +20,7 @@ TESTS = [
     ("math_library.trg", "TRG_MATH_TESTS_PASSED"),
     ("plain_english.trg", "TRG_PLAIN_ENGLISH_TESTS_PASSED"),
     ("3d_scene_roundtrip.trg", "TRG_3D_SCENE_ROUNDTRIP_PASSED"),
+    ("stack_trace.trg", ["at inner (called from line", "at outer (called from line"], True),
 ]
 
 def run(command, **kwargs):
@@ -35,13 +36,19 @@ def main():
         print("\nBUILD FAILED")
         return built.returncode
     failures = []
-    for filename, marker in TESTS:
+    for test in TESTS:
+        filename, markers = test[0], test[1]
+        expect_error = test[2] if len(test) > 2 else False
+        if isinstance(markers, str):
+            markers = [markers]
         print(f"\n=== {filename} ===", flush=True)
         result = run([str(BINARY), str(ROOT / "tests" / filename)],
                      stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output = result.stdout
         print(output, end="" if output.endswith("\n") else "\n")
-        if result.returncode or marker not in output or "ERROR " in output:
+        missing_markers = [marker for marker in markers if marker not in output]
+        has_error = "ERROR " in output
+        if result.returncode or missing_markers or (has_error and not expect_error) or (expect_error and not has_error):
             failures.append(filename)
             print(f"FAIL: {filename}")
         else:
