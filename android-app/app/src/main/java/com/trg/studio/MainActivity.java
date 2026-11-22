@@ -248,6 +248,21 @@ public final class MainActivity extends Activity {
         editorScreen = new LinearLayout(this);
         editorScreen.setOrientation(LinearLayout.VERTICAL);
         editorScreen.setBackgroundColor(Color.rgb(10, 16, 25));
+
+        // OneCompiler-style compact project/action toolbar.
+        LinearLayout editorToolbar = new LinearLayout(this);
+        editorToolbar.setOrientation(LinearLayout.HORIZONTAL);
+        editorToolbar.setGravity(Gravity.CENTER_VERTICAL);
+        editorToolbar.setPadding(dp(8), dp(5), dp(8), dp(5));
+        editorToolbar.setBackgroundColor(Color.rgb(18, 31, 45));
+        addEditorToolbarAction(editorToolbar, "▶ RUN", Color.rgb(20, 119, 111), this::runSource, 1.25f);
+        addEditorToolbarAction(editorToolbar, "＋ NEW", Color.rgb(37, 56, 75), this::createNewDocument, 1f);
+        addEditorToolbarAction(editorToolbar, "OPEN", Color.rgb(37, 56, 75), this::openDocument, 1f);
+        addEditorToolbarAction(editorToolbar, "SAVE", Color.rgb(37, 56, 75),
+                () -> createDocument(currentDocumentName, REQUEST_EXPORT), 1f);
+        addEditorToolbarAction(editorToolbar, "MENU", Color.rgb(37, 56, 75), this::showStudioMenu, 1f);
+        editorScreen.addView(editorToolbar, new LinearLayout.LayoutParams(-1, dp(48)));
+
         HorizontalScrollView tabScroller = new HorizontalScrollView(this);
         tabScroller.setHorizontalScrollBarEnabled(false);
         tabScroller.setBackgroundColor(Color.rgb(16, 27, 40));
@@ -799,6 +814,48 @@ public final class MainActivity extends Activity {
         outputScreen.setVisibility(View.GONE);
         editorScreen.setVisibility(View.VISIBLE);
         status.setText("Editor ready  |  " + currentDocumentName);
+    }
+
+    private void addEditorToolbarAction(LinearLayout parent, String label, int background,
+                                        Runnable action, float weight) {
+        TextView button = new TextView(this);
+        button.setText(label);
+        button.setTextColor(Color.rgb(238, 246, 250));
+        button.setTextSize(11);
+        button.setTypeface(fixedUiFontBold);
+        button.setGravity(Gravity.CENTER);
+        button.setPadding(dp(10), 0, dp(10), 0);
+        button.setBackgroundColor(background);
+        button.setOnClickListener(view -> action.run());
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(36), weight);
+        params.setMargins(dp(3), 0, dp(3), 0);
+        parent.addView(button, params);
+    }
+
+    private void createNewDocument() {
+        final EditText nameInput = new EditText(this);
+        nameInput.setSingleLine(true);
+        nameInput.setText("program" + (openDocuments.size() + 1) + ".trg");
+        nameInput.setHint("filename.trg");
+        new AlertDialog.Builder(this)
+                .setTitle("New TRG file")
+                .setView(nameInput)
+                .setNegativeButton("CANCEL", null)
+                .setPositiveButton("CREATE", (dialog, which) -> {
+                    String name = nameInput.getText().toString().trim();
+                    if (name.isEmpty()) name = "program.trg";
+                    if (!name.toLowerCase(Locale.ROOT).endsWith(".trg")) name += ".trg";
+                    openDocuments.put(currentDocumentName, editor.getText().toString());
+                    currentDocumentName = name;
+                    sourceText = "";
+                    openDocuments.put(name, sourceText);
+                    editor.setText(sourceText);
+                    editor.setSelection(0);
+                    refreshFileTabs();
+                    showCodeScreen();
+                    status.setText("New file  |  " + currentDocumentName);
+                })
+                .show();
     }
 
     private void refreshFileTabs() {
