@@ -1,18 +1,19 @@
-// TRG Studio — touch-first 2D UI designer
-// The entire editor layout and its tools are authored in TRG.
+// TRG Studio — Bouncy Balls-inspired 2D scene editor
+// A canvas-first editor with a compact tool rail and an object inspector.
 add (ui)
 
 color accent = #9B6BFF
 color panel = #171421
-color canvas = #FFFFFF
 word selectedName = ""
-word currentColor = #8B5CF6
+word currentColor = "#8B5CF6"
 word backgroundColor = "#FFFFFF"
 word currentShape = "square"
 word renameInput = ""
 word addLabel = ""
 word widthChange = ""
 word heightChange = ""
+word moveX = ""
+word moveY = ""
 word animDx = ""
 word animDy = ""
 word animTime = ""
@@ -20,43 +21,38 @@ list objects
 num objectCount = 0
 num selectedIndex = 0
 
-block z 0 x 0 y 0 w 100 h 100 color #FFFFFF name EDITOR_BACKGROUND
-block z 1 x 0 y 0 w 100 h 1 color accent name EDITOR_ACCENT
-block z 1 x 3 y 13 w 94 h 49 color panel edges round name CANVAS_FRAME
-block z 2 x 4 y 14 w 92 h 47 color canvas edges round name CANVAS
-block z 3 x 4 y 14 w 92 h 0.25 color #282238 name GRID_TOP
-block z 3 x 4 y 60 w 92 h 0.25 color #282238 name GRID_BOTTOM
-block z 3 x 4 y 14 w 0.25 h 47 color #282238 name GRID_LEFT
-block z 3 x 95 y 14 w 0.25 h 47 color #282238 name GRID_RIGHT
-block z 3 x 15 y 14 w 0.2 h 47 color #211B30 name GRID_V1
-block z 3 x 26 y 14 w 0.2 h 47 color #211B30 name GRID_V2
-block z 3 x 37 y 14 w 0.2 h 47 color #211B30 name GRID_V3
-block z 3 x 48 y 14 w 0.2 h 47 color #211B30 name GRID_V4
-block z 3 x 59 y 14 w 0.2 h 47 color #211B30 name GRID_V5
-block z 3 x 70 y 14 w 0.2 h 47 color #211B30 name GRID_V6
-block z 3 x 81 y 14 w 0.2 h 47 color #211B30 name GRID_V7
-block z 3 x 4 y 24 w 92 h 0.2 color #211B30 name GRID_H1
-block z 3 x 4 y 34 w 92 h 0.2 color #211B30 name GRID_H2
-block z 3 x 4 y 44 w 92 h 0.2 color #211B30 name GRID_H3
-block z 3 x 4 y 54 w 92 h 0.2 color #211B30 name GRID_H4
+// Main workspace
+block z 0 x 0 y 0 w 100 h 100 color #111019 name EDITOR_BACKGROUND
+block z 1 x 0 y 0 w 100 h 1 color accent name TOP_ACCENT
+block z 1 x 0 y 2 w 100 h 9 color #191622 name TOPBAR
+text "TRG" x 3 y 5 size 3.4 color #FFFFFF bold true
+text "2D EDITOR" x 12 y 5.5 size 2.1 color #BDA7F5 bold true
+text "SCENE" x 97 y 5.8 size 1.5 color #A99DBB align right
 
-text "TRG / DESIGN" x 4 y 7 size 3.3 color #211A30 bold true
-text "2D CANVAS" x 4 y 11 size 1.5 color #514963
-text "TAP TO SELECT  •  DRAG TO MOVE" x 95 y 11 size 1.25 color #514963 align right
-text object_label "No object selected" x 4 y 65 size 2.2 color #211A30 bold true
-text object_count "0 OBJECTS" x 95 y 65 size 1.4 color #514963 align right
+// Canvas frame and grid
+block z 1 x 20 y 13 w 78 h 57 color #282238 edges round name CANVAS_FRAME
+block z 2 x 21 y 14 w 76 h 55 color #FFFFFF edges round name CANVAS
+block z 3 x 21 y 14 w 76 h 0.2 color #D9D4E2 name GRID_TOP
+block z 3 x 21 y 68.8 w 76 h 0.2 color #D9D4E2 name GRID_BOTTOM
+block z 3 x 21 y 14 w 0.2 h 55 color #D9D4E2 name GRID_LEFT
+block z 3 x 96.8 y 14 w 0.2 h 55 color #D9D4E2 name GRID_RIGHT
+block z 3 x 36 y 14 w 0.15 h 55 color #EEEAF3 name GRID_V1
+block z 3 x 51 y 14 w 0.15 h 55 color #EEEAF3 name GRID_V2
+block z 3 x 66 y 14 w 0.15 h 55 color #EEEAF3 name GRID_V3
+block z 3 x 81 y 14 w 0.15 h 55 color #EEEAF3 name GRID_V4
+block z 3 x 21 y 25 w 76 h 0.15 color #EEEAF3 name GRID_H1
+block z 3 x 21 y 36 y 36 w 76 h 0.15 color #EEEAF3 name GRID_H2
+block z 3 x 21 y 47 w 76 h 0.15 color #EEEAF3 name GRID_H3
+block z 3 x 21 y 58 w 76 h 0.15 color #EEEAF3 name GRID_H4
 
-ui create block auto x 38 y 30 w 14 h 13 color accent shape square
-push objects last_ui_object
-length objects objectCount
-selectedIndex = 0
-get objects selectedIndex selectedName
-set_text object_label selectedName
-set_text object_count objectCount
-
-// Creation tools
-button add_block "＋ BLOCK" x 3 y 68 w 22 h 7 color #56368F (
-    ui create block auto x 38 y 30 w 14 h 12 color currentColor shape square
+// Left tool rail
+block z 1 x 2 y 13 w 16 h 57 color #191622 edges round name TOOL_RAIL
+text "TOOLS" x 4 y 16 size 1.4 color #A99DBB bold true
+button tool_select "SELECT" x 3 y 19 w 14 h 6 color #56368F (
+    say "Select an object on the canvas, then drag it to move."
+)
+button tool_block "+ BLOCK" x 3 y 26 w 14 h 6 color #30243F (
+    ui create block auto x 45 y 35 w 14 h 12 color currentColor shape square
     push objects last_ui_object
     length objects objectCount
     selectedIndex = objectCount - 1
@@ -64,8 +60,8 @@ button add_block "＋ BLOCK" x 3 y 68 w 22 h 7 color #56368F (
     set_text object_label selectedName
     set_text object_count objectCount
 )
-button add_circle "○ CIRCLE" x 27 y 68 w 22 h 7 color #30243F (
-    ui create block auto x 38 y 30 w 14 h 12 color currentColor shape circle
+button tool_circle "CIRCLE" x 3 y 33 w 14 h 6 color #30243F (
+    ui create block auto x 45 y 35 w 12 h 12 color currentColor shape circle
     push objects last_ui_object
     length objects objectCount
     selectedIndex = objectCount - 1
@@ -73,10 +69,10 @@ button add_circle "○ CIRCLE" x 27 y 68 w 22 h 7 color #30243F (
     set_text object_label selectedName
     set_text object_count objectCount
 )
-button add_button "＋ BUTTON" x 51 y 68 w 22 h 7 color #30243F (
+button tool_button "BUTTON" x 3 y 40 w 14 h 6 color #30243F (
     ask "Button object name:" renameInput
     ask "Button label:" addLabel
-    button renameInput addLabel x 38 y 31 w 24 h 9 color currentColor ( say "Button clicked" )
+    button renameInput addLabel x 45 y 35 w 24 h 9 color currentColor ( say "Button clicked" )
     push objects renameInput
     length objects objectCount
     selectedIndex = objectCount - 1
@@ -84,10 +80,10 @@ button add_button "＋ BUTTON" x 51 y 68 w 22 h 7 color #30243F (
     set_text object_label selectedName
     set_text object_count objectCount
 )
-button add_text "＋ TEXT" x 75 y 68 w 22 h 7 color #30243F (
+button tool_text "TEXT" x 3 y 47 w 14 h 6 color #30243F (
     ask "Text object name:" renameInput
     ask "Text to display:" addLabel
-    text renameInput addLabel x 38 y 35 size 3.2 color #211A30
+    text renameInput addLabel x 45 y 35 size 3 color #211A30
     push objects renameInput
     length objects objectCount
     selectedIndex = objectCount - 1
@@ -95,31 +91,38 @@ button add_text "＋ TEXT" x 75 y 68 w 22 h 7 color #30243F (
     set_text object_label selectedName
     set_text object_count objectCount
 )
+button tool_bg "BG" x 3 y 54 w 14 h 6 color #30243F (
+    ask "Canvas background colour (#RRGGBB):" backgroundColor
+    ui color CANVAS backgroundColor
+)
 
-// Selection and properties
-button previous "‹" x 3 y 77 w 10 h 7 color #30243F (
+// Canvas status strip
+text object_label "No object selected" x 21 y 72 size 2.1 color #FFFFFF bold true
+text object_count "0 OBJECTS" x 97 y 72 size 1.4 color #B8ADC9 align right
+text "TAP TO SELECT  •  DRAG TO MOVE" x 21 y 75 size 1.2 color #A99DBB
+
+// Inspector panel
+block z 1 x 2 y 78 w 96 h 19 color #191622 edges round name INSPECTOR
+text "OBJECT INSPECTOR" x 4 y 80 size 1.5 color #BDA7F5 bold true
+button previous "‹" x 4 y 83 w 8 h 5 color #30243F (
     if objectCount > 0 (
         selectedIndex = selectedIndex - 1
-        if selectedIndex < 0 (
-            selectedIndex = objectCount - 1
-        )
+        if selectedIndex < 0 ( selectedIndex = objectCount - 1 )
         get objects selectedIndex selectedName
         set_text object_label selectedName
     )
 )
-button next "›" x 15 y 77 w 10 h 7 color #30243F (
+button next "›" x 13 y 83 w 8 h 5 color #30243F (
     if objectCount > 0 (
         selectedIndex = selectedIndex + 1
-        if selectedIndex >= objectCount (
-            selectedIndex = 0
-        )
+        if selectedIndex >= objectCount ( selectedIndex = 0 )
         get objects selectedIndex selectedName
         set_text object_label selectedName
     )
 )
-button name "NAME" x 27 y 77 w 15 h 7 color #30243F (
+button rename "NAME" x 22 y 83 w 13 h 5 color #30243F (
     if objectCount > 0 (
-        ask "New object name (use letters, numbers and _):" renameInput
+        ask "New object name:" renameInput
         ui rename selectedName renameInput
         remove objects selectedIndex
         insert objects selectedIndex renameInput
@@ -127,29 +130,30 @@ button name "NAME" x 27 y 77 w 15 h 7 color #30243F (
         set_text object_label selectedName
     )
 )
-button resize "RESIZE" x 44 y 77 w 16 h 7 color #56368F (
+button resize "SIZE" x 36 y 83 w 12 h 5 color #56368F (
     if objectCount > 0 (
-        ask "Size change (+/-):" widthChange
-        ui resize selectedName widthChange widthChange
+        ask "Width change (+/-):" widthChange
+        ask "Height change (+/-):" heightChange
+        ui resize selectedName widthChange heightChange
     )
 )
-button color "COLOR" x 62 y 77 w 15 h 7 color #30243F (
+button move "MOVE" x 49 y 83 w 12 h 5 color #30243F (
     if objectCount > 0 (
-        if currentColor = "#8B5CF6" (
-            currentColor = "#3B82F6"
-        )
-        else (
-            if currentColor = "#3B82F6" (
-                currentColor = "#22C55E"
-            )
-            else (
-                currentColor = "#8B5CF6"
-            )
-        )
+        ask "Horizontal movement:" moveX
+        ask "Vertical movement:" moveY
+        ui move selectedName moveX moveY
+    )
+)
+button color "COLOR" x 62 y 83 w 12 h 5 color #30243F (
+    if objectCount > 0 (
+        if currentColor = "#8B5CF6" ( currentColor = "#3B82F6" )
+        else ( if currentColor = "#3B82F6" ( currentColor = "#22C55E" )
+        else ( if currentColor = "#22C55E" ( currentColor = "#F59E0B" )
+        else ( currentColor = "#8B5CF6" ) ) )
         ui color selectedName currentColor
     )
 )
-button shape "SHAPE" x 79 y 77 w 18 h 7 color #30243F (
+button shape "SHAPE" x 75 y 83 w 20 h 5 color #30243F (
     if objectCount > 0 (
         if currentShape = "square" ( currentShape = "circle" )
         else ( if currentShape = "circle" ( currentShape = "triangle" )
@@ -161,8 +165,7 @@ button shape "SHAPE" x 79 y 77 w 18 h 7 color #30243F (
     )
 )
 
-// Object actions
-button duplicate "DUPLICATE" x 3 y 86 w 21 h 7 color #30243F (
+button duplicate "DUPLICATE" x 4 y 90 w 18 h 5 color #30243F (
     if objectCount > 0 (
         ui duplicate selectedName auto
         push objects last_ui_object
@@ -173,15 +176,13 @@ button duplicate "DUPLICATE" x 3 y 86 w 21 h 7 color #30243F (
         set_text object_count objectCount
     )
 )
-button delete "DELETE" x 26 y 86 w 17 h 7 color #652A45 (
+button delete "DELETE" x 23 y 90 w 15 h 5 color #652A45 (
     if objectCount > 0 (
         ui delete selectedName
         remove objects selectedIndex
         length objects objectCount
         if objectCount > 0 (
-            if selectedIndex >= objectCount (
-                selectedIndex = objectCount - 1
-            )
+            if selectedIndex >= objectCount ( selectedIndex = objectCount - 1 )
             get objects selectedIndex selectedName
             set_text object_label selectedName
         )
@@ -192,10 +193,7 @@ button delete "DELETE" x 26 y 86 w 17 h 7 color #652A45 (
         set_text object_count objectCount
     )
 )
-button copy_code "COPY CODE" x 45 y 86 w 23 h 7 color #56368F (
-    say "Tap an object, then use COPY CODE to copy its TRG source."
-)
-button animate "ANIMATE" x 70 y 86 w 27 h 7 color #30243F (
+button animate "ANIMATE" x 39 y 90 w 16 h 5 color #30243F (
     if objectCount > 0 (
         ask "Animation X movement:" animDx
         ask "Animation Y movement:" animDy
@@ -203,5 +201,18 @@ button animate "ANIMATE" x 70 y 86 w 27 h 7 color #30243F (
         animate selectedName x animDx y animDy fps 60 time animTime
     )
 )
+button copy_code "COPY CODE" x 56 y 90 w 17 h 5 color #56368F (
+    say "Select an object and use its creation command in your TRG project."
+)
+button exit "CODE" x 74 y 90 w 21 h 5 color #652A45 (
+    studio code
+)
 
-button background "BACKGROUND" x 3 y 94 w 25 h 5 color #56368F (\n    ask "Canvas background colour (#RRGGBB):" backgroundColor\n    ui color CANVAS backgroundColor\n)\nbutton exit "EXIT" x 73 y 94 w 24 h 5 color #652A45 (\n    studio code\n)\ntext "Drag objects to move them. SHAPE cycles through six patterns." x 31 y 97 size 1.1 color #514963
+// Starter object
+ui create block auto x 45 y 35 w 14 h 12 color accent shape square
+push objects last_ui_object
+length objects objectCount
+selectedIndex = 0
+get objects selectedIndex selectedName
+set_text object_label selectedName
+set_text object_count objectCount
