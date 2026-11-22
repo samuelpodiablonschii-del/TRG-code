@@ -1,9 +1,9 @@
-// Stack trace regression test: an error inside inner() must show both calls.
-define inner (
+// Stack trace regression test: an error inside inner_task() must show both calls.
+define inner_task (
     unknown_stack_trace_probe_command
 )
-define outer (
-    inner
+define outer_task (
+    inner_task
 )
-outer
+outer_task
 say "TRG_STACK_TRACE_PASSED"
