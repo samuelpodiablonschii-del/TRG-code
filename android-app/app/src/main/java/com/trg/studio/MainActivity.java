@@ -102,6 +102,7 @@ public final class MainActivity extends Activity {
 
     private static native void nativeInitialize(MainActivity activity);
     private static native String nativeRun(String source);
+    private static native String nativeGetEditorSource(boolean threeD);
     private static native String nativeRunEvery(int index);
     private static native String nativeClickButton(int index);
     private static native void nativeSetMobileInput(String name, String state);
@@ -191,13 +192,7 @@ public final class MainActivity extends Activity {
             try (InputStream studioMenu = getAssets().open("StudioMenu.trg")) {
                 studioMenuSource = readText(studioMenu);
             }
-            try (InputStream twoD = getAssets().open("2DEditor.trg")) {
-                twoDEditorSource = readText(twoD);
-            }
-            try (InputStream threeD = getAssets().open("3DEditor.trg")) {
-                threeDEditorSource = readText(threeD);
-            }
-            sourceText = exampleSource;
+sourceText = exampleSource;
             openDocuments.put("program.trg", sourceText);
         } catch (Exception exception) {
             showError("Could not load the TRG Studio app", exception);
@@ -418,10 +413,10 @@ public final class MainActivity extends Activity {
                 status.setText("Example loaded  |  Example.trg");
                 break;
             case "open_2d":
-                launchTrgTool("2DEditor.trg", twoDEditorSource);
+                launchTrgTool("2D Editor", nativeGetEditorSource(false));
                 break;
             case "open_3d":
-                launchTrgTool("3DEditor.trg", threeDEditorSource);
+                launchTrgTool("3D Editor", nativeGetEditorSource(true));
                 break;
             case "import":
                 openDocument();
