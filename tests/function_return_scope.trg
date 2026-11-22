@@ -5,5 +5,14 @@ define get_answer (
 )
 
 get_answer -> result
-say "returned=" result
-say "TRG_FUNCTION_RETURN_SCOPE_PASSED"
+if result = 8 (
+    if private_value = 100 (
+        say "ERROR function-local variable leaked"
+    )
+    else (
+        say "TRG_FUNCTION_RETURN_SCOPE_PASSED"
+    )
+)
+else (
+    say "ERROR function return value was incorrect"
+)
