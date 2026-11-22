@@ -1430,6 +1430,8 @@ sourceText = exampleSource;
         private final List<JSONObject> sprites = new ArrayList<>();
         private final List<JSONObject> models = new ArrayList<>();
         private final HashMap<String, Bitmap> spriteBitmaps = new HashMap<>();
+        private final HashMap<String, JSONObject> animationByName = new HashMap<>();
+        private final float[] animatedPositionScratch = new float[2];
         private JSONObject state = new JSONObject();
         private long updatedAt;
         private float touchStartX;
@@ -1475,6 +1477,14 @@ sourceText = exampleSource;
         void setState(JSONObject next) {
             state = next;
             updatedAt = SystemClock.uptimeMillis();
+            animationByName.clear();
+            JSONArray nextAnimations = state.optJSONArray("animations");
+            if (nextAnimations != null) {
+                for (int i = 0; i < nextAnimations.length(); i++) {
+                    JSONObject animation = nextAnimations.optJSONObject(i);
+                    if (animation != null) animationByName.put(animation.optString("name"), animation);
+                }
+            }
             orderedBlocks.clear();
             textItems.clear();
             sprites.clear();
@@ -1717,17 +1727,17 @@ sourceText = exampleSource;
         }
 
         private float[] animatedPosition(String name, float x, float y, double elapsed, JSONArray animations) {
-            if (animations == null) return new float[] {x, y};
-            for (int i = 0; i < animations.length(); i++) {
-                JSONObject animation = animations.optJSONObject(i);
-                if (animation == null || !name.equals(animation.optString("name"))) continue;
+            JSONObject animation = animationByName.get(name);
+            if (animation != null) {
                 double start = animation.optDouble("start");
                 double duration = Math.max(0.001, animation.optDouble("duration", 1));
                 double progress = Math.max(0, Math.min(1, (elapsed - start) / duration));
                 x = (float) (animation.optDouble("x") + animation.optDouble("dx") * progress);
                 y = (float) (animation.optDouble("y") + animation.optDouble("dy") * progress);
             }
-            return new float[] {x, y};
+            animatedPositionScratch[0] = x;
+            animatedPositionScratch[1] = y;
+            return animatedPositionScratch;
         }
 
         private String rotationSource(JSONObject model, String name) {
@@ -1761,17 +1771,14 @@ sourceText = exampleSource;
                     double y = block.optDouble("y");
                     double bx = x;
                     double by = y;
-                    if (animations != null) {
-                        for (int i = 0; i < animations.length(); i++) {
-                            JSONObject animation = animations.optJSONObject(i);
-                            if (animation == null || !block.optString("name").equals(animation.optString("name"))) continue;
-                            double start = animation.optDouble("start");
-                            double duration = animation.optDouble("duration");
-                            double progress = Math.max(0, Math.min(1, (elapsed - start) / duration));
-                            if (elapsed < start + duration) animating = true;
-                            bx = animation.optDouble("x") + animation.optDouble("dx") * progress;
-                            by = animation.optDouble("y") + animation.optDouble("dy") * progress;
-                        }
+                    JSONObject animation = animationByName.get(block.optString("name"));
+                    if (animation != null) {
+                        double start = animation.optDouble("start");
+                        double duration = Math.max(0.001, animation.optDouble("duration", 1));
+                        double progress = Math.max(0, Math.min(1, (elapsed - start) / duration));
+                        if (elapsed < start + duration) animating = true;
+                        bx = animation.optDouble("x") + animation.optDouble("dx") * progress;
+                        by = animation.optDouble("y") + animation.optDouble("dy") * progress;
                     }
                     int blockColor = parseColor(block.optString("color"));
                     paint.setColor(Color.argb(Math.round(Color.alpha(blockColor) * Math.max(0f,
