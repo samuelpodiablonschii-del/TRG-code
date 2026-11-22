@@ -239,7 +239,11 @@ struct Flow {
     bool returned = false;
     VariableValue returnValue;
 };
-struct TrgCallFrame { std::string functionName; std::size_t callLine = 0; };
+struct TrgCallFrame {
+    std::string functionName;
+    std::size_t callLine = 0;
+    std::size_t definitionLine = 0;
+};
 std::vector<TrgCallFrame> trgCallStack;
 
 struct EveryTask {
@@ -292,6 +296,7 @@ struct UserFunction {
     std::string name;
     std::vector<std::string> params;
     std::vector<std::string> body;
+    std::size_t sourceLine = 0;
 };
 
 struct UiBlock {
@@ -906,7 +911,9 @@ bool validVariablePath(const std::string& name) {
 }
 
 void reportError(std::size_t lineNumber, const std::string& reason, const std::string& part = "") {
-    std::string msg = "line " + std::to_string(lineNumber) + ": " + reason;
+    const std::size_t sourceLine = lineNumber +
+        (trgCallStack.empty() ? 0 : trgCallStack.back().definitionLine);
+    std::string msg = "line " + std::to_string(sourceLine) + ": " + reason;
     if (!part.empty()) msg += " \"" + part + "\"";
     for (auto frame = trgCallStack.rbegin(); frame != trgCallStack.rend(); ++frame) {
         msg += "\n  at " + frame->functionName + " (called from line " +
@@ -2267,7 +2274,8 @@ void registerFunctions(const std::vector<std::string>& program, bool clearFirst 
         if (findBlock(program, i, program.size(), open, close)) {
             userFunctions[lower(name)] = {name, params,
                 std::vector<std::string>(program.begin() + static_cast<std::ptrdiff_t>(open + 1),
-                                         program.begin() + static_cast<std::ptrdiff_t>(close))};
+                                         program.begin() + static_cast<std::ptrdiff_t>(close)),
+                i + 1};
         }
     }
 }
@@ -2709,7 +2717,9 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 }
             }
             Flow inner;
-            trgCallStack.push_back({uf.name, i + 1});
+            const std::size_t callSiteLine = i + 1 +
+                (trgCallStack.empty() ? 0 : trgCallStack.back().definitionLine);
+            trgCallStack.push_back({uf.name, callSiteLine, uf.sourceLine});
             executeBlock(uf.body, 0, uf.body.size(), localVariables, localTypes, localDefaults,
                          inner, manualMode, uiMode);
             trgCallStack.pop_back();
