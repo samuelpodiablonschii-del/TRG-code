@@ -1,3 +1,4 @@
+#include "EditorSources.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -6791,7 +6792,7 @@ bool launchDesktopVisualEditor(const std::string& fileName) {
     if (!codeEditor) return false;
     if (!desktopVisualEditorActive) {
         const int length = GetWindowTextLengthW(codeEditor);
-        std::wstring current(static_cast<std::size_t>(length) + 1, L'\0');
+        std::wstring current(static_cast<std::size_t>(length) + 1, L'\\0');
         GetWindowTextW(codeEditor, current.data(), length + 1);
         current.resize(static_cast<std::size_t>(length));
         desktopPreviousSource = current;
@@ -6799,18 +6800,34 @@ bool launchDesktopVisualEditor(const std::string& fileName) {
         desktopPreviousDirty = editorDirty;
         desktopVisualEditorActive = true;
     }
-    std::filesystem::path editorPath = std::filesystem::current_path() / fileName;
-    if (!std::filesystem::exists(editorPath)) {
-        wchar_t executable[32768] = {};
-        const DWORD count = GetModuleFileNameW(nullptr, executable, 32768);
-        if (count > 0 && count < 32768)
-            editorPath = std::filesystem::path(executable).parent_path() / fileName;
-    }
-    if (!std::filesystem::exists(editorPath) || !loadSourceFile(editorPath)) {
-        appendOutput("ERROR Could not find the bundled " + fileName + ".\r\n");
+
+    const char* embeddedSource = nullptr;
+    if (fileName == "2DEditor.trg" || fileName == "2D Editor")
+        embeddedSource = trg_builtin::editor2D;
+    else if (fileName == "3DEditor.trg" || fileName == "3D Editor")
+        embeddedSource = trg_builtin::editor3D;
+
+    if (!embeddedSource) {
+        appendOutput("ERROR Unknown built-in visual editor.\\r\\n");
         desktopVisualEditorActive = false;
         return false;
     }
+
+    const int wideLength = MultiByteToWideChar(CP_UTF8, 0, embeddedSource, -1, nullptr, 0);
+    if (wideLength <= 0) {
+        appendOutput("ERROR Could not decode the built-in visual editor.\\r\\n");
+        desktopVisualEditorActive = false;
+        return false;
+    }
+    std::wstring wideSource(static_cast<std::size_t>(wideLength), L'\\0');
+    MultiByteToWideChar(CP_UTF8, 0, embeddedSource, -1, wideSource.data(), wideLength);
+    SetWindowTextW(codeEditor, wideSource.c_str());
+    currentSourcePath.clear();
+    projectRoot = std::filesystem::current_path();
+    editorDirty = false;
+    applyEditorSyntaxHighlighting();
+    updateEditorWindowTitle();
+
     runEditorSource();
     previewMode = true;
     SetWindowTextW(previewButton, L"Code");
