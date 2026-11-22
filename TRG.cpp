@@ -188,6 +188,10 @@ struct VariableValue {
     VariableValue(const std::vector<std::string>& items) : value(items) {}
     VariableValue(std::vector<std::string>&& items) : value(std::move(items)) {}
     VariableValue(const std::shared_ptr<DictionaryData>& dictionary) : value(dictionary) {}
+    VariableValue(const VariableList& items) : value(items) {}
+    VariableValue(VariableList&& items) : value(std::move(items)) {}
+    VariableValue& operator=(const VariableList& items) { value = items; return *this; }
+    VariableValue& operator=(VariableList&& items) { value = std::move(items); return *this; }
     VariableValue& operator=(const std::string& text) { value = text; return *this; }
     VariableValue& operator=(std::string&& text) { value = std::move(text); return *this; }
     VariableValue& operator=(const char* text) { value = std::string(text); return *this; }
