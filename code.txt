@@ -287,6 +287,10 @@ struct PhysicsBody {
     bool triggerRepeats = false;
     bool triggerHasActivated = false;
     int bounceCount = 0;
+    double angle = 0;
+    bool stopsMomentum = false;
+    bool noClip = false;
+    bool isFlipped = false;
 };
 
 struct AiSample { std::vector<double> inputs; double expected = 0; };
@@ -313,6 +317,10 @@ struct UiBlock {
     double height = 100;
     double cornerRadius = 0;
     double opacity = 1.0;
+    double angle = 0;
+    bool stopsMomentum = false;
+    bool noClip = false;
+    bool isFlipped = false;
     bool visible = true;
 };
 
