@@ -35,6 +35,9 @@
 #include <regex>
 
 #ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include <winhttp.h>
 #pragma comment(lib, "winhttp.lib")
