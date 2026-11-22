@@ -998,7 +998,9 @@ Defaults standardDefaults() {
 
 std::vector<std::string> tokenize(const std::string& text) {
     std::vector<std::string> result;
+    result.reserve(text.size() / 2 + 1);
     std::string token;
+    token.reserve(text.size());
     bool quoted = false;
     char quote = '\0';
     for (std::size_t i = 0; i < text.size(); ++i) {
@@ -1147,16 +1149,25 @@ bool parseColor(const std::string& color, unsigned& red, unsigned& green, unsign
 bool evaluateExpression(const std::string& expr, Vars& variables, double& result) {
     std::string t = trim(expr);
     if (t.empty()) return false;
+    // Avoid constructing a temporary operator string for every character.
+    const auto isOperator = [](char c) noexcept {
+        switch (c) {
+            case '(' : case ')' : case '+' : case '-' : case '*' :
+            case '/' : case '%' : case '^' : case ',' : return true;
+            default: return false;
+        }
+    };
     std::vector<std::string> tokens;
+    tokens.reserve(t.size() / 2 + 1);
     for (std::size_t i = 0; i < t.size();) {
         if (std::isspace(static_cast<unsigned char>(t[i]))) { ++i; continue; }
-        if (std::string("()+-*/%^,").find(t[i]) != std::string::npos) {
+        if (isOperator(t[i])) {
             tokens.emplace_back(1, t[i++]);
             continue;
         }
         const std::size_t start = i;
         while (i < t.size() && !std::isspace(static_cast<unsigned char>(t[i])) &&
-               std::string("()+-*/%^,").find(t[i]) == std::string::npos) ++i;
+               !isOperator(t[i])) ++i;
         tokens.push_back(t.substr(start, i - start));
     }
     std::size_t position = 0;
