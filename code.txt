@@ -815,7 +815,7 @@ std::string lower(std::string s) {
 
 std::string suggestedCommand(const std::string& input) {
     static const std::vector<std::string> commands = {
-        "say", "print", "show", "let", "ask", "ai", "math", "word", "num", "toggle", "color", "if", "else", "loop", "every", "random",
+        "say", "print", "show", "let", "list", "ask", "ai", "math", "word", "num", "toggle", "color", "if", "else", "loop", "every", "for", "each", "query", "random",
         "group", "define", "stop", "exit", "break", "continue", "add", "text",
         "button", "block", "animate", "collides", "touching", "move_ui", "register", "move", "subtract", "multiply",
         "watch_collision",
@@ -2959,6 +2959,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 if (library == "(web)") { webEnabled = true; appendOutput("TRG WebAssembly commands enabled.\r\n"); continue; }
                 if (library == "(collision)") { collisionEnabled = true; appendOutput("TRG collision helpers enabled.\r\n"); continue; }
                 if (library == "(physics)") { physicsEnabled = true; appendOutput("TRG physics library enabled.\r\n"); continue; }
+                if (library == "(3d)") { threeDEnabled = true; appendOutput("TRG 3D library enabled.\r\n"); continue; }
                 if (library == "(manual)") { manualMode = true; continue; }
                 if (library == "(ui)" || library == "(animation)") { uiMode = true; continue; }
                 if (library == "(controls)") { initializeControls(variables, types); continue; }
@@ -4350,9 +4351,9 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     const bool isElseIf = loweredHeader.rfind("else if", 0) == 0 &&
                         (loweredHeader.size() == 7 || std::isspace(static_cast<unsigned char>(loweredHeader[7])) ||
                          loweredHeader[7] == '(');
-                    const bool isElse = loweredHeader == "else" || loweredHeader.rfind("else(", 0) == 0 ||
+                    const bool isElse = !isElseIf && (loweredHeader == "else" || loweredHeader.rfind("else(", 0) == 0 ||
                         (loweredHeader.rfind("else", 0) == 0 && loweredHeader.size() > 4 &&
-                         std::isspace(static_cast<unsigned char>(loweredHeader[4])));
+                         std::isspace(static_cast<unsigned char>(loweredHeader[4]))));
                     if (!isElseIf && !isElse) break;
                     std::size_t chainOpen = 0, chainClose = 0;
                     if (!findBlock(program, chainLine, end, chainOpen, chainClose)) break;
