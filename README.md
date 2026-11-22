@@ -169,6 +169,56 @@ num area = 3 * 3 ^ 2
 num side = sqrt(area)
 ```
 
+### Functions and return values
+
+Define reusable functions with `define`. Parameters are local to each call, and declarations made inside a function do not leak into the caller. A function can return a typed value with `return`; capture it with `-> RESULT_VARIABLE`.
+
+```text
+define add_bonus amount (
+    num private_value = 100
+    return amount + 5
+)
+
+add_bonus 10 -> total
+say "Total:" total
+```
+
+A function can also be called without capturing its result. Assignments to variables that already exist in the caller remain visible, while newly declared function variables stay local. Runtime errors inside functions include the function call chain and call-site line numbers.
+
+### Typed lists
+
+Lists can contain numbers, text, toggles, other lists, and dictionaries. Values retrieved from a list keep their original type.
+
+```text
+list inventory = "key", 3, true
+push inventory 12
+get inventory 1 count
+say "Count:" count
+
+for each item in inventory (
+    say item
+)
+```
+
+Use `push LIST VALUE`, `get LIST INDEX VARIABLE`, `remove LIST INDEX`, `insert LIST INDEX VALUE`, and `pop LIST RESULT` to edit lists. `split` also creates a list, and `join` combines its values into text.
+
+### Dictionaries
+
+Dictionaries store typed values under text keys:
+
+```text
+dictionary player
+dict_set player name "Sam"
+dict_set player score 42
+dict_get player score score
+dict_has player name has_name
+dict_count player entries
+dict_keys player keys
+dict_remove player name
+```
+
+The commands are `dict_set`, `dict_get`, `dict_has`, `dict_remove`, `dict_keys`, and `dict_count`. Dictionary values can be numbers, text, toggles, lists, or other dictionaries.
+
 Use `wait 10s` or `wait 100ms` to pause. Durations are seconds by default; add `ms` for milliseconds.
 
 `random MIN MAX RESULT` creates a random number. Whole-number bounds produce an integer; decimal bounds produce a decimal.
