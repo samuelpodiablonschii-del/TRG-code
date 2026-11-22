@@ -6792,7 +6792,7 @@ bool launchDesktopVisualEditor(const std::string& fileName) {
     if (!codeEditor) return false;
     if (!desktopVisualEditorActive) {
         const int length = GetWindowTextLengthW(codeEditor);
-        std::wstring current(static_cast<std::size_t>(length) + 1, L'\\0');
+        std::wstring current(static_cast<std::size_t>(length) + 1, L'\0');
         GetWindowTextW(codeEditor, current.data(), length + 1);
         current.resize(static_cast<std::size_t>(length));
         desktopPreviousSource = current;
@@ -6808,18 +6808,18 @@ bool launchDesktopVisualEditor(const std::string& fileName) {
         embeddedSource = trg_builtin::editor3D;
 
     if (!embeddedSource) {
-        appendOutput("ERROR Unknown built-in visual editor.\\r\\n");
+        appendOutput("ERROR Unknown built-in visual editor.\r\n");
         desktopVisualEditorActive = false;
         return false;
     }
 
     const int wideLength = MultiByteToWideChar(CP_UTF8, 0, embeddedSource, -1, nullptr, 0);
     if (wideLength <= 0) {
-        appendOutput("ERROR Could not decode the built-in visual editor.\\r\\n");
+        appendOutput("ERROR Could not decode the built-in visual editor.\r\n");
         desktopVisualEditorActive = false;
         return false;
     }
-    std::wstring wideSource(static_cast<std::size_t>(wideLength), L'\\0');
+    std::wstring wideSource(static_cast<std::size_t>(wideLength), L'\0');
     MultiByteToWideChar(CP_UTF8, 0, embeddedSource, -1, wideSource.data(), wideLength);
     SetWindowTextW(codeEditor, wideSource.c_str());
     currentSourcePath.clear();
