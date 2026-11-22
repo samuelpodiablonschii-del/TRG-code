@@ -13,6 +13,7 @@ TESTS = [
     ("else_if.trg", "TRG_ELSE_IF_TEST_PASSED"),
     ("function_return_scope.trg", "TRG_FUNCTION_RETURN_SCOPE_PASSED"),
     ("for_each.trg", "TRG_FOR_EACH_PASSED"),
+    ("dictionary.trg", "TRG_DICTIONARY_PASSED"),
     ("collections_strings.trg", "TRG_FEATURE_TESTS_PASSED"),
     ("advanced_libraries.trg", "TRG_ADVANCED_LIBRARIES_PASSED"),
     ("math_library.trg", "TRG_MATH_TESTS_PASSED"),
