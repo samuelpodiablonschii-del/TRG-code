@@ -24,7 +24,7 @@ Package a source file as a single-file executable:
 TRG.exe compile hello.trg
 ```
 
-This creates `hello.exe`, which contains the TRG app and source program. It runs without a separate `.trg` file, but is an interpreter package rather than native machine-code compilation. Packaged apps use the purple TRG icon and show their output in a window.
+This creates `hello.exe`, which contains the TRG app and source program. It runs without a separate `.trg` file, but is an interpreter package rather than native machine-code compilation. Packaged apps use the purple TRG icon. Programs that enable `add (ui)` open directly in the UI preview with the editor controls hidden; the desktop editor's own Preview button remains available when you run a project from the editor.
 
 Open `TRG-Example.trg` from your Desktop for a clickable tour. Each button explains the feature, shows the relevant code, and runs it; UI and animation examples appear in the display area.
 
