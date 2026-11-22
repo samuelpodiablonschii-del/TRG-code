@@ -236,6 +236,8 @@ struct Flow {
     bool returned = false;
     VariableValue returnValue;
 };
+struct TrgCallFrame { std::string functionName; std::size_t callLine = 0; };
+std::vector<TrgCallFrame> trgCallStack;
 
 struct EveryTask {
     std::vector<std::string> body;
@@ -515,6 +517,7 @@ bool loadingEditorText = false;
 bool highlightingEditor = false;
 bool editorDirty = false;
 bool previewMode = false;
+bool standaloneAppMode = false;
 std::string inputResult;
 constexpr int openButtonId = 101;
 constexpr int inputEditId = 201;
@@ -651,14 +654,18 @@ void layoutOutputControls(HWND window) {
             dictionaryButton, editor2DButton, editor3DButton};
         for (HWND control : controls) if (control) ShowWindow(control, SW_HIDE);
         if (previewButton) {
-            SetWindowTextW(previewButton, L"Code");
-            const LONG buttonWidth = scaleForDpi(window, 76);
-            const LONG buttonHeight = scaleForDpi(window, 34);
-            MoveWindow(previewButton, std::max<LONG>(margin, width - margin - buttonWidth),
-                margin, buttonWidth, buttonHeight, TRUE);
-            ShowWindow(previewButton, SW_SHOW);
-            SetWindowPos(previewButton, HWND_TOP, 0, 0, 0, 0,
-                SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+            if (standaloneAppMode) {
+                ShowWindow(previewButton, SW_HIDE);
+            } else {
+                SetWindowTextW(previewButton, L"Code");
+                const LONG buttonWidth = scaleForDpi(window, 76);
+                const LONG buttonHeight = scaleForDpi(window, 34);
+                MoveWindow(previewButton, std::max<LONG>(margin, width - margin - buttonWidth),
+                    margin, buttonWidth, buttonHeight, TRUE);
+                ShowWindow(previewButton, SW_SHOW);
+                SetWindowPos(previewButton, HWND_TOP, 0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+            }
         }
     } else {
         const LONG available = std::max<LONG>(scaleForDpi(window, 9 * 48 + 8 * 5),
@@ -898,6 +905,10 @@ bool validVariablePath(const std::string& name) {
 void reportError(std::size_t lineNumber, const std::string& reason, const std::string& part = "") {
     std::string msg = "line " + std::to_string(lineNumber) + ": " + reason;
     if (!part.empty()) msg += " \"" + part + "\"";
+    for (auto frame = trgCallStack.rbegin(); frame != trgCallStack.rend(); ++frame) {
+        msg += "\\n  at " + frame->functionName + " (called from line " +
+               std::to_string(frame->callLine) + ")";
+    }
     ++errorCount;
     appendOutput("ERROR " + msg + "\r\n");
 }
@@ -2659,8 +2670,10 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 localVariables[uf.params[p]] = valueFor(tokens[p + 1], callerVariables);
             }
             Flow inner;
+            trgCallStack.push_back({uf.name, i + 1});
             executeBlock(uf.body, 0, uf.body.size(), localVariables, localTypes, localDefaults,
                          inner, manualMode, uiMode);
+            trgCallStack.pop_back();
 
             for (const auto& existing : callerVariables) {
                 if (std::find(uf.params.begin(), uf.params.end(), existing.first) != uf.params.end()) continue;
@@ -6480,6 +6493,7 @@ void executeProgram(const std::vector<std::string>& program) {
     webPageHtml.clear();
     Flow flow;
     errorCount = 0;
+    trgCallStack.clear();
     uiBlocks.clear();
     ui3DObjects.clear();
     uiAutoNameCounter = 1;
@@ -6918,6 +6932,19 @@ int runApplication(int argc, char** argv) {
 #endif
     }
 
+#if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
+    LibraryState launchLibraries;
+    scanLibraries(program, launchLibraries);
+    if (launchLibraries.ui) {
+        standaloneAppMode = true;
+        previewMode = true;
+        if (mainWindow) {
+            SetWindowTextW(mainWindow, (L"TRG App - " +
+                (scriptPath.empty() ? std::wstring(L"Untitled") : scriptPath.filename().wstring())).c_str());
+            layoutOutputControls(mainWindow);
+        }
+    }
+#endif
     executeProgram(program);
 #if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
     runMessageLoop();
