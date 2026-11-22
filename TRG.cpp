@@ -2694,13 +2694,13 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 if (updated != localVariables.end()) variables[existing.first] = updated->second;
             }
             for (const auto& existing : callerTypes) {
-                if (std::find(uf.params.begin(), uf.params.end(), existing.first) != uf.params.end()) continue;
+                if (declaredLocals.count(existing.first) ||
+                    std::find(uf.params.begin(), uf.params.end(), existing.first) != uf.params.end()) continue;
                 const auto updated = localTypes.find(existing.first);
                 if (updated != localTypes.end()) types[existing.first] = updated->second;
             }
 
             if (inner.stopped) { flow.stopped = true; return; }
-                if (inner.returned) { flow.returned = true; flow.returnValue = inner.returnValue; return; }
             if (inner.returned && !resultName.empty()) {
                 variables[resultName] = inner.returnValue;
                 if (std::holds_alternative<double>(inner.returnValue.value)) types[resultName] = "num";
