@@ -47,7 +47,7 @@ std::wstring systemMessage(const std::wstring& operation) {
 }
 
 std::uint64_t embeddedSize(UINT resourceId) {
-    HRSRC resource = FindResourceW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(resourceId), RT_RCDATA);
+    HRSRC resource = FindResourceW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(resourceId), MAKEINTRESOURCEW(10));
     if (!resource) throw std::runtime_error("An installation file is missing from this installer.");
     return SizeofResource(GetModuleHandleW(nullptr), resource);
 }
@@ -59,7 +59,7 @@ bool matchesEmbeddedFile(UINT resourceId, const std::filesystem::path& path) {
         return false;
     }
     HMODULE module = GetModuleHandleW(nullptr);
-    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(resourceId), RT_RCDATA);
+    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(resourceId), MAKEINTRESOURCEW(10));
     if (!resource) throw std::runtime_error("The Desktop example is missing from this installer.");
     HGLOBAL loaded = LoadResource(module, resource);
     const auto* data = static_cast<const unsigned char*>(LockResource(loaded));
@@ -166,7 +166,7 @@ void updateProgress(const std::wstring& status) {
 void writeEmbeddedFile(UINT resourceId, const std::filesystem::path& destination,
                        const std::wstring& displayName) {
     HMODULE module = GetModuleHandleW(nullptr);
-    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(resourceId), RT_RCDATA);
+    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(resourceId), MAKEINTRESOURCEW(10));
     if (!resource) throw std::runtime_error("Could not find an embedded installation file.");
     HGLOBAL loaded = LoadResource(module, resource);
     const auto* data = static_cast<const unsigned char*>(LockResource(loaded));
@@ -459,7 +459,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
     WNDCLASSW windowClass = {};
     windowClass.lpfnWndProc = installerWindowProc;
     windowClass.hInstance = instance;
-    windowClass.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+    windowClass.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
     windowClass.hIcon = LoadIconW(instance, MAKEINTRESOURCEW(IDI_TRG));
     windowClass.lpszClassName = className;
     if (!RegisterClassW(&windowClass) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) {
