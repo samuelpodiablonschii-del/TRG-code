@@ -319,6 +319,7 @@ struct UiBlock {
     double cornerRadius = 0;
     double opacity = 1.0;
     double angle = 0;
+    double lineWidth = 1.0;
     bool stopsMomentum = false;
     bool noClip = false;
     bool isFlipped = false;
