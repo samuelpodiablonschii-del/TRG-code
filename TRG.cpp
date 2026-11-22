@@ -6504,7 +6504,13 @@ void executeProgram(const std::vector<std::string>& program) {
     
     
     
+#ifdef TRG_TEST_CONSOLE
+    // Regression tests must execute only their selected script. Project-wide
+    // discovery would merge every neighbouring test file into each test run.
+    uiProgram = program;
+#else
     uiProgram = mergePrograms(program, currentSourcePath, true, true);
+#endif
     LibraryState libraries;
     scanLibraries(uiProgram, libraries);
     filesEnabled = libraries.files;
