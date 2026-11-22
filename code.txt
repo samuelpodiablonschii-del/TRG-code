@@ -291,6 +291,7 @@ struct PhysicsBody {
     bool stopsMomentum = false;
     bool noClip = false;
     bool isFlipped = false;
+    bool isCircle = false;
 };
 
 struct AiSample { std::vector<double> inputs; double expected = 0; };
@@ -360,6 +361,8 @@ struct UiAnimation {
     double startTime = 0;
     double duration = 0;
     int fps = 60;
+    bool loop = false;
+    double phase = 0;
 };
 
 struct UiButton {
