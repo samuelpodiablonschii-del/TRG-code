@@ -906,7 +906,7 @@ void reportError(std::size_t lineNumber, const std::string& reason, const std::s
     std::string msg = "line " + std::to_string(lineNumber) + ": " + reason;
     if (!part.empty()) msg += " \"" + part + "\"";
     for (auto frame = trgCallStack.rbegin(); frame != trgCallStack.rend(); ++frame) {
-        msg += "\\n  at " + frame->functionName + " (called from line " +
+        msg += "\n  at " + frame->functionName + " (called from line " +
                std::to_string(frame->callLine) + ")";
     }
     ++errorCount;
