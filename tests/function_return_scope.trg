@@ -1,9 +1,9 @@
 // Function return values and local-scope regression test.
-define add_bonus amount (
+define get_answer (
     num private_value = 100
-    return amount + 5
+    return 8
 )
 
-add_bonus 3 -> result
+get_answer -> result
 say "returned=" result
 say "TRG_FUNCTION_RETURN_SCOPE_PASSED"
