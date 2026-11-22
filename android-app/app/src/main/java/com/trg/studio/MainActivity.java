@@ -1434,6 +1434,7 @@ sourceText = exampleSource;
         private final List<JSONObject> models = new ArrayList<>();
         private final HashMap<String, Bitmap> spriteBitmaps = new HashMap<>();
         private final HashMap<String, JSONObject> animationByName = new HashMap<>();
+        private final HashMap<String, Integer> colorCache = new HashMap<>();
         private final float[] animatedPositionScratch = new float[2];
         private JSONObject state = new JSONObject();
         private long updatedAt;
@@ -1760,10 +1761,9 @@ sourceText = exampleSource;
             double elapsed = state.optDouble("elapsed")
                     + (SystemClock.uptimeMillis() - updatedAt) / 1000.0;
             JSONArray animations = state.optJSONArray("animations");
-            if (animations != null) {
-                for (int i = 0; i < animations.length(); i++) {
-                    JSONObject animation = animations.optJSONObject(i);
-                    if (animation != null && elapsed < animation.optDouble("start") + animation.optDouble("duration")
+            if (!animationByName.isEmpty()) {
+                for (JSONObject animation : animationByName.values()) {
+                    if (elapsed < animation.optDouble("start") + animation.optDouble("duration")
                             && elapsed >= animation.optDouble("start")) animating = true;
                 }
             }
@@ -2299,24 +2299,29 @@ sourceText = exampleSource;
         }
 
         private int parseColor(String source) {
+            Integer cached = colorCache.get(source);
+            if (cached != null) return cached;
+            int parsed = Color.MAGENTA;
             try {
                 if (source.startsWith("##") && source.length() == 8) {
                     long channels = Long.parseLong(source.substring(2), 16);
                     int blue = (int) ((channels >> 16) & 255);
                     int red = (int) ((channels >> 8) & 255);
                     int green = (int) (channels & 255);
-                    return Color.rgb(red, green, blue);
-                }
-                if (source.startsWith("#")) return Color.parseColor(source);
-                if (source.startsWith("0x") || source.startsWith("0X")) {
+                    parsed = Color.rgb(red, green, blue);
+                } else if (source.startsWith("#")) {
+                    parsed = Color.parseColor(source);
+                } else if (source.startsWith("0x") || source.startsWith("0X")) {
                     long value = Long.parseLong(source.substring(2), 16);
-                    if (source.length() > 8) return (int) value;
-                    return Color.rgb((int) ((value >> 16) & 255), (int) ((value >> 8) & 255), (int) (value & 255));
+                    if (source.length() > 8) parsed = (int) value;
+                    else parsed = Color.rgb((int) ((value >> 16) & 255), (int) ((value >> 8) & 255), (int) (value & 255));
                 }
             } catch (IllegalArgumentException ignored) {
-                return Color.MAGENTA;
+                parsed = Color.MAGENTA;
             }
-            return Color.MAGENTA;
+            if (colorCache.size() >= 128) colorCache.clear();
+            colorCache.put(source, parsed);
+            return parsed;
         }
     }
 }
