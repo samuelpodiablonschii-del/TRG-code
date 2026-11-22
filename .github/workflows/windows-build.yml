@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "TRG.cpp"
+      - "EditorSources.h"
       - "TRG.rc"
       - "TRG-Installer.cpp"
       - "TRG-Installer.rc"
