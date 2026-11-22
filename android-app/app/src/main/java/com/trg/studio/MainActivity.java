@@ -93,6 +93,18 @@ public final class MainActivity extends Activity {
     private static final int MENU_DEBUG = 10;
     private static final int MENU_2D = 11;
     private static final int MENU_3D = 12;
+    private static final HashSet<String> BASE_COMMANDS = new HashSet<>(Arrays.asList(
+            "say", "ask", "word", "num", "toggle", "color", "if", "else", "loop", "group",
+            "wait", "every", "random", "collides", "touching", "watch_collision", "move_ui",
+            "record", "class", "struct", "new", "image", "sprite", "json", "create", "run",
+            "define", "stop", "exit", "break", "continue", "add", "text", "button", "block", "animate",
+            "ui", "3d", "studio", "set_text", "set_color",
+            "register", "registry", "move", "subtract", "multiply", "divide", "list", "push", "get", "remove",
+            "upper", "lower", "length", "contains", "replace", "read_file", "write_file", "append_file", "delete_file", "file_exists",
+            "play_audio", "show_image", "play_video", "run_wasm", "web_page", "web_heading", "web_text",
+            "web_color", "web_button", "web_image", "web_show"));
+    private static final java.util.regex.Pattern NUMBER_PATTERN =
+            java.util.regex.Pattern.compile("(?<![A-Za-z_])\\d+(?:\\.\\d+)?");
     private static final String[] MOBILE_SWIPES = {
             "mobile_swipe_left", "mobile_swipe_right", "mobile_swipe_up", "mobile_swipe_down"
     };
@@ -1115,16 +1127,7 @@ sourceText = exampleSource;
                 source.removeSpan(span);
             }
             String text = source.toString();
-            String[] commands = {"say", "ask", "word", "num", "toggle", "color", "if", "else", "loop", "group",
-                    "wait", "every", "random", "collides", "touching", "watch_collision", "move_ui",
-                    "record", "class", "struct", "new", "image", "sprite", "json", "create", "run",
-                    "define", "stop", "exit", "break", "continue", "add", "text", "button", "block", "animate",
-                    "ui", "3d", "studio", "set_text", "set_color",
-                    "register", "registry", "move", "subtract", "multiply", "divide", "list", "push", "get", "remove",
-                    "upper", "lower", "length", "contains", "replace", "read_file", "write_file", "append_file", "delete_file", "file_exists",
-                    "play_audio", "show_image", "play_video", "run_wasm", "web_page", "web_heading", "web_text",
-                    "web_color", "web_button", "web_image", "web_show"};
-            HashSet<String> knownCommands = new HashSet<>(Arrays.asList(commands));
+            HashSet<String> knownCommands = new HashSet<>(BASE_COMMANDS);
             for (String sourceLine : text.split("\\n")) {
                 String[] declaration = sourceLine.trim().split("\\s+");
                 if (declaration.length >= 2 && declaration[0].equalsIgnoreCase("define")) knownCommands.add(declaration[1].toLowerCase(Locale.ROOT));
@@ -1179,7 +1182,7 @@ sourceText = exampleSource;
                 }
                 lineStart = lineEnd + 1;
             }
-            java.util.regex.Matcher numberMatcher = java.util.regex.Pattern.compile("(?<![A-Za-z_])\\d+(?:\\.\\d+)?").matcher(text);
+            java.util.regex.Matcher numberMatcher = NUMBER_PATTERN.matcher(text);
             while (numberMatcher.find()) source.setSpan(new ForegroundColorSpan(Color.rgb(141, 190, 235)),
                     numberMatcher.start(), numberMatcher.end(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         } finally {
