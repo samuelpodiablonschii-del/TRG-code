@@ -6479,7 +6479,7 @@ bool askForInput(const std::string& prompt, std::string& answer) {
 #endif
 
 std::vector<std::string> readProgram(std::istream& source) {
-    std::vector<std::string> program;
+    std::vector<std::string> rawLines;
     std::string line;
     bool firstLine = true;
     while (std::getline(source, line)) {
@@ -6489,8 +6489,22 @@ std::vector<std::string> readProgram(std::istream& source) {
             static_cast<unsigned char>(line[2]) == 0xBF)
             line.erase(0, 3);
         firstLine = false;
-        std::string cleanLine = stripComment(line);
-        const std::size_t first = cleanLine.find_first_not_of(" \\t");
+        rawLines.push_back(stripComment(line));
+    }
+
+    // Discover user-defined function names before typo correction so calls to
+    // names resembling built-in commands are never silently rewritten.
+    std::unordered_set<std::string> functionNames;
+    for (const std::string& rawLine : rawLines) {
+        const auto tokens = tokenize(trim(rawLine));
+        if (tokens.size() >= 2 && lower(tokens[0]) == "define" && validName(tokens[1]))
+            functionNames.insert(lower(tokens[1]));
+    }
+
+    std::vector<std::string> program;
+    program.reserve(rawLines.size());
+    for (std::string cleanLine : rawLines) {
+        const std::size_t first = cleanLine.find_first_not_of(" \t");
         if (first != std::string::npos) {
             std::size_t last = first;
             while (last < cleanLine.size() &&
@@ -6498,17 +6512,17 @@ std::vector<std::string> readProgram(std::istream& source) {
             if (last > first) {
                 const std::string typed = cleanLine.substr(first, last - first);
                 const std::string corrected = suggestedCommand(typed);
-                if (!corrected.empty() && lower(typed) != corrected) {
+                if (!functionNames.count(lower(typed)) &&
+                    !corrected.empty() && lower(typed) != corrected) {
                     cleanLine.replace(first, last - first, corrected);
                     appendOutput("AUTO-CORRECTED command '" + typed + "' to '" + corrected + "'\r\n");
                 }
             }
         }
-        program.push_back(cleanLine);
+        program.push_back(std::move(cleanLine));
     }
     return program;
 }
-
 void executeProgram(const std::vector<std::string>& program) {
     uiStart = std::chrono::steady_clock::now();
 #ifdef __ANDROID__
