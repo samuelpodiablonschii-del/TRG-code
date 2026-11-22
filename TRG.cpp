@@ -2682,7 +2682,31 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 }
             }
             for (std::size_t p = 0; p < uf.params.size() && p + 1 < resultArrow; ++p) {
-                localVariables[uf.params[p]] = valueFor(tokens[p + 1], callerVariables);
+                const std::string& argument = tokens[p + 1];
+                const std::string& parameter = uf.params[p];
+                if (callerVariables.count(argument)) {
+                    localVariables[parameter] = callerVariables.at(argument);
+                    const auto argumentType = callerTypes.find(argument);
+                    if (argumentType != callerTypes.end()) localTypes[parameter] = argumentType->second;
+                    else if (std::holds_alternative<double>(localVariables[parameter].value)) localTypes[parameter] = "num";
+                    else if (std::holds_alternative<bool>(localVariables[parameter].value)) localTypes[parameter] = "toggle";
+                    else if (std::holds_alternative<VariableList>(localVariables[parameter].value)) localTypes[parameter] = "list";
+                    else if (std::holds_alternative<std::shared_ptr<DictionaryData>>(localVariables[parameter].value)) localTypes[parameter] = "dictionary";
+                    else localTypes[parameter] = "word";
+                } else {
+                    const std::string raw = valueFor(argument, callerVariables);
+                    double numeric = 0;
+                    if (lower(raw) == "true" || lower(raw) == "false") {
+                        localVariables[parameter] = lower(raw) == "true";
+                        localTypes[parameter] = "toggle";
+                    } else if (parseNumber(raw, numeric)) {
+                        localVariables[parameter] = numeric;
+                        localTypes[parameter] = "num";
+                    } else {
+                        localVariables[parameter] = raw;
+                        localTypes[parameter] = "word";
+                    }
+                }
             }
             Flow inner;
             trgCallStack.push_back({uf.name, i + 1});
