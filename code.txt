@@ -211,6 +211,8 @@ struct Flow {
     bool broke = false;
     bool continued = false;
     bool stopped = false;
+    bool returned = false;
+    VariableValue returnValue;
 };
 
 struct EveryTask {
@@ -2325,7 +2327,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             return;
         }
 #endif
-        if (flow.stopped || flow.broke || flow.continued) return;
+        if (flow.stopped || flow.broke || flow.continued || flow.returned) return;
         
         std::string line = trim(program[i]);
         if (line.empty() || line == "(" || line == ")") continue;
@@ -2612,20 +2614,52 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
         auto ufIt = userFunctions.find(cmd);
         if (ufIt != userFunctions.end()) {
             const auto& uf = ufIt->second;
-            Vars savedVars;
-            for (std::size_t p = 0; p < uf.params.size() && p + 1 < tokens.size(); ++p) {
-                const auto existing = variables.find(uf.params[p]);
-                if (existing != variables.end()) savedVars[uf.params[p]] = existing->second;
-                variables[uf.params[p]] = valueFor(tokens[p + 1], variables);
+            std::size_t resultArrow = tokens.size();
+            for (std::size_t tokenIndex = 1; tokenIndex < tokens.size(); ++tokenIndex) {
+                if (tokens[tokenIndex] == "->") { resultArrow = tokenIndex; break; }
+            }
+            const std::string resultName = resultArrow + 1 < tokens.size() ? tokens[resultArrow + 1] : "";
+            if (resultArrow < tokens.size() &&
+                (resultArrow + 2 != tokens.size() || !validName(resultName))) {
+                reportError(i + 1, "function result syntax is FUNCTION ARGUMENTS -> RESULT_VARIABLE");
+                continue;
+            }
+
+            // Function frames inherit the caller's values, but declarations made
+            // inside the function stay local. Assignments to pre-existing globals
+            // remain visible, while parameters always shadow caller variables.
+            Vars callerVariables = variables;
+            Types callerTypes = types;
+            Defaults localDefaults = defaults;
+            Vars localVariables = variables;
+            Types localTypes = types;
+            for (std::size_t p = 0; p < uf.params.size() && p + 1 < resultArrow; ++p) {
+                localVariables[uf.params[p]] = valueFor(tokens[p + 1], callerVariables);
             }
             Flow inner;
-            executeBlock(uf.body, 0, uf.body.size(), variables, types, defaults, inner, manualMode, uiMode);
-            for (const std::string& param : uf.params) {
-                const auto saved = savedVars.find(param);
-                if (saved == savedVars.end()) variables.erase(param);
-                else variables[param] = saved->second;
+            executeBlock(uf.body, 0, uf.body.size(), localVariables, localTypes, localDefaults,
+                         inner, manualMode, uiMode);
+
+            for (const auto& existing : callerVariables) {
+                if (std::find(uf.params.begin(), uf.params.end(), existing.first) != uf.params.end()) continue;
+                const auto updated = localVariables.find(existing.first);
+                if (updated != localVariables.end()) variables[existing.first] = updated->second;
             }
+            for (const auto& existing : callerTypes) {
+                if (std::find(uf.params.begin(), uf.params.end(), existing.first) != uf.params.end()) continue;
+                const auto updated = localTypes.find(existing.first);
+                if (updated != localTypes.end()) types[existing.first] = updated->second;
+            }
+
             if (inner.stopped) { flow.stopped = true; return; }
+                if (inner.returned) { flow.returned = true; flow.returnValue = inner.returnValue; return; }
+            if (inner.returned && !resultName.empty()) {
+                variables[resultName] = inner.returnValue;
+                if (std::holds_alternative<double>(inner.returnValue.value)) types[resultName] = "num";
+                else if (std::holds_alternative<bool>(inner.returnValue.value)) types[resultName] = "toggle";
+                else if (std::holds_alternative<std::vector<std::string>>(inner.returnValue.value)) types[resultName] = "list";
+                else types[resultName] = "word";
+            }
             continue;
         }
         if (cmd == "define") {
@@ -2810,6 +2844,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 Flow inner;
                 executeBlock(program, open + 1, close, variables, types, defaults, inner, manualMode, uiMode);
                 if (inner.stopped) { flow.stopped = true; return; }
+                if (inner.returned) { flow.returned = true; flow.returnValue = inner.returnValue; return; }
                 i = close;
                 continue;
             }
@@ -2863,6 +2898,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                              manualMode || connectedLibraries.manual, uiMode || connectedLibraries.ui);
                 --connectDepth;
                 if (inner.stopped) { flow.stopped = true; return; }
+                if (inner.returned) { flow.returned = true; flow.returnValue = inner.returnValue; return; }
                 continue;
             }
 
@@ -2908,6 +2944,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                                  manualMode || moduleLibraries.manual, uiMode || moduleLibraries.ui);
                     --includeDepth;
                     if (moduleFlow.stopped) { flow.stopped = true; return; }
+                if (moduleFlow.returned) { flow.returned = true; flow.returnValue = moduleFlow.returnValue; return; }
                     continue;
                 }
             }
@@ -3014,6 +3051,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             activeRunFiles.erase(runKey);
             --runDepth;
             if (inner.stopped) { flow.stopped = true; return; }
+                if (inner.returned) { flow.returned = true; flow.returnValue = inner.returnValue; return; }
             continue;
         }
 
@@ -4272,6 +4310,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     }
                 }
                 if (inner.stopped) { flow.stopped = true; return; }
+                if (inner.returned) { flow.returned = true; flow.returnValue = inner.returnValue; return; }
             } else if (cmd == "every") {
                 long long interval = 0;
                 if (tokens.size() < 2 || !parseDurationMilliseconds(valueFor(tokens[1], variables), interval) || interval <= 0) {
@@ -4327,6 +4366,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     if (isElse) break;
                 }
                 if (branchFlow.stopped) { flow.stopped = true; return; }
+                if (branchFlow.returned) { flow.returned = true; flow.returnValue = branchFlow.returnValue; return; }
                 if (branchFlow.broke) { flow.broke = true; return; }
                 if (branchFlow.continued) { flow.continued = true; return; }
                 if (finalChainClose > close) close = finalChainClose;
@@ -4340,6 +4380,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     Flow inner;
                     executeBlock(program, open + 1, close, variables, types, defaults, inner, manualMode, uiMode);
                     if (inner.stopped) { flow.stopped = true; return; }
+                if (inner.returned) { flow.returned = true; flow.returnValue = inner.returnValue; return; }
                     if (inner.broke) break;
 #ifdef _WIN32
                     if (controlsEnabled) Sleep(10);
@@ -4352,6 +4393,31 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             continue;
         }
 
+        if (cmd == "return") {
+            if (tokens.size() < 2) {
+                flow.returnValue = VariableValue();
+            } else {
+                const std::string raw = trim(line.substr(line.find_first_of(" \t") + 1));
+                double numeric = 0;
+                if (evaluateExpression(raw, variables, numeric)) {
+                    flow.returnValue = numeric;
+                } else if (tokens.size() == 2 && variables.count(tokens[1])) {
+                    flow.returnValue = variables[tokens[1]];
+                } else if (tokens.size() == 2 &&
+                           (lower(tokens[1]) == "true" || lower(tokens[1]) == "false")) {
+                    flow.returnValue = lower(tokens[1]) == "true";
+                } else {
+                    std::string textValue;
+                    for (std::size_t part = 1; part < tokens.size(); ++part) {
+                        if (part > 1) textValue += ' ';
+                        textValue += valueFor(tokens[part], variables);
+                    }
+                    flow.returnValue = textValue;
+                }
+            }
+            flow.returned = true;
+            return;
+        }
         if (cmd == "break") { flow.broke = true; return; }
         if (cmd == "continue") { flow.continued = true; return; }
         if (cmd == "stop" || cmd == "exit") { flow.stopped = true; return; }
