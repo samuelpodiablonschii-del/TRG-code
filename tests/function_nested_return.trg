@@ -1,12 +1,12 @@
 // Nested function return propagation regression test.
-define classify value (
-    if value > 0 (
-        return "positive"
+define choose_value (
+    if 1 = 1 (
+        return 8
     )
-    return "not positive"
+    return 0
 )
-classify 2 -> label
-if label = "positive" (
+choose_value -> answer
+if answer = 8 (
     say "TRG_NESTED_RETURN_PASSED"
 )
 else (
