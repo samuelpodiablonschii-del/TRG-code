@@ -174,8 +174,9 @@ TRG_BLUETOOTH_DLL_EXPORT std::vector<std::string> bluetoothDevices;
 #define VK_OEM_7 0xDE
 #endif
 
+struct DictionaryData;
 struct VariableValue {
-    std::variant<double, bool, std::string, std::vector<std::string>> value = std::string();
+    std::variant<double, bool, std::string, std::vector<std::string>, std::shared_ptr<DictionaryData>> value = std::string();
     VariableValue() = default;
     VariableValue(const std::string& text) : value(text) {}
     VariableValue(std::string&& text) : value(std::move(text)) {}
@@ -184,6 +185,7 @@ struct VariableValue {
     VariableValue(bool flag) : value(flag) {}
     VariableValue(const std::vector<std::string>& items) : value(items) {}
     VariableValue(std::vector<std::string>&& items) : value(std::move(items)) {}
+    VariableValue(const std::shared_ptr<DictionaryData>& dictionary) : value(dictionary) {}
     VariableValue& operator=(const std::string& text) { value = text; return *this; }
     VariableValue& operator=(std::string&& text) { value = std::move(text); return *this; }
     VariableValue& operator=(const char* text) { value = std::string(text); return *this; }
@@ -195,14 +197,20 @@ struct VariableValue {
         if (const auto* text = std::get_if<std::string>(&value)) return *text;
         if (const auto* number = std::get_if<double>(&value)) { std::ostringstream out; out << std::setprecision(15) << *number; return out.str(); }
         if (const auto* flag = std::get_if<bool>(&value)) return *flag ? "true" : "false";
-        std::string joined;
-        for (const auto& item : std::get<std::vector<std::string>>(value)) {
-            if (!joined.empty()) joined += ", ";
-            joined += item;
+        if (const auto* items = std::get_if<std::vector<std::string>>(&value)) {
+            std::string joined;
+            for (const auto& item : *items) {
+                if (!joined.empty()) joined += ", ";
+                joined += item;
+            }
+            return joined;
         }
-        return joined;
+        return "{dictionary}";
     }
     void clear() { value = std::string(); }
+};
+struct DictionaryData {
+    std::unordered_map<std::string, VariableValue> values;
 };
 using Vars = std::unordered_map<std::string, VariableValue>;
 using Types = std::unordered_map<std::string, std::string>;
@@ -815,7 +823,7 @@ std::string lower(std::string s) {
 
 std::string suggestedCommand(const std::string& input) {
     static const std::vector<std::string> commands = {
-        "say", "print", "show", "let", "list", "ask", "ai", "math", "word", "num", "toggle", "color", "if", "else", "loop", "every", "for", "each", "query", "random",
+        "say", "print", "show", "let", "list", "dictionary", "dict_set", "dict_get", "dict_has", "dict_remove", "dict_keys", "dict_count", "ask", "ai", "math", "word", "num", "toggle", "color", "if", "else", "loop", "every", "for", "each", "query", "random",
         "group", "define", "stop", "exit", "break", "continue", "add", "text",
         "button", "block", "animate", "collides", "touching", "move_ui", "register", "move", "subtract", "multiply",
         "watch_collision",
@@ -2658,6 +2666,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 if (std::holds_alternative<double>(inner.returnValue.value)) types[resultName] = "num";
                 else if (std::holds_alternative<bool>(inner.returnValue.value)) types[resultName] = "toggle";
                 else if (std::holds_alternative<std::vector<std::string>>(inner.returnValue.value)) types[resultName] = "list";
+                else if (std::holds_alternative<std::shared_ptr<DictionaryData>>(inner.returnValue.value)) types[resultName] = "dictionary";
                 else types[resultName] = "word";
             }
             continue;
@@ -3843,6 +3852,74 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 else { reportError(i + 1, "physics drag and bounce must be zero or greater"); continue; }
             } else {
                 reportError(i + 1, "unknown physics operation", action);
+            }
+            continue;
+        }
+
+        if (cmd == "dictionary") {
+            if (tokens.size() != 2 || !validName(tokens[1])) {
+                reportError(i + 1, "use dictionary NAME");
+                continue;
+            }
+            variables[tokens[1]] = std::make_shared<DictionaryData>();
+            types[tokens[1]] = "dictionary";
+            continue;
+        }
+        if (cmd == "dict_set" || cmd == "dict_get" || cmd == "dict_has" ||
+            cmd == "dict_remove" || cmd == "dict_keys" || cmd == "dict_count") {
+            const std::size_t expected = cmd == "dict_set" ? 4 :
+                (cmd == "dict_get" || cmd == "dict_has" ? 4 :
+                 (cmd == "dict_remove" ? 3 : 3));
+            if (tokens.size() != expected || !variables.count(tokens[1]) ||
+                types[tokens[1]] != "dictionary") {
+                reportError(i + 1, "use dictionary NAME, then dict_set/get/has/remove/keys/count");
+                continue;
+            }
+            auto* dictionaryPointer = std::get_if<std::shared_ptr<DictionaryData>>(&variables[tokens[1]].value);
+            if (!dictionaryPointer || !*dictionaryPointer) {
+                reportError(i + 1, "dictionary value is invalid", tokens[1]);
+                continue;
+            }
+            auto& entries = (*dictionaryPointer)->values;
+            if (cmd == "dict_set") {
+                const std::string key = valueFor(tokens[2], variables);
+                const std::string raw = valueFor(tokens[3], variables);
+                if (variables.count(tokens[3])) entries[key] = variables[tokens[3]];
+                else if (lower(raw) == "true" || lower(raw) == "false") entries[key] = (lower(raw) == "true");
+                else {
+                    double numeric = 0;
+                    if (parseNumber(raw, numeric)) entries[key] = numeric;
+                    else entries[key] = raw;
+                }
+            } else if (cmd == "dict_get") {
+                const std::string key = valueFor(tokens[2], variables);
+                const auto found = entries.find(key);
+                if (found == entries.end()) { reportError(i + 1, "dictionary key was not found", key); continue; }
+                if (!validName(tokens[3])) { reportError(i + 1, "dict_get needs a destination variable", tokens[3]); continue; }
+                variables[tokens[3]] = found->second;
+                if (std::holds_alternative<double>(found->second.value)) types[tokens[3]] = "num";
+                else if (std::holds_alternative<bool>(found->second.value)) types[tokens[3]] = "toggle";
+                else if (std::holds_alternative<std::vector<std::string>>(found->second.value)) types[tokens[3]] = "list";
+                else if (std::holds_alternative<std::shared_ptr<DictionaryData>>(found->second.value)) types[tokens[3]] = "dictionary";
+                else types[tokens[3]] = "word";
+            } else if (cmd == "dict_has") {
+                if (!validName(tokens[3])) { reportError(i + 1, "dict_has needs a result variable", tokens[3]); continue; }
+                variables[tokens[3]] = entries.count(valueFor(tokens[2], variables)) != 0;
+                types[tokens[3]] = "toggle";
+            } else if (cmd == "dict_remove") {
+                entries.erase(valueFor(tokens[2], variables));
+            } else if (cmd == "dict_count") {
+                if (!validName(tokens[2])) { reportError(i + 1, "dict_count needs a result variable", tokens[2]); continue; }
+                variables[tokens[2]] = static_cast<double>(entries.size());
+                types[tokens[2]] = "num";
+            } else {
+                if (!validName(tokens[2])) { reportError(i + 1, "dict_keys needs a destination list", tokens[2]); continue; }
+                std::vector<std::string> keys;
+                keys.reserve(entries.size());
+                for (const auto& entry : entries) keys.push_back(entry.first);
+                std::sort(keys.begin(), keys.end());
+                variables[tokens[2]] = std::move(keys);
+                types[tokens[2]] = "list";
             }
             continue;
         }
