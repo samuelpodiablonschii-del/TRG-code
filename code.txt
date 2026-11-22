@@ -2667,6 +2667,17 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             Defaults localDefaults = defaults;
             Vars localVariables = variables;
             Types localTypes = types;
+            std::unordered_set<std::string> declaredLocals;
+            for (const std::string& bodyLine : uf.body) {
+                const auto declaration = tokenize(trim(bodyLine));
+                if (declaration.size() >= 2 &&
+                    (declaration[0] == "let" || declaration[0] == "word" ||
+                     declaration[0] == "num" || declaration[0] == "toggle" ||
+                     declaration[0] == "color" || declaration[0] == "list" ||
+                     declaration[0] == "dictionary")) {
+                    declaredLocals.insert(declaration[1]);
+                }
+            }
             for (std::size_t p = 0; p < uf.params.size() && p + 1 < resultArrow; ++p) {
                 localVariables[uf.params[p]] = valueFor(tokens[p + 1], callerVariables);
             }
@@ -2677,7 +2688,8 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             trgCallStack.pop_back();
 
             for (const auto& existing : callerVariables) {
-                if (std::find(uf.params.begin(), uf.params.end(), existing.first) != uf.params.end()) continue;
+                if (declaredLocals.count(existing.first) ||
+                    std::find(uf.params.begin(), uf.params.end(), existing.first) != uf.params.end()) continue;
                 const auto updated = localVariables.find(existing.first);
                 if (updated != localVariables.end()) variables[existing.first] = updated->second;
             }
