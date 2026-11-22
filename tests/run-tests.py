@@ -20,7 +20,7 @@ TESTS = [
     ("math_library.trg", "TRG_MATH_TESTS_PASSED"),
     ("plain_english.trg", "TRG_PLAIN_ENGLISH_TESTS_PASSED"),
     ("3d_scene_roundtrip.trg", "TRG_3D_SCENE_ROUNDTRIP_PASSED"),
-    ("stack_trace.trg", ["at inner_task (called from line", "at outer_task (called from line"], True),
+    ("stack_trace.trg", ["line 3: unknown command", "at inner_task (called from line 6)", "at outer_task (called from line 8)"], True),
 ]
 
 def run(command, **kwargs):
