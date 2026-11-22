@@ -32,10 +32,10 @@ else (
 
 dictionary player
 dict_set player score 10
-define map_roundtrip value (
+define pass_dictionary value (
     return value
 )
-map_roundtrip player -> copied_player
+pass_dictionary player -> copied_player
 dict_get copied_player score dictionary_score
 if dictionary_score = 10 (
     say "TRG_TYPED_DICTIONARY_ARGUMENT_PASSED"
