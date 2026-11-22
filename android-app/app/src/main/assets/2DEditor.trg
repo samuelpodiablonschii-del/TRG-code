@@ -41,7 +41,7 @@ block z 3 x 51 y 14 w 0.15 h 55 color #EEEAF3 name GRID_V2
 block z 3 x 66 y 14 w 0.15 h 55 color #EEEAF3 name GRID_V3
 block z 3 x 81 y 14 w 0.15 h 55 color #EEEAF3 name GRID_V4
 block z 3 x 21 y 25 w 76 h 0.15 color #EEEAF3 name GRID_H1
-block z 3 x 21 y 36 y 36 w 76 h 0.15 color #EEEAF3 name GRID_H2
+block z 3 x 21 y 36 w 76 h 0.15 color #EEEAF3 name GRID_H2
 block z 3 x 21 y 47 w 76 h 0.15 color #EEEAF3 name GRID_H3
 block z 3 x 21 y 58 w 76 h 0.15 color #EEEAF3 name GRID_H4
 
