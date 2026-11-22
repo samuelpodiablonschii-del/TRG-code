@@ -174,9 +174,11 @@ TRG_BLUETOOTH_DLL_EXPORT std::vector<std::string> bluetoothDevices;
 #define VK_OEM_7 0xDE
 #endif
 
+struct VariableValue;
 struct DictionaryData;
+using VariableList = std::vector<std::shared_ptr<VariableValue>>;
 struct VariableValue {
-    std::variant<double, bool, std::string, std::vector<std::string>, std::shared_ptr<DictionaryData>> value = std::string();
+    std::variant<double, bool, std::string, std::vector<std::string>, std::shared_ptr<DictionaryData>, VariableList> value = std::string();
     VariableValue() = default;
     VariableValue(const std::string& text) : value(text) {}
     VariableValue(std::string&& text) : value(std::move(text)) {}
@@ -202,6 +204,14 @@ struct VariableValue {
             for (const auto& item : *items) {
                 if (!joined.empty()) joined += ", ";
                 joined += item;
+            }
+            return joined;
+        }
+        if (const auto* list = std::get_if<VariableList>(&value)) {
+            std::string joined;
+            for (const auto& item : *list) {
+                if (!joined.empty()) joined += ", ";
+                if (item) joined += static_cast<std::string>(*item);
             }
             return joined;
         }
@@ -2665,7 +2675,8 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 variables[resultName] = inner.returnValue;
                 if (std::holds_alternative<double>(inner.returnValue.value)) types[resultName] = "num";
                 else if (std::holds_alternative<bool>(inner.returnValue.value)) types[resultName] = "toggle";
-                else if (std::holds_alternative<std::vector<std::string>>(inner.returnValue.value)) types[resultName] = "list";
+                else if (std::holds_alternative<std::vector<std::string>>(inner.returnValue.value) ||
+                         std::holds_alternative<VariableList>(inner.returnValue.value)) types[resultName] = "list";
                 else if (std::holds_alternative<std::shared_ptr<DictionaryData>>(inner.returnValue.value)) types[resultName] = "dictionary";
                 else types[resultName] = "word";
             }
@@ -3899,7 +3910,8 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 variables[tokens[3]] = found->second;
                 if (std::holds_alternative<double>(found->second.value)) types[tokens[3]] = "num";
                 else if (std::holds_alternative<bool>(found->second.value)) types[tokens[3]] = "toggle";
-                else if (std::holds_alternative<std::vector<std::string>>(found->second.value)) types[tokens[3]] = "list";
+                else if (std::holds_alternative<std::vector<std::string>>(found->second.value) ||
+                         std::holds_alternative<VariableList>(found->second.value)) types[tokens[3]] = "list";
                 else if (std::holds_alternative<std::shared_ptr<DictionaryData>>(found->second.value)) types[tokens[3]] = "dictionary";
                 else types[tokens[3]] = "word";
             } else if (cmd == "dict_has") {
@@ -3914,10 +3926,12 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 types[tokens[2]] = "num";
             } else {
                 if (!validName(tokens[2])) { reportError(i + 1, "dict_keys needs a destination list", tokens[2]); continue; }
-                std::vector<std::string> keys;
+                VariableList keys;
                 keys.reserve(entries.size());
-                for (const auto& entry : entries) keys.push_back(entry.first);
-                std::sort(keys.begin(), keys.end());
+                std::vector<std::string> sortedKeys;
+                for (const auto& entry : entries) sortedKeys.push_back(entry.first);
+                std::sort(sortedKeys.begin(), sortedKeys.end());
+                for (const auto& key : sortedKeys) keys.push_back(std::make_shared<VariableValue>(key));
                 variables[tokens[2]] = std::move(keys);
                 types[tokens[2]] = "list";
             }
@@ -3926,13 +3940,22 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
 
         if (cmd == "list") {
             if (tokens.size() < 2 || !validName(tokens[1])) { reportError(i + 1, "use list NAME [VALUE, VALUE]", "list"); continue; }
-            std::vector<std::string> items;
+            VariableList items;
             const std::size_t namePosition = positionAfterArgument(line, tokens[1]);
             if (namePosition == std::string::npos) { reportError(i + 1, "list needs a valid name", tokens[1]); continue; }
             std::string initial = trim(line.substr(namePosition));
             if (!initial.empty() && initial.front() == '=') {
                 initial = trim(initial.substr(1));
-                items = tokenize(initial);
+                for (const std::string& item : tokenize(initial)) {
+                    if (variables.count(item)) items.push_back(std::make_shared<VariableValue>(variables[item]));
+                    else if (lower(item) == "true" || lower(item) == "false")
+                        items.push_back(std::make_shared<VariableValue>(lower(item) == "true"));
+                    else {
+                        double numeric = 0;
+                        if (parseNumber(item, numeric)) items.push_back(std::make_shared<VariableValue>(numeric));
+                        else items.push_back(std::make_shared<VariableValue>(item));
+                    }
+                }
             }
             variables[tokens[1]] = std::move(items);
             types[tokens[1]] = "list";
@@ -3944,9 +3967,18 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 reportError(i + 1, cmd == "push" ? "use push LIST VALUE" : (cmd == "get" ? "use get LIST INDEX VARIABLE" : "use remove LIST INDEX"));
                 continue;
             }
-            auto* items = std::get_if<std::vector<std::string>>(&variables[tokens[1]].value);
+            auto* items = std::get_if<VariableList>(&variables[tokens[1]].value);
             if (!items) { reportError(i + 1, "variable is not a list", tokens[1]); continue; }
-            if (cmd == "push") items->push_back(valueFor(tokens[2], variables));
+            if (cmd == "push") {
+                if (variables.count(tokens[2])) items->push_back(std::make_shared<VariableValue>(variables[tokens[2]]));
+                else if (lower(tokens[2]) == "true" || lower(tokens[2]) == "false")
+                    items->push_back(std::make_shared<VariableValue>(lower(tokens[2]) == "true"));
+                else {
+                    double numeric = 0;
+                    if (parseNumber(valueFor(tokens[2], variables), numeric)) items->push_back(std::make_shared<VariableValue>(numeric));
+                    else items->push_back(std::make_shared<VariableValue>(valueFor(tokens[2], variables)));
+                }
+            }
             else {
                 double parsedIndex = 0;
                 if (!parseNumber(valueFor(tokens[2], variables), parsedIndex) || parsedIndex < 0 ||
@@ -3954,8 +3986,14 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 const std::size_t index = static_cast<std::size_t>(parsedIndex);
                 if (cmd == "get") {
                     if (!validName(tokens[3])) { reportError(i + 1, "get needs a valid destination variable", tokens[3]); continue; }
-                    variables[tokens[3]] = (*items)[index];
-                    if (!types.count(tokens[3])) types[tokens[3]] = "word";
+                    if (!(*items)[index]) { reportError(i + 1, "list item is invalid", tokens[2]); continue; }
+                    variables[tokens[3]] = *(*items)[index];
+                    if (std::holds_alternative<double>((*items)[index]->value)) types[tokens[3]] = "num";
+                    else if (std::holds_alternative<bool>((*items)[index]->value)) types[tokens[3]] = "toggle";
+                    else if (std::holds_alternative<VariableList>((*items)[index]->value) ||
+                             std::holds_alternative<std::vector<std::string>>((*items)[index]->value)) types[tokens[3]] = "list";
+                    else if (std::holds_alternative<std::shared_ptr<DictionaryData>>((*items)[index]->value)) types[tokens[3]] = "dictionary";
+                    else types[tokens[3]] = "word";
                 } else items->erase(items->begin() + static_cast<std::ptrdiff_t>(index));
             }
             continue;
@@ -3975,12 +4013,17 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     reportError(i + 1, cmd + " needs a list variable", tokens[1]);
                     continue;
                 }
-                auto* items = std::get_if<std::vector<std::string>>(&variables[tokens[1]].value);
+                auto* items = std::get_if<VariableList>(&variables[tokens[1]].value);
                 if (!items) { reportError(i + 1, "variable is not a list", tokens[1]); continue; }
                 if (cmd == "pop") {
                     if (items->empty()) { reportError(i + 1, "cannot pop an empty list", tokens[1]); continue; }
-                    variables[tokens[2]] = items->back();
-                    types[tokens[2]] = "word";
+                    if (!items->back()) { reportError(i + 1, "list item is invalid", tokens[1]); continue; }
+                    variables[tokens[2]] = *items->back();
+                    if (std::holds_alternative<double>(items->back()->value)) types[tokens[2]] = "num";
+                    else if (std::holds_alternative<bool>(items->back()->value)) types[tokens[2]] = "toggle";
+                    else if (std::holds_alternative<VariableList>(items->back()->value)) types[tokens[2]] = "list";
+                    else if (std::holds_alternative<std::shared_ptr<DictionaryData>>(items->back()->value)) types[tokens[2]] = "dictionary";
+                    else types[tokens[2]] = "word";
                     items->pop_back();
                 } else if (cmd == "insert") {
                     double parsedIndex = 0;
@@ -3989,13 +4032,23 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                         reportError(i + 1, "insert index must be a whole number from 0 to list length", tokens[2]);
                         continue;
                     }
-                    items->insert(items->begin() + static_cast<std::ptrdiff_t>(parsedIndex), valueFor(tokens[3], variables));
+                    VariableValue inserted;
+                    if (variables.count(tokens[3])) inserted = variables[tokens[3]];
+                    else {
+                        const std::string raw = valueFor(tokens[3], variables);
+                        double numeric = 0;
+                        if (lower(raw) == "true" || lower(raw) == "false") inserted = lower(raw) == "true";
+                        else if (parseNumber(raw, numeric)) inserted = numeric;
+                        else inserted = raw;
+                    }
+                    items->insert(items->begin() + static_cast<std::ptrdiff_t>(parsedIndex),
+                                  std::make_shared<VariableValue>(std::move(inserted)));
                 } else {
                     const std::string delimiter = valueFor(tokens[2], variables);
                     std::string joined;
                     for (std::size_t n = 0; n < items->size(); ++n) {
                         if (n) joined += delimiter;
-                        joined += (*items)[n];
+                        if ((*items)[n]) joined += static_cast<std::string>(*(*items)[n]);
                     }
                     variables[tokens[3]] = joined;
                     types[tokens[3]] = "word";
@@ -4016,14 +4069,14 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 const std::string source = valueFor(tokens[1], variables);
                 const std::string delimiter = valueFor(tokens[2], variables);
                 if (delimiter.empty()) { reportError(i + 1, "split delimiter cannot be empty", tokens[2]); continue; }
-                std::vector<std::string> parts;
+                VariableList parts;
                 std::size_t begin = 0;
                 std::size_t found = 0;
                 while ((found = source.find(delimiter, begin)) != std::string::npos) {
-                    parts.push_back(source.substr(begin, found - begin));
+                    parts.push_back(std::make_shared<VariableValue>(source.substr(begin, found - begin)));
                     begin = found + delimiter.size();
                 }
-                parts.push_back(source.substr(begin));
+                parts.push_back(std::make_shared<VariableValue>(source.substr(begin)));
                 variables[tokens[3]] = std::move(parts);
                 types[tokens[3]] = "list";
                 continue;
@@ -4065,7 +4118,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             else if (cmd == "lower") result = lower(source);
             else if (cmd == "length") {
                 const auto variable = variables.find(tokens[1]);
-                const auto* listValue = variable == variables.end() ? nullptr : std::get_if<std::vector<std::string>>(&variable->second.value);
+                const auto* listValue = variable == variables.end() ? nullptr : std::get_if<VariableList>(&variable->second.value);
                 result = std::to_string(listValue ? listValue->size() : source.size());
             } else if (cmd == "contains") result = source.find(valueFor(tokens[2], variables)) == std::string::npos ? "false" : "true";
             else {
@@ -4397,13 +4450,13 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     i = close;
                     continue;
                 }
-                const auto* sourceItems = std::get_if<std::vector<std::string>>(&variables[tokens[4]].value);
+                const auto* sourceItems = std::get_if<VariableList>(&variables[tokens[4]].value);
                 if (!sourceItems) {
                     reportError(i + 1, "for each needs a list of values", tokens[4]);
                     i = close;
                     continue;
                 }
-                const std::vector<std::string> items = *sourceItems;
+                const VariableList items = *sourceItems;
                 const std::string itemName = tokens[2];
                 const auto previousValue = variables.find(itemName);
                 const bool hadPreviousValue = previousValue != variables.end();
@@ -4412,9 +4465,14 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 const auto previousType = types.find(itemName);
                 const bool hadPreviousType = previousType != types.end();
                 const std::string savedType = hadPreviousType ? previousType->second : "";
-                for (const std::string& item : items) {
-                    variables[itemName] = item;
-                    types[itemName] = "word";
+                for (const auto& item : items) {
+                    if (!item) continue;
+                    variables[itemName] = *item;
+                    if (std::holds_alternative<double>(item->value)) types[itemName] = "num";
+                    else if (std::holds_alternative<bool>(item->value)) types[itemName] = "toggle";
+                    else if (std::holds_alternative<VariableList>(item->value)) types[itemName] = "list";
+                    else if (std::holds_alternative<std::shared_ptr<DictionaryData>>(item->value)) types[itemName] = "dictionary";
+                    else types[itemName] = "word";
                     Flow iteration;
                     executeBlock(program, open + 1, close, variables, types, defaults,
                                  iteration, manualMode, uiMode);
