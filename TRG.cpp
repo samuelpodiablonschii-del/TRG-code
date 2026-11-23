@@ -570,6 +570,7 @@ HWND terminalSendButton = nullptr;
 HWND dictionaryWindow = nullptr;
 HWND dictionaryEdit = nullptr;
 HBRUSH terminalInputBrush = nullptr;
+HBRUSH outputControlBrush = nullptr;
 HBRUSH dictionaryEditBrush = nullptr;
 WNDPROC previousCodeEditorProc = nullptr;
 WNDPROC previousTerminalInputProc = nullptr;
@@ -6316,6 +6317,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         if (terminalSendButton && openButtonFont)
             SendMessageW(terminalSendButton, WM_SETFONT, reinterpret_cast<WPARAM>(openButtonFont), TRUE);
         terminalInputBrush = CreateSolidBrush(RGB(12, 9, 19));
+        outputControlBrush = CreateSolidBrush(RGB(8, 7, 12));
         restoreDesktopAutosave();
         if (codeEditor && richEditModule) {
             SendMessageW(codeEditor, EM_SETBKGNDCOLOR, 0, RGB(19, 13, 31));
@@ -6385,11 +6387,19 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             return TRUE;
         }
     }
-    if (message == WM_CTLCOLOREDIT && reinterpret_cast<HWND>(lParam) == terminalInputControl) {
+    if ((message == WM_CTLCOLOREDIT || message == WM_CTLCOLORSTATIC) &&
+        reinterpret_cast<HWND>(lParam) == terminalInputControl) {
         HDC dc = reinterpret_cast<HDC>(wParam);
         SetTextColor(dc, RGB(241, 235, 250));
         SetBkColor(dc, RGB(12, 9, 19));
         return reinterpret_cast<LRESULT>(terminalInputBrush);
+    }
+    if ((message == WM_CTLCOLOREDIT || message == WM_CTLCOLORSTATIC) &&
+        reinterpret_cast<HWND>(lParam) == outputControl) {
+        HDC dc = reinterpret_cast<HDC>(wParam);
+        SetTextColor(dc, RGB(235, 229, 245));
+        SetBkColor(dc, RGB(8, 7, 12));
+        return reinterpret_cast<LRESULT>(outputControlBrush);
     }
     if (message == WM_SIZE) {
         layoutOutputControls(window);
@@ -7133,7 +7143,9 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 minY = std::min(minY, point.y); maxY = std::max(maxY, point.y);
             }
             RECT objectHit = {minX - 8, minY - 8, maxX + 8, maxY + 8};
-            desktop3DProjectedHits.emplace_back(model.name, objectHit);
+            RECT clippedHit = {};
+            if (IntersectRect(&clippedHit, &objectHit, &desktop3DViewportRect))
+                desktop3DProjectedHits.emplace_back(model.name, clippedHit);
             const LONG shapeCenterX = (minX + maxX) / 2;
             const LONG shapeCenterY = (minY + maxY) / 2;
             if (model.shape == "sphere" || model.shape == "spawn") {
@@ -7442,7 +7454,9 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         exportButton = outputControl = terminalInputControl = terminalSendButton = nullptr;
         dictionaryWindow = dictionaryEdit = nullptr;
         if (terminalInputBrush) DeleteObject(terminalInputBrush);
+        if (outputControlBrush) DeleteObject(outputControlBrush);
         terminalInputBrush = nullptr;
+        outputControlBrush = nullptr;
         desktopSpriteCache.clear();
         if (gdiplusToken != 0) {
             Gdiplus::GdiplusShutdown(gdiplusToken);
