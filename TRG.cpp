@@ -601,7 +601,9 @@ POINT desktop3DMouseDown = {};
 double desktop3DDragStartX = 0.0, desktop3DDragStartY = 0.0;
 double desktop3DDragStartYaw = 0.0, desktop3DDragStartPitch = 0.0;
 bool desktop3DContextOpen = false;
+bool desktop3DRightClickMoved = false;
 POINT desktop3DContextPoint = {};
+POINT desktop3DMouseCurrent = {};
 RECT desktop3DContextRect = {};
 LRESULT CALLBACK codeEditorWindowProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK terminalInputWindowProc(HWND, UINT, WPARAM, LPARAM);
@@ -6066,6 +6068,105 @@ DesktopLayout desktopLayout(HWND window, const RECT& client) {
     return {width, height, headerHeight, panelTop,
         std::max<LONG>(1, panelTop - headerHeight), margin, panelTop,
         std::max<LONG>(panelTop, height - margin)};
+}
+
+
+void setDesktop3DLabel(const std::string& name, const std::string& value) {
+    for (UiText& label : uiTexts) if (label.name == name) label.value = value;
+}
+
+void syncDesktop3DEditorState() {
+    if (!desktop3DEngineActive) return;
+    VariableList names;
+    names.reserve(ui3DObjects.size());
+    for (const Ui3DObject& model : ui3DObjects)
+        names.push_back(std::make_shared<VariableValue>(model.name));
+    uiVariables["objects"] = std::move(names);
+    uiTypes["objects"] = "list";
+    uiVariables["objectCount"] = static_cast<double>(ui3DObjects.size());
+    uiTypes["objectCount"] = "num";
+    auto selected = std::find_if(ui3DObjects.begin(), ui3DObjects.end(),
+        [](const Ui3DObject& model) { return model.name == desktop3DSelectedName; });
+    if (selected == ui3DObjects.end() && !ui3DObjects.empty()) {
+        selected = ui3DObjects.begin();
+        desktop3DSelectedName = selected->name;
+    }
+    const std::size_t index = selected == ui3DObjects.end() ? 0 :
+        static_cast<std::size_t>(std::distance(ui3DObjects.begin(), selected));
+    uiVariables["selectedIndex"] = static_cast<double>(index);
+    uiTypes["selectedIndex"] = "num";
+    uiVariables["selectedName"] = selected == ui3DObjects.end() ? std::string() : selected->name;
+    uiTypes["selectedName"] = "word";
+    setDesktop3DLabel("object_count", std::to_string(ui3DObjects.size()) + " OBJECTS");
+    setDesktop3DLabel("hierarchy_selected",
+        selected == ui3DObjects.end() ? "No objects in scene" : selected->name);
+    setDesktop3DLabel("model_label",
+        selected == ui3DObjects.end() ? "Nothing selected" : selected->name);
+    setDesktop3DLabel("viewport_status",
+        selected == ui3DObjects.end() ? "Empty scene — drag an asset into the viewport" : selected->name);
+    if (selected != ui3DObjects.end()) {
+        setDesktop3DLabel("current_color_label", "Material: " + selected->color);
+        setDesktop3DLabel("texture_label", "Texture: " + selected->texture);
+    } else {
+        setDesktop3DLabel("current_color_label", "Material: —");
+        setDesktop3DLabel("texture_label", "Texture: —");
+    }
+    if (mainWindow) InvalidateRect(mainWindow, nullptr, FALSE);
+}
+
+std::string desktop3DUniqueName(const std::string& base) {
+    std::string candidate;
+    unsigned index = 1;
+    do {
+        candidate = base + "_" + std::to_string(index++);
+    } while (std::any_of(ui3DObjects.begin(), ui3DObjects.end(),
+        [&](const Ui3DObject& model) { return model.name == candidate; }));
+    return candidate;
+}
+
+void createDesktop3DAsset(int kind, double x, double y, double z) {
+    Ui3DObject model;
+    model.group = "default";
+    model.x = x;
+    model.y = y;
+    model.z = z;
+    switch (kind) {
+        case 1:
+            model.name = desktop3DUniqueName("Sphere");
+            model.shape = "sphere";
+            model.width = model.height = model.depth = 1.6;
+            model.color = "#4F9CFB";
+            break;
+        case 2:
+            model.name = desktop3DUniqueName("Camera");
+            model.shape = "camera";
+            model.width = 1.1; model.height = 0.8; model.depth = 1.4;
+            model.color = "#B79BEA";
+            break;
+        case 3:
+            model.name = desktop3DUniqueName("Spawn");
+            model.shape = "spawn";
+            model.width = model.height = model.depth = 1.0;
+            model.color = "#E7A85C";
+            break;
+        case 4:
+            model.name = desktop3DUniqueName("Plane");
+            model.shape = "plane";
+            model.width = model.depth = 6.0;
+            model.height = 0.15;
+            model.y = -1.0;
+            model.color = "#70B68A";
+            break;
+        default:
+            model.name = desktop3DUniqueName("Box");
+            model.shape = "box";
+            model.width = model.height = model.depth = 2.0;
+            model.color = "#8B5CF6";
+            break;
+    }
+    ui3DObjects.push_back(std::move(model));
+    desktop3DSelectedName = ui3DObjects.back().name;
+    syncDesktop3DEditorState();
 }
 
 LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
