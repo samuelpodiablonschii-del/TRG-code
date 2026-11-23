@@ -748,6 +748,7 @@ void layoutOutputControls(HWND window) {
         }
         if (previewButton) SetWindowTextW(previewButton, L"Preview");
     }
+    if (codeEditor && previewMode) ShowWindow(codeEditor, SW_HIDE);
 
     LONG panelTop = 0;
     if (previewMode) {
