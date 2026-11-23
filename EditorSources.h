@@ -447,6 +447,21 @@ button reset_view "RESET VIEW" x 70 y 19 w 9 h 4 color #30243F (
 )
 button load_scene "LOAD SCENE" x 70 y 24 w 9 h 4 color #30243F (
     3d load "scene.trgscene"
+    length objects objectCount
+    if objectCount > 0 (
+        selectedIndex = 0
+        get objects selectedIndex selectedName
+        set_text model_label selectedName
+        set_text hierarchy_selected selectedName
+        set_text viewport_status selectedName
+    )
+    else (
+        selectedName = ""
+        set_text model_label "No selection"
+        set_text hierarchy_selected "No object selected"
+        set_text viewport_status "No object selected"
+    )
+    set_text object_count objectCount
 )
 button save_scene "SAVE SCENE" x 70 y 29 w 9 h 4 color #56368F (
     3d save "scene.trgscene"
