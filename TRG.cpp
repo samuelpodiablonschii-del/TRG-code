@@ -5860,11 +5860,11 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         return 0;
     }
     if (message == WM_COMMAND && LOWORD(wParam) == editor2DButtonId) {
-        launchDesktopVisualEditor("2DEditor.trg");
+        launchDesktopVisualEditor("2D Editor");
         return 0;
     }
     if (message == WM_COMMAND && LOWORD(wParam) == editor3DButtonId) {
-        launchDesktopVisualEditor("3DEditor.trg");
+        launchDesktopVisualEditor("3D Editor");
         return 0;
     }
     if (message == WM_COMMAND && LOWORD(wParam) == dictionaryButtonId) {
