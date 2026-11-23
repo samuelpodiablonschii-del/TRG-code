@@ -6819,6 +6819,7 @@ void restoreDesktopAutosave() {
         loadingEditorText = true;
         SetWindowTextW(codeEditor, wideFromUtf8(source).c_str());
         loadingEditorText = false;
+        applyEditorSyntaxHighlighting();
         if (!sourcePath.empty()) {
             currentSourcePath = std::filesystem::u8path(sourcePath);
             projectRoot = currentSourcePath.parent_path();
@@ -6866,7 +6867,7 @@ bool launchDesktopVisualEditor(const std::string& fileName) {
         embeddedSource = trg_builtin::editor3D;
 
     if (!embeddedSource) {
-        appendOutput("ERROR Unknown built-in visual editor.\\r\\n");
+        appendOutput("ERROR Unknown built-in visual editor.\r\n");
         return false;
     }
 
@@ -6883,7 +6884,7 @@ bool launchDesktopVisualEditor(const std::string& fileName) {
     currentSourcePath.clear();
     projectRoot = std::filesystem::current_path();
     outputBuffer.clear();
-    appendOutput("Opening built-in " + fileName + " workspace...\\r\\n\\r\\n");
+    appendOutput("Opening built-in " + fileName + " workspace...\r\n\r\n");
     std::istringstream builtInStream(embeddedSource);
     const std::vector<std::string> builtInProgram = readProgram(builtInStream);
     executeProgram(builtInProgram);
