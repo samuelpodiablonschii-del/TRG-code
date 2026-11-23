@@ -225,17 +225,17 @@ get objects selectedIndex selectedName
 set_text object_label selectedName
 set_text object_count objectCount
 )TRGEDITOR2D";
-inline constexpr const char* editor3D = R"TRGEDITOR3D(// TRG Studio — desktop/mobile 3D engine workspace
-// Scene hierarchy, central 3D viewport, inspector and asset shelf.
+inline constexpr const char* editor3D = R"TRGEDITOR3D(// TRG Studio — professional desktop 3D scene workspace
+// Empty scene, docked hierarchy/inspector, asset shelf and viewport tools.
 add (ui)
 add (3d)
 
 color accent = #9B6BFF
-color panel = #171222
-color panelRaised = #211832
-color muted = #A99ABD
+color panel = #191421
+color panelRaised = #241B32
 word selectedName = ""
 word currentColor = "#8B5CF6"
+word currentTexture = "grid"
 word renameInput = ""
 word scaleFactor = ""
 word rotateAmount = ""
@@ -243,209 +243,31 @@ list objects
 num objectCount = 0
 num selectedIndex = 0
 
-// Engine shell and panel layout
-block z 0 x 0 y 0 w 100 h 100 color #100C19 name ENGINE_BACKGROUND
-block z 1 x 0 y 0 w 100 h 7 color #1B1429 name ENGINE_HEADER
-block z 2 x 0 y 7 w 100 h 7 color #241A35 name ENGINE_TOOLBAR
-block z 1 x 0 y 14 w 19 h 66 color #1B1429 name HIERARCHY_PANEL
-block z 1 x 19 y 14 w 61 h 66 color #0D0A15 name VIEWPORT_PANEL
-block z 1 x 80 y 14 w 20 h 66 color #1B1429 name INSPECTOR_PANEL
-block z 2 x 0 y 14 w 19 h 5 color #302044 name HIERARCHY_HEADER
-block z 2 x 80 y 14 w 20 h 5 color #302044 name INSPECTOR_HEADER
-block z 2 x 0 y 80 w 100 h 20 color #1B1429 name ASSET_PANEL
-block z 3 x 0 y 80 w 100 h 1 color #6B4A9E name ASSET_DIVIDER
+// Docked editor layout.
+block z 0 x 0 y 0 w 100 h 100 color #100D17 name ENGINE_BACKGROUND
+block z 1 x 0 y 0 w 100 h 6 color #1B1525 name ENGINE_TITLEBAR
+block z 2 x 0 y 6 w 100 h 7 color #241B32 name ENGINE_TOOLBAR
+block z 1 x 0 y 13 w 19 h 65 color #1A1423 name HIERARCHY_PANEL
+block z 1 x 19 y 13 w 61 h 65 color #0C0A12 name VIEWPORT_PANEL
+block z 1 x 80 y 13 w 20 h 65 color #1A1423 name INSPECTOR_PANEL
+block z 2 x 0 y 78 w 100 h 22 color #1A1423 name ASSET_BROWSER
+block z 3 x 0 y 78 w 100 h 0.35 color #7351A8 name ASSET_DIVIDER
+block z 2 x 0 y 13 w 19 h 5 color #302341 name HIERARCHY_HEADER
+block z 2 x 80 y 13 w 20 h 5 color #302341 name INSPECTOR_HEADER
 
-// Viewport grid and axes
-block z 3 x 22 y 70 w 55 h 0.25 color #40334F name GRID_LINE_1
-block z 3 x 26 y 65 w 47 h 0.2 color #352943 name GRID_LINE_2
-block z 3 x 31 y 60 w 37 h 0.2 color #352943 name GRID_LINE_3
-block z 3 x 36 y 55 w 27 h 0.2 color #352943 name GRID_LINE_4
-block z 3 x 49.8 y 21 w 0.25 h 49 color #49345F name AXIS_Y
-block z 3 x 22 y 69.8 w 55 h 0.25 color #49345F name AXIS_X
+text "TRG ENGINE" x 2 y 3.6 size 2.5 color #F5EDFF bold true
+text "SCENE EDITOR" x 15 y 3.7 size 1.2 color #BCA8DA
+text "PROJECT   EDIT   WINDOW   HELP" x 98 y 3.7 size 1.15 color #CFC1E3 align right
 
-text "TRG ENGINE" x 2 y 3.5 size 2.7 color #F4ECFF bold true
-text "SCENE EDITOR" x 14 y 3.5 size 1.3 color #BBA6D8
-text "FILE   EDIT   OBJECT   VIEW   BUILD" x 98 y 3.5 size 1.25 color #D8C9EC align right
-text "SELECT" x 2 y 10.5 size 1.5 color #EDE4FA bold true
-text "MOVE" x 13 y 10.5 size 1.5 color #BDA6E8
-text "ROTATE" x 22 y 10.5 size 1.5 color #BDA6E8
-text "SCALE" x 33 y 10.5 size 1.5 color #BDA6E8
-text "PLAY" x 98 y 10.5 size 1.5 color #D8C9EC align right
-
-text "HIERARCHY" x 2 y 17 size 1.6 color #EDE4FA bold true
-text "Scene" x 2 y 22 size 1.45 color #BDA6E8
-text "  Main Camera" x 2 y 27 size 1.25 color #B8A9C9
-text "  Directional Light" x 2 y 31 size 1.25 color #B8A9C9
-text hierarchy_selected "No object selected" x 2 y 36 size 1.25 color #D8C2FF bold true
-text "OBJECTS" x 2 y 43 size 1.2 color #8D7AA8
-text object_count "0 OBJECTS" x 2 y 47 size 1.3 color #CBB6EA
-text "Select with PREV/NEXT" x 2 y 55 size 1.05 color #8D7AA8
-
-text "SCENE VIEW" x 21 y 16 size 1.4 color #D7C5F4 bold true
-text "PERSPECTIVE   |   GRID ON" x 78 y 16 size 1.1 color #9E8AB8 align right
-text viewport_status "No object selected" x 50 y 74 size 1.5 color #BDA6E8 align center
-
-text "INSPECTOR" x 82 y 17 size 1.6 color #EDE4FA bold true
-text "TRANSFORM" x 82 y 23 size 1.2 color #BDA6E8 bold true
-text "Selected:" x 82 y 28 size 1.1 color #8D7AA8
-text model_label "No selection" x 82 y 32 size 1.2 color #F0E8FF
-text "Scale / Rotate" x 82 y 39 size 1.1 color #8D7AA8
-text "MATERIAL" x 82 y 49 size 1.2 color #BDA6E8 bold true
-text current_color_label "Material: purple" x 82 y 54 size 1.1 color #D8C9EC
-text "Use controls below" x 82 y 61 size 1.05 color #8D7AA8
-
-text "CONTENT BROWSER" x 2 y 83 size 1.5 color #EDE4FA bold true
-text "SCENE ASSETS" x 2 y 87 size 1.1 color #8D7AA8
-text "Primitives   Materials   Textures" x 2 y 92 size 1.2 color #BDA6E8
-text "TRG 3D WORKSPACE" x 98 y 96 size 1.1 color #8D7AA8 align right
-
-// Start with a model in the viewport.
-3d box auto x 0 y 0 z 0 w 3 h 3 d 3 color accent
-push objects last_3d_object
-length objects objectCount
-selectedIndex = 0
-get objects selectedIndex selectedName
-set_text model_label selectedName
-        set_text hierarchy_selected selectedName
-        set_text viewport_status selectedName
-set_text object_count objectCount
-set_text current_color_label currentColor
-
-// Hierarchy and object creation controls.
-button add_box "＋ BOX" x 21 y 19 w 10 h 4 color #56368F (
-    3d box auto x -2 y 0 z 0 w 2 h 2 d 2 color currentColor
-    push objects last_3d_object
-    length objects objectCount
-    selectedIndex = objectCount - 1
-    get objects selectedIndex selectedName
-    set_text model_label selectedName
-        set_text hierarchy_selected selectedName
-        set_text viewport_status selectedName
-    set_text object_count objectCount
+// Compact, non-overlapping tool strip.
+text "SELECT" x 2 y 10.5 size 1.25 color #F1E9FC bold true
+button reset_view "RESET VIEW" x 20 y 7.7 w 10 h 4.2 color #483363 (
+    say "Camera reset. Use W A S D to move, Q/E to move vertically, and right mouse drag to orbit."
 )
-button add_sphere "＋ SPHERE" x 32 y 19 w 13 h 4 color #30243F (
-    3d sphere auto x 2 y 0 z 0 size 2 color currentColor
-    push objects last_3d_object
-    length objects objectCount
-    selectedIndex = objectCount - 1
-    get objects selectedIndex selectedName
-    set_text model_label selectedName
-        set_text hierarchy_selected selectedName
-        set_text viewport_status selectedName
-    set_text object_count objectCount
+button save_scene "SAVE" x 31 y 7.7 w 8 h 4.2 color #3B2A55 (
+    3d save "scene.trgscene"
 )
-button duplicate "DUPLICATE" x 46 y 19 w 12 h 4 color #30243F (
-    if objectCount > 0 (
-        3d duplicate selectedName auto
-        push objects last_3d_object
-        length objects objectCount
-        selectedIndex = objectCount - 1
-        get objects selectedIndex selectedName
-        set_text model_label selectedName
-        set_text hierarchy_selected selectedName
-        set_text viewport_status selectedName
-        set_text object_count objectCount
-    )
-)
-button delete "DELETE" x 59 y 19 w 10 h 4 color #652A45 (
-    if objectCount > 0 (
-        3d delete selectedName
-        remove objects selectedIndex
-        length objects objectCount
-        if objectCount > 0 (
-            if selectedIndex >= objectCount (
-                selectedIndex = objectCount - 1
-            )
-            get objects selectedIndex selectedName
-            set_text model_label selectedName
-            set_text hierarchy_selected selectedName
-            set_text viewport_status selectedName
-        )
-        else (
-            selectedName = ""
-            set_text model_label "No object selected"
-            set_text hierarchy_selected "No object selected"
-            set_text viewport_status "No object selected"
-        )
-        set_text object_count objectCount
-    )
-)
-
-// Object selection and inspector actions.
-button previous "PREV" x 2 y 60 w 7 h 4 color #30243F (
-    if objectCount > 0 (
-        selectedIndex = selectedIndex - 1
-        if selectedIndex < 0 (
-            selectedIndex = objectCount - 1
-        )
-        get objects selectedIndex selectedName
-        set_text model_label selectedName
-        set_text hierarchy_selected selectedName
-        set_text viewport_status selectedName
-    )
-)
-button next "NEXT" x 10 y 60 w 7 h 4 color #30243F (
-    if objectCount > 0 (
-        selectedIndex = selectedIndex + 1
-        if selectedIndex >= objectCount (
-            selectedIndex = 0
-        )
-        get objects selectedIndex selectedName
-        set_text model_label selectedName
-        set_text hierarchy_selected selectedName
-        set_text viewport_status selectedName
-    )
-)
-button rename "RENAME" x 82 y 35 w 16 h 4 color #30243F (
-    if objectCount > 0 (
-        ask "New object name:" renameInput
-        3d rename selectedName renameInput
-        remove objects selectedIndex
-        insert objects selectedIndex renameInput
-        selectedName = renameInput
-        set_text model_label selectedName
-        set_text hierarchy_selected selectedName
-        set_text viewport_status selectedName
-    )
-)
-button scale "SCALE" x 82 y 42 w 16 h 4 color #56368F (
-    if objectCount > 0 (
-        ask "Scale factor (e.g. 1.2 or 0.8):" scaleFactor
-        3d scale selectedName scaleFactor
-    )
-)
-button rotate "ROTATE" x 82 y 45 w 16 h 4 color #30243F (
-    if objectCount > 0 (
-        ask "Rotation around Y in degrees:" rotateAmount
-        3d rotate selectedName 0 rotateAmount 0
-    )
-)
-button material "CHANGE MATERIAL" x 82 y 57 w 16 h 4 color #56368F (
-    if objectCount > 0 (
-        if currentColor = "#8B5CF6" (
-            currentColor = "#3B82F6"
-        )
-        else (
-            if currentColor = "#3B82F6" (
-                currentColor = "#22C55E"
-            )
-            else (
-                currentColor = "#8B5CF6"
-            )
-        )
-        3d color selectedName currentColor
-        set_text model_label selectedName
-        set_text hierarchy_selected selectedName
-        set_text viewport_status selectedName
-        set_text current_color_label currentColor
-    )
-)
-
-// Viewport and project actions.
-button reset_view "RESET VIEW" x 70 y 19 w 9 h 4 color #30243F (
-    say "Camera view reset."
-)
-button load_scene "LOAD SCENE" x 70 y 24 w 9 h 4 color #30243F (
+button load_scene "LOAD" x 40 y 7.7 w 8 h 4.2 color #30243F (
     3d load "scene.trgscene"
     length objects objectCount
     if objectCount > 0 (
@@ -458,16 +280,158 @@ button load_scene "LOAD SCENE" x 70 y 24 w 9 h 4 color #30243F (
     else (
         selectedName = ""
         set_text model_label "No selection"
-        set_text hierarchy_selected "No object selected"
-        set_text viewport_status "No object selected"
+        set_text hierarchy_selected "No objects in scene"
+        set_text viewport_status "Empty scene — drag an asset into the viewport"
     )
     set_text object_count objectCount
 )
-button save_scene "SAVE SCENE" x 70 y 29 w 9 h 4 color #56368F (
-    3d save "scene.trgscene"
+button code "CODE" x 49 y 7.7 w 8 h 4.2 color #30243F (
+    studio code
 )
-button controls "CONTROLS" x 70 y 34 w 9 h 4 color #30243F (
-    say "Drag a model to move it. Drag empty space to orbit. Pinch to zoom on touch screens."
+
+// Scene hierarchy.
+text "HIERARCHY" x 1.5 y 16.5 size 1.35 color #EDE4FA bold true
+text "▾ Scene" x 2 y 21.5 size 1.3 color #BDA6E8
+text hierarchy_selected "No objects in scene" x 2 y 27 size 1.15 color #E0D2F6
+text object_count "0 OBJECTS" x 2 y 33 size 1.15 color #9F8DB8
+text "Right-click an object" x 2 y 68 size 1.0 color #847594
+text "for properties" x 2 y 71 size 1.0 color #847594
+
+// Viewport overlays; 3D models are clipped to this central panel.
+text "PERSPECTIVE" x 21 y 16 size 1.1 color #BDA6E8 bold true
+text "GRID  |  WORLD AXES" x 78 y 16 size 1.0 color #8F7EA5 align right
+text viewport_status "Empty scene — drag an asset into the viewport" x 50 y 73 size 1.2 color #BCA8DA align center
+
+// Inspector.
+text "INSPECTOR" x 82 y 16.5 size 1.35 color #EDE4FA bold true
+text "OBJECT" x 82 y 22 size 1.05 color #9F8DB8 bold true
+text model_label "Nothing selected" x 82 y 26 size 1.1 color #F3EAFF
+text "TRANSFORM" x 82 y 33 size 1.05 color #BDA6E8 bold true
+text "Right-click for full properties" x 82 y 37 size 0.92 color #8F7EA5
+button rename "RENAME" x 82 y 40 w 16 h 4 color #30243F (
+    if objectCount > 0 (
+        ask "New object name:" renameInput
+        3d rename selectedName renameInput
+        remove objects selectedIndex
+        insert objects selectedIndex renameInput
+        selectedName = renameInput
+        set_text model_label selectedName
+        set_text hierarchy_selected selectedName
+        set_text viewport_status selectedName
+    )
+)
+button duplicate "DUPLICATE" x 82 y 45 w 16 h 4 color #30243F (
+    if objectCount > 0 (
+        3d duplicate selectedName auto
+        push objects last_3d_object
+        length objects objectCount
+        selectedIndex = objectCount - 1
+        get objects selectedIndex selectedName
+        set_text model_label selectedName
+        set_text hierarchy_selected selectedName
+        set_text object_count objectCount
+    )
+)
+button delete "DELETE" x 82 y 50 w 16 h 4 color #603044 (
+    if objectCount > 0 (
+        3d delete selectedName
+        remove objects selectedIndex
+        length objects objectCount
+        if objectCount > 0 (
+            if selectedIndex >= objectCount ( selectedIndex = objectCount - 1 )
+            get objects selectedIndex selectedName
+            set_text model_label selectedName
+            set_text hierarchy_selected selectedName
+        )
+        else (
+            selectedName = ""
+            set_text model_label "Nothing selected"
+            set_text hierarchy_selected "No objects in scene"
+        )
+        set_text object_count objectCount
+    )
+)
+button material "MATERIAL" x 82 y 55 w 16 h 4 color #483363 (
+    if objectCount > 0 (
+        if currentColor = "#8B5CF6" ( currentColor = "#4F9CFB" )
+        else ( if currentColor = "#4F9CFB" ( currentColor = "#D99A56" )
+        else ( if currentColor = "#D99A56" ( currentColor = "#70B68A" )
+        else ( currentColor = "#8B5CF6" ) ) )
+        3d color selectedName currentColor
+        set_text current_color_label currentColor
+    )
+)
+button texture "TEXTURE" x 82 y 60 w 16 h 4 color #30243F (
+    if objectCount > 0 (
+        if currentTexture = "grid" ( currentTexture = "metal" )
+        else ( if currentTexture = "metal" ( currentTexture = "wood" )
+        else ( if currentTexture = "wood" ( currentTexture = "smooth" )
+        else ( currentTexture = "grid" ) ) )
+        3d texture selectedName currentTexture
+        set_text texture_label currentTexture
+    )
+)
+text current_color_label "Material: purple" x 82 y 67 size 0.95 color #BDA6E8
+text texture_label "Texture: grid" x 82 y 71 size 0.95 color #BDA6E8
+
+// Asset browser. Click an asset or drag it into the viewport.
+text "ASSET BROWSER" x 2 y 81.5 size 1.3 color #EDE4FA bold true
+text "DRAG INTO VIEWPORT  •  BOXES  •  SPHERES  •  CAMERA  •  SPAWN" x 98 y 81.5 size 0.95 color #8F7EA5 align right
+
+button asset_box "＋  BOX" x 20 y 84 w 14 h 12 color #483363 (
+    3d box auto x 0 y 0 z 0 w 2 h 2 d 2 color currentColor
+    push objects last_3d_object
+    length objects objectCount
+    selectedIndex = objectCount - 1
+    get objects selectedIndex selectedName
+    set_text model_label selectedName
+    set_text hierarchy_selected selectedName
+    set_text object_count objectCount
+    set_text viewport_status selectedName
+)
+button asset_sphere "◯  SPHERE" x 36 y 84 w 14 h 12 color #30435F (
+    3d sphere auto x 0 y 0 z 0 size 1.7 color #4F9CFB
+    push objects last_3d_object
+    length objects objectCount
+    selectedIndex = objectCount - 1
+    get objects selectedIndex selectedName
+    set_text model_label selectedName
+    set_text hierarchy_selected selectedName
+    set_text object_count objectCount
+    set_text viewport_status selectedName
+)
+button asset_camera "▣  CAMERA" x 52 y 84 w 14 h 12 color #3B3659 (
+    3d camera auto x 0 y 1 z 0 w 1.1 h 0.8 d 1.4 color #B79BEA
+    push objects last_3d_object
+    length objects objectCount
+    selectedIndex = objectCount - 1
+    get objects selectedIndex selectedName
+    set_text model_label selectedName
+    set_text hierarchy_selected selectedName
+    set_text object_count objectCount
+    set_text viewport_status selectedName
+)
+button asset_spawn "◆  SPAWN" x 68 y 84 w 14 h 12 color #60452E (
+    3d spawn auto x 0 y 0 z 0 size 1 color #E7A85C
+    push objects last_3d_object
+    length objects objectCount
+    selectedIndex = objectCount - 1
+    get objects selectedIndex selectedName
+    set_text model_label selectedName
+    set_text hierarchy_selected selectedName
+    set_text object_count objectCount
+    set_text viewport_status selectedName
+)
+button asset_plane "▱  PLANE" x 84 y 84 w 14 h 12 color #315044 (
+    3d plane auto x 0 y -1 z 0 w 6 h 0.15 d 6 color #70B68A
+    push objects last_3d_object
+    length objects objectCount
+    selectedIndex = objectCount - 1
+    get objects selectedIndex selectedName
+    set_text model_label selectedName
+    set_text hierarchy_selected selectedName
+    set_text object_count objectCount
+    set_text viewport_status selectedName
 )
 )TRGEDITOR3D";
 } // namespace trg_builtin
