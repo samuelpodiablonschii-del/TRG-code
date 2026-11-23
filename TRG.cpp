@@ -598,7 +598,7 @@ bool desktop3DDraggingCamera = false;
 int desktop3DAssetCandidate = -1;
 bool desktop3DAssetDragging = false;
 POINT desktop3DMouseDown = {};
-double desktop3DDragStartX = 0.0, desktop3DDragStartY = 0.0;
+double desktop3DDragStartX = 0.0, desktop3DDragStartY = 0.0, desktop3DDragStartZ = 0.0;
 double desktop3DDragStartYaw = 0.0, desktop3DDragStartPitch = 0.0;
 bool desktop3DContextOpen = false;
 bool desktop3DRightClickMoved = false;
@@ -6643,6 +6643,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                     desktop3DDraggingObject = true;
                     desktop3DDragStartX = selected->x;
                     desktop3DDragStartY = selected->y;
+                    desktop3DDragStartZ = selected->z;
                 }
                 syncDesktop3DEditorState();
                 break;
@@ -6663,7 +6664,9 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 [](const Ui3DObject& model) { return model.name == desktop3DSelectedName; });
             if (selected != ui3DObjects.end()) {
                 const double scale = std::max(8.0, desktop3DWorldScale);
-                selected->x = desktop3DDragStartX + (point.x - desktop3DMouseDown.x) / scale;
+                const double horizontal = (point.x - desktop3DMouseDown.x) / scale;
+                selected->x = desktop3DDragStartX + horizontal * std::cos(desktop3DCameraYaw);
+                selected->z = desktop3DDragStartZ - horizontal * std::sin(desktop3DCameraYaw);
                 selected->y = desktop3DDragStartY - (point.y - desktop3DMouseDown.y) / scale;
                 syncDesktop3DEditorState();
             }
@@ -6679,9 +6682,15 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 const double scale = std::max(8.0, desktop3DWorldScale);
                 const double centerX = (desktop3DViewportRect.left + desktop3DViewportRect.right) * 0.5;
                 const double centerY = (desktop3DViewportRect.top + desktop3DViewportRect.bottom) * 0.5;
-                const double worldX = (point.x - centerX) / scale + desktop3DCameraX;
-                const double worldY = (centerY - point.y) / scale + desktop3DCameraY;
-                createDesktop3DAsset(desktop3DAssetCandidate, worldX, worldY, 0.0);
+                const double screenX = (point.x - centerX) / scale;
+                const double screenY = (centerY - point.y) / scale;
+                const double depth = 12.0;
+                const double worldX = desktop3DCameraX + std::sin(desktop3DCameraYaw) * depth +
+                    std::cos(desktop3DCameraYaw) * screenX;
+                const double worldZ = desktop3DCameraZ + std::cos(desktop3DCameraYaw) * depth -
+                    std::sin(desktop3DCameraYaw) * screenX;
+                const double worldY = desktop3DCameraY + screenY;
+                createDesktop3DAsset(desktop3DAssetCandidate, worldX, worldY, worldZ);
             }
             desktop3DAssetCandidate = -1;
             desktop3DAssetDragging = false;
@@ -7073,6 +7082,21 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                     Arc(dc, sphereArea.left + diameter / 5, sphereArea.top + diameter / 5,
                         sphereArea.right - diameter / 5, sphereArea.bottom - diameter / 5,
                         sphereArea.left, shapeCenterY, sphereArea.right, shapeCenterY);
+                    if (model.texture != "smooth") {
+                        int sphereHatch = model.texture == "grid" ? HS_CROSS :
+                            model.texture == "wood" ? HS_FDIAGONAL :
+                            model.texture == "stone" ? HS_BDIAGONAL : HS_DIAGCROSS;
+                        HBRUSH textureBrush = CreateHatchBrush(sphereHatch,
+                            RGB(static_cast<BYTE>(std::min(255u, red + 34u)),
+                                static_cast<BYTE>(std::min(255u, green + 34u)),
+                                static_cast<BYTE>(std::min(255u, blue + 34u))));
+                        HGDIOBJ previousTextureBrush = SelectObject(dc, textureBrush);
+                        const int previousMode = SetBkMode(dc, TRANSPARENT);
+                        Ellipse(dc, sphereArea.left, sphereArea.top, sphereArea.right, sphereArea.bottom);
+                        SetBkMode(dc, previousMode);
+                        SelectObject(dc, previousTextureBrush);
+                        DeleteObject(textureBrush);
+                    }
                     SelectObject(dc, previousDetailPen);
                     DeleteObject(detailPen);
                 }
