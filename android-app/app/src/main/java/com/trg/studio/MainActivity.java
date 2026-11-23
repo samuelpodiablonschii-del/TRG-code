@@ -181,11 +181,11 @@ public final class MainActivity extends Activity {
                 if (start == end && start > 0 && start < content.length() &&
                         content.charAt(start - 1) == '(' && content.charAt(start) == ')') {
                     int lineStart = start - 1;
-                    while (lineStart > 0 && content.charAt(lineStart - 1) != '\\n') lineStart--;
+                    while (lineStart > 0 && content.charAt(lineStart - 1) != '\n') lineStart--;
                     int indent = 0;
                     while (lineStart + indent < content.length() &&
                             content.charAt(lineStart + indent) == ' ') indent++;
-                    String insertion = "\\n" + repeatSpaces(indent + 4) + "\\n" + repeatSpaces(indent);
+                    String insertion = "\n" + repeatSpaces(indent + 4) + "\n" + repeatSpaces(indent);
                     content.replace(start, end, insertion);
                     setSelection(start + 1 + indent + 4);
                     return true;
