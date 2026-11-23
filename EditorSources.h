@@ -469,5 +469,5 @@ button save_scene "SAVE SCENE" x 70 y 29 w 9 h 4 color #56368F (
 button controls "CONTROLS" x 70 y 34 w 9 h 4 color #30243F (
     say "Drag a model to move it. Drag empty space to orbit. Pinch to zoom on touch screens."
 )
-)TRGEDITOR3D"
+)TRGEDITOR3D";
 } // namespace trg_builtin
