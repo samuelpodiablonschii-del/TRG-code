@@ -6880,6 +6880,7 @@ bool launchDesktopVisualEditor(const std::string& fileName) {
         desktopPreviousDirty = editorDirty;
     }
     desktopVisualEditorActive = true;
+    currentSourcePath.clear();
     projectRoot = std::filesystem::current_path();
     outputBuffer.clear();
     appendOutput("Opening built-in " + fileName + " workspace...\\r\\n\\r\\n");
