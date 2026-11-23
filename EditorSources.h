@@ -225,152 +225,139 @@ get objects selectedIndex selectedName
 set_text object_label selectedName
 set_text object_count objectCount
 )TRGEDITOR2D";
-inline constexpr const char* editor3D = R"TRGEDITOR3D(// TRG Studio — portrait-first mobile 3D scene editor
-// The viewport uses the full device width; hierarchy, inspector and assets dock below it.
+inline constexpr const char* editor3D = R"TRGEDITOR3D(// TRG Studio — mobile 3D editor, styled after the supplied reference
 add (ui)
 add (3d)
 
-color accent = #9B6BFF
-color panel = #191421
-word selectedName = ""
-word currentColor = "#8B5CF6"
-word currentTexture = "grid"
+color accent = #9B55FF
+color background = #100B1C
+color panel = #1B142B
+color panelLight = #2B1D40
+word selectedName = "Cube"
+word currentColor = "#8B42F5"
+word currentTexture = "smooth"
 word renameInput = ""
-word scaleFactor = ""
-word rotateAmount = ""
 list objects
-num objectCount = 0
+num objectCount = 1
 num selectedIndex = 0
 
-// Full-screen workspace and compact header.
-block z 0 x 0 y 0 w 100 h 100 color #100D17 name ENGINE_BACKGROUND
-block z 1 x 0 y 0 w 100 h 7 color #1B1525 name ENGINE_TITLEBAR
-block z 2 x 0 y 7 w 100 h 6 color #241B32 name ENGINE_TOOLBAR
+// Default scene: a selected cube, ready to edit.
+3d box Cube x 0 y 0 z 0 w 2 h 2 d 2 color #8B42F5
+push objects "Cube"
 
-text "TRG ENGINE" x 18 y 4.5 size 2.0 color #F5EDFF bold true
-text "3D EDITOR" x 50 y 5.2 size 1.0 color #BCA8DA align center
+// App header.
+block z 0 x 0 y 0 w 100 h 100 color #100B1C name ENGINE_BACKGROUND
+block z 1 x 0 y 0 w 100 h 6.2 color #171027 name ENGINE_TITLEBAR
+text "◆" x 4.5 y 4.35 size 3.0 color #A65BFF bold true
+text "TRG ENGINE" x 15 y 4.15 size 2.55 color #F8F3FF bold true
+text "☰" x 94 y 4.4 size 3.0 color #A65BFF align center
 
-button reset_view "RESET" x 2 y 7.8 w 18 h 4.4 color #483363 (
-    say "Camera reset. Drag empty viewport space to orbit; use two fingers to orbit and zoom."
+// Main action toolbar.
+block z 1 x 0 y 6.2 w 100 h 6.3 color #130D20 name TOOLBAR_BACKGROUND
+button select_tool "➤  Select" x 2 y 7.1 w 20 h 4.7 color #6630B5 (
+    say "Select an object in the viewport. Drag it to move it."
 )
-button save_scene "SAVE" x 21 y 7.8 w 17 h 4.4 color #3B2A55 (
+button reset_view "⟳  Reset" x 23 y 7.1 w 19 h 4.7 color #302044 (
+    say "Camera reset."
+)
+button save_scene "▣  Save" x 43 y 7.1 w 18 h 4.7 color #302044 (
     3d save "scene.trgscene"
+    say "Scene saved."
 )
-button load_scene "LOAD" x 39 y 7.8 w 17 h 4.4 color #30243F (
+button load_scene "▰  Load" x 62 y 7.1 w 18 h 4.7 color #302044 (
     3d load "scene.trgscene"
-    length objects objectCount
-    if objectCount > 0 (
-        selectedIndex = 0
-        get objects selectedIndex selectedName
-        set_text model_label selectedName
-        set_text hierarchy_selected selectedName
-        set_text viewport_status selectedName
-    )
-    else (
-        selectedName = ""
-        set_text model_label "Nothing selected"
-        set_text hierarchy_selected "No objects in scene"
-        set_text viewport_status "Empty scene — add an asset below"
-    )
-    set_text object_count objectCount
+    say "Scene loaded."
 )
-button code "CODE" x 77 y 7.8 w 21 h 4.4 color #30243F (
+button code "‹/›  Code" x 81 y 7.1 w 17 h 4.7 color #302044 (
     studio code
 )
 
-// Full-width perspective viewport.
-block z 1 x 1 y 14 w 98 h 48 color #0C0A12 edges round name VIEWPORT_PANEL
-block z 2 x 1 y 36 w 98 h 0.12 color #252039 name GRID_H1
-block z 2 x 1 y 47 w 98 h 0.12 color #252039 name GRID_H2
-block z 2 x 1 y 58 w 98 h 0.12 color #252039 name GRID_H3
-block z 2 x 25 y 14 w 0.12 h 48 color #211A31 name GRID_V1
-block z 2 x 50 y 14 w 0.12 h 48 color #211A31 name GRID_V2
-block z 2 x 75 y 14 w 0.12 h 48 color #211A31 name GRID_V3
-text "PERSPECTIVE" x 3 y 16.5 size 1.15 color #BDA6E8 bold true
-text "WORLD GRID  •  XYZ AXES" x 97 y 16.5 size 0.95 color #8F7EA5 align right
-text "DRAG MODEL  •  DRAG EMPTY SPACE TO ORBIT" x 50 y 59.5 size 0.95 color #8F7EA5 align center
-text viewport_status "Empty scene — add an asset below" x 50 y 54 size 1.15 color #BCA8DA align center
+// Large, uncluttered perspective viewport.
+block z 1 x 0.6 y 13.1 w 98.8 h 34.2 color #0C0915 edges round name VIEWPORT_PANEL
+block z 2 x 1 y 29 w 98 h 0.12 color #28203A name GRID_H1
+block z 2 x 1 y 34 w 98 h 0.12 color #28203A name GRID_H2
+block z 2 x 1 y 39 w 98 h 0.12 color #28203A name GRID_H3
+block z 2 x 1 y 44 w 98 h 0.12 color #28203A name GRID_H4
+block z 2 x 10 y 28 w 40 h 0.12 color #28203A name GRID_D1
+block z 2 x 50 y 28 w 40 h 0.12 color #28203A name GRID_D2
+block z 2 x 1 y 46 w 98 h 0.12 color #28203A name GRID_HORIZON
+text "PERSPECTIVE" x 3 y 15.2 size 0.95 color #A895C6 bold true
+text "X  Y  Z" x 96 y 15.2 size 0.9 color #9C83C4 align right
+text "DRAG TO MOVE  •  TWO FINGERS TO ORBIT + ZOOM" x 50 y 46.3 size 0.78 color #89799E align center
 
-// Hierarchy strip: always visible without stealing viewport width.
-block z 1 x 0 y 63 w 100 h 7 color #1A1423 name HIERARCHY_PANEL
-text "HIERARCHY" x 3 y 65.5 size 1.1 color #BDA6E8 bold true
-text hierarchy_selected "No objects in scene" x 3 y 68.5 size 1.0 color #F3EAFF
-text object_count "0 OBJECTS" x 97 y 68.5 size 0.95 color #9F8DB8 align right
+// Hierarchy / inspector navigation tabs.
+block z 1 x 0 y 47.7 w 100 h 5.4 color #160F23 name EDITOR_TABS
+button tab_hierarchy "▰  Hierarchy" x 1.5 y 48.2 w 48 h 4.7 color #572A9B (
+    set_text panel_heading "HIERARCHY"
+    set_text panel_hint "Cube is selected"
+)
+button tab_inspector "⚙  Inspector" x 50.5 y 48.2 w 48 h 4.7 color #281B3A (
+    set_text panel_heading "INSPECTOR"
+    set_text panel_hint "Edit the selected object below"
+)
 
-// Touch-sized inspector actions.
-block z 1 x 0 y 71 w 100 h 9 color #191421 name INSPECTOR_PANEL
-text "INSPECTOR" x 3 y 73 size 1.0 color #BDA6E8 bold true
-button rename "RENAME" x 2 y 74 w 18 h 4.8 color #30243F (
+// Inspector card, matching the reference's compact stacked form.
+block z 1 x 0.7 y 53.4 w 98.6 h 26.1 color #191226 edges round name INSPECTOR_CARD
+text "◆" x 5 y 57.3 size 3.0 color #A65BFF
+text model_label "Cube (Selected)" x 14 y 57.3 size 1.8 color #F5EEFF bold true
+block z 2 x 4 y 59.1 w 92 h 0.12 color #342447 name INSPECTOR_DIVIDER
+
+text "Name" x 4 y 62.3 size 1.35 color #D8CBEA
+button rename "Cube" x 28 y 60.5 w 68 h 3.9 color #2B203D (
     if objectCount > 0 (
-        ask "New object name:" renameInput
+        ask "Object name:" renameInput
         3d rename selectedName renameInput
-        remove objects selectedIndex
-        insert objects selectedIndex renameInput
         selectedName = renameInput
         set_text model_label selectedName
         set_text hierarchy_selected selectedName
-        set_text viewport_status selectedName
+        set_text rename selectedName
     )
 )
-button duplicate "DUPLICATE" x 21 y 74 w 18 h 4.8 color #30243F (
-    if objectCount > 0 (
-        3d duplicate selectedName auto
-        push objects last_3d_object
-        length objects objectCount
-        selectedIndex = objectCount - 1
-        get objects selectedIndex selectedName
-        set_text model_label selectedName
-        set_text hierarchy_selected selectedName
-        set_text object_count objectCount
-        set_text viewport_status selectedName
-    )
-)
-button delete "DELETE" x 40 y 74 w 18 h 4.8 color #603044 (
-    if objectCount > 0 (
-        3d delete selectedName
-        remove objects selectedIndex
-        length objects objectCount
-        if objectCount > 0 (
-            if selectedIndex >= objectCount ( selectedIndex = objectCount - 1 )
-            get objects selectedIndex selectedName
-            set_text model_label selectedName
-            set_text hierarchy_selected selectedName
-        )
-        else (
-            selectedName = ""
-            set_text model_label "Nothing selected"
-            set_text hierarchy_selected "No objects in scene"
-        )
-        set_text object_count objectCount
-    )
-)
-button material "MATERIAL" x 59 y 74 w 18 h 4.8 color #483363 (
-    if objectCount > 0 (
-        if currentColor = "#8B5CF6" ( currentColor = "#4F9CFB" )
-        else ( if currentColor = "#4F9CFB" ( currentColor = "#D99A56" )
-        else ( if currentColor = "#D99A56" ( currentColor = "#70B68A" )
-        else ( currentColor = "#8B5CF6" ) ) )
-        3d color selectedName currentColor
-        set_text current_color_label currentColor
-    )
-)
-button texture "TEXTURE" x 78 y 74 w 20 h 4.8 color #30243F (
-    if objectCount > 0 (
-        if currentTexture = "grid" ( currentTexture = "metal" )
-        else ( if currentTexture = "metal" ( currentTexture = "wood" )
-        else ( if currentTexture = "wood" ( currentTexture = "smooth" )
-        else ( currentTexture = "grid" ) ) )
-        3d texture selectedName currentTexture
-        set_text texture_label currentTexture
-    )
-)
-text current_color_label "Material: purple" x 3 y 79.5 size 0.85 color #BDA6E8
-text texture_label "Texture: grid" x 97 y 79.5 size 0.85 color #BDA6E8 align right
 
-// Horizontal asset shelf with five evenly sized touch targets.
-block z 1 x 0 y 82 w 100 h 18 color #1A1423 name ASSET_BROWSER
-text "ASSET BROWSER" x 3 y 84.5 size 1.15 color #EDE4FA bold true
-button asset_box "BOX" x 2 y 86 w 18 h 12 color #483363 (
+text "Position" x 4 y 67.2 size 1.3 color #D8CBEA
+button pos_x "X  0.00" x 28 y 65.1 w 21 h 3.6 color #2B203D (
+    say "Drag the selected object in the viewport to change its position."
+)
+button pos_y "Y  0.00" x 51 y 65.1 w 21 h 3.6 color #2B203D (
+    say "Drag the selected object in the viewport to change its position."
+)
+button pos_z "Z  0.00" x 74 y 65.1 w 22 h 3.6 color #2B203D (
+    say "Drag the selected object in the viewport to change its position."
+)
+
+text "Scale" x 4 y 71.8 size 1.3 color #D8CBEA
+button scale_x "1.00" x 28 y 69.7 w 21 h 3.6 color #2B203D (
+    say "Scale editing is available from the selected object's code."
+)
+button scale_y "1.00" x 51 y 69.7 w 21 h 3.6 color #2B203D (
+    say "Scale editing is available from the selected object's code."
+)
+button scale_z "1.00" x 74 y 69.7 w 22 h 3.6 color #2B203D (
+    say "Scale editing is available from the selected object's code."
+)
+
+text "Material" x 4 y 76.5 size 1.3 color #D8CBEA
+button material "●  Purple                         ▾" x 28 y 74.3 w 68 h 3.8 color #2B203D (
+    if objectCount > 0 (
+        if currentColor = "#8B42F5" ( currentColor = "#438FF5" )
+        else ( if currentColor = "#438FF5" ( currentColor = "#E2A34D" )
+        else ( if currentColor = "#E2A34D" ( currentColor = "#58B985" )
+        else ( currentColor = "#8B42F5" ) ) )
+        3d color selectedName currentColor
+        if currentColor = "#8B42F5" ( set_text material "●  Purple                         ▾" )
+        else ( if currentColor = "#438FF5" ( set_text material "●  Blue                           ▾" )
+        else ( if currentColor = "#E2A34D" ( set_text material "●  Gold                           ▾" )
+        else ( set_text material "●  Green                          ▾" ) ) )
+    )
+)
+
+// Asset browser dock.
+block z 1 x 0.7 y 80.2 w 98.6 h 19.2 color #191226 edges round name ASSET_BROWSER
+text "◆" x 4 y 83.2 size 2.0 color #A65BFF
+text "Asset Browser" x 11 y 83.2 size 1.45 color #F4ECFF bold true
+text "›" x 95 y 83.3 size 2.4 color #A65BFF align center
+
+button asset_box "◆\nBox" x 3 y 85 w 17.5 h 12.2 color #302044 (
     3d box auto x 0 y 0 z 0 w 2 h 2 d 2 color currentColor
     push objects last_3d_object
     length objects objectCount
@@ -379,10 +366,9 @@ button asset_box "BOX" x 2 y 86 w 18 h 12 color #483363 (
     set_text model_label selectedName
     set_text hierarchy_selected selectedName
     set_text object_count objectCount
-    set_text viewport_status selectedName
 )
-button asset_sphere "SPHERE" x 21 y 86 w 18 h 12 color #30435F (
-    3d sphere auto x 0 y 0 z 0 size 1.7 color #4F9CFB
+button asset_sphere "●\nSphere" x 22 y 85 w 17.5 h 12.2 color #302044 (
+    3d sphere auto x 0 y 0 z 0 size 1.7 color #8D62F4
     push objects last_3d_object
     length objects objectCount
     selectedIndex = objectCount - 1
@@ -390,9 +376,8 @@ button asset_sphere "SPHERE" x 21 y 86 w 18 h 12 color #30435F (
     set_text model_label selectedName
     set_text hierarchy_selected selectedName
     set_text object_count objectCount
-    set_text viewport_status selectedName
 )
-button asset_camera "CAMERA" x 40 y 86 w 18 h 12 color #3B3659 (
+button asset_camera "◉\nCamera" x 41 y 85 w 17.5 h 12.2 color #302044 (
     3d camera auto x 0 y 1 z 0 w 1.1 h 0.8 d 1.4 color #B79BEA
     push objects last_3d_object
     length objects objectCount
@@ -401,10 +386,9 @@ button asset_camera "CAMERA" x 40 y 86 w 18 h 12 color #3B3659 (
     set_text model_label selectedName
     set_text hierarchy_selected selectedName
     set_text object_count objectCount
-    set_text viewport_status selectedName
 )
-button asset_spawn "SPAWN" x 59 y 86 w 18 h 12 color #60452E (
-    3d spawn auto x 0 y 0 z 0 size 1 color #E7A85C
+button asset_spawn "▶\nSpawn" x 60 y 85 w 17.5 h 12.2 color #302044 (
+    3d spawn auto x 0 y 0 z 0 size 1 color #58C78D
     push objects last_3d_object
     length objects objectCount
     selectedIndex = objectCount - 1
@@ -412,9 +396,8 @@ button asset_spawn "SPAWN" x 59 y 86 w 18 h 12 color #60452E (
     set_text model_label selectedName
     set_text hierarchy_selected selectedName
     set_text object_count objectCount
-    set_text viewport_status selectedName
 )
-button asset_plane "PLANE" x 78 y 86 w 20 h 12 color #315044 (
+button asset_plane "◇\nPlane" x 79 y 85 w 18 h 12.2 color #302044 (
     3d plane auto x 0 y -1 z 0 w 6 h 0.15 d 6 color #70B68A
     push objects last_3d_object
     length objects objectCount
@@ -423,7 +406,6 @@ button asset_plane "PLANE" x 78 y 86 w 20 h 12 color #315044 (
     set_text model_label selectedName
     set_text hierarchy_selected selectedName
     set_text object_count objectCount
-    set_text viewport_status selectedName
 )
 )TRGEDITOR3D";
 inline constexpr const char* desktopEditor3D = R"TRGDESKTOP3D(// Native Windows editor owns the desktop 3D workspace and renders the scene UI.
