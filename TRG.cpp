@@ -6188,6 +6188,59 @@ void createDesktop3DAsset(int kind, double x, double y, double z) {
     syncDesktop3DEditorState();
 }
 
+
+bool buildStandaloneTrgExecutable(const std::filesystem::path& sourcePath,
+                                  std::filesystem::path& outputPath,
+                                  std::string& errorMessage) {
+    std::ifstream source(sourcePath, std::ios::binary);
+    if (!source) {
+        errorMessage = "Could not open source file: " + sourcePath.u8string();
+        return false;
+    }
+#ifdef _WIN32
+    wchar_t executableBuffer[32768] = {};
+    const DWORD executableLength = GetModuleFileNameW(nullptr, executableBuffer, 32768);
+    if (executableLength == 0 || executableLength >= 32768) {
+        errorMessage = "Could not locate the TRG runtime executable.";
+        return false;
+    }
+    const std::filesystem::path executablePath(std::wstring(executableBuffer, executableLength));
+#else
+    errorMessage = "Standalone .exe export is only available on Windows.";
+    return false;
+#endif
+    std::error_code fileError;
+    const std::uint64_t payloadSize = std::filesystem::file_size(sourcePath, fileError);
+    if (fileError) {
+        errorMessage = "Could not determine source size: " + fileError.message();
+        return false;
+    }
+    outputPath = sourcePath;
+    outputPath.replace_extension(".exe");
+    std::error_code copyError;
+    std::filesystem::copy_file(executablePath, outputPath,
+        std::filesystem::copy_options::overwrite_existing, copyError);
+    if (copyError) {
+        errorMessage = "Could not create " + outputPath.u8string() + ": " + copyError.message();
+        return false;
+    }
+    std::ofstream output(outputPath, std::ios::binary | std::ios::app);
+    if (!output) {
+        errorMessage = "Could not append the TRG program to " + outputPath.u8string();
+        return false;
+    }
+    output << source.rdbuf();
+    for (unsigned byte = 0; byte < 8; ++byte)
+        output.put(static_cast<char>((payloadSize >> (byte * 8)) & 0xff));
+    output.write("TRGPKG01", 8);
+    output.close();
+    if (!output) {
+        errorMessage = "Failed while finalizing " + outputPath.u8string();
+        return false;
+    }
+    return true;
+}
+
 LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     if (message == WM_CREATE) {
         mainWindow = window;
@@ -6431,19 +6484,14 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
     }
     if (message == WM_COMMAND && LOWORD(wParam) == buildButtonId) {
         if (!saveSourceFile()) return 0;
-        wchar_t executablePath[32768] = {};
-        const DWORD executableLength = GetModuleFileNameW(nullptr, executablePath, 32768);
-        if (executableLength == 0 || executableLength >= 32768) {
-            appendOutput("ERROR Could not locate the TRG runtime for building.\r\n");
-            return 0;
+        appendOutput("Compiling standalone TRG executable...\r\n");
+        std::filesystem::path outputPath;
+        std::string errorMessage;
+        if (!buildStandaloneTrgExecutable(currentSourcePath, outputPath, errorMessage)) {
+            appendOutput("ERROR " + errorMessage + "\r\n");
+        } else {
+            appendOutput("Created " + outputPath.u8string() + " (standalone TRG app).\r\n");
         }
-        const std::wstring parameters = L"compile \"" + currentSourcePath.wstring() + L"\"";
-        const HINSTANCE launched = ShellExecuteW(window, L"open", executablePath, parameters.c_str(),
-            projectRoot.c_str(), SW_SHOWNORMAL);
-        if (reinterpret_cast<INT_PTR>(launched) <= 32)
-            appendOutput("ERROR Could not start the TRG build process.\r\n");
-        else
-            appendOutput("Building standalone app for " + currentSourcePath.u8string() + "...\r\n");
         return 0;
     }
     if (message == WM_COMMAND && LOWORD(wParam) == previewButtonId) {
