@@ -258,32 +258,32 @@ sourceText = exampleSource;
     private void buildInterface() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(Color.rgb(10, 16, 25));
+        root.setBackgroundColor(Color.rgb(15, 11, 26));
 
         preview = new PreviewView(true);
         root.addView(preview, new LinearLayout.LayoutParams(-1, dp(72)));
 
         editorScreen = new LinearLayout(this);
         editorScreen.setOrientation(LinearLayout.VERTICAL);
-        editorScreen.setBackgroundColor(Color.rgb(10, 16, 25));
+        editorScreen.setBackgroundColor(Color.rgb(15, 11, 26));
 
         // OneCompiler-style compact project/action toolbar.
         LinearLayout editorToolbar = new LinearLayout(this);
         editorToolbar.setOrientation(LinearLayout.HORIZONTAL);
         editorToolbar.setGravity(Gravity.CENTER_VERTICAL);
         editorToolbar.setPadding(dp(8), dp(5), dp(8), dp(5));
-        editorToolbar.setBackgroundColor(Color.rgb(18, 31, 45));
-        addEditorToolbarAction(editorToolbar, "▶ RUN", Color.rgb(20, 119, 111), this::runSource, 1.25f);
-        addEditorToolbarAction(editorToolbar, "＋ NEW", Color.rgb(37, 56, 75), this::createNewDocument, 1f);
-        addEditorToolbarAction(editorToolbar, "OPEN", Color.rgb(37, 56, 75), this::openDocument, 1f);
-        addEditorToolbarAction(editorToolbar, "SAVE", Color.rgb(37, 56, 75),
+        editorToolbar.setBackgroundColor(Color.rgb(32, 23, 48));
+        addEditorToolbarAction(editorToolbar, "▶ RUN", Color.rgb(104, 70, 170), this::runSource, 1.25f);
+        addEditorToolbarAction(editorToolbar, "＋ NEW", Color.rgb(45, 33, 66), this::createNewDocument, 1f);
+        addEditorToolbarAction(editorToolbar, "OPEN", Color.rgb(45, 33, 66), this::openDocument, 1f);
+        addEditorToolbarAction(editorToolbar, "SAVE", Color.rgb(45, 33, 66),
                 () -> createDocument(currentDocumentName, REQUEST_EXPORT), 1f);
-        addEditorToolbarAction(editorToolbar, "MENU", Color.rgb(37, 56, 75), this::showStudioMenu, 1f);
+        addEditorToolbarAction(editorToolbar, "MENU", Color.rgb(45, 33, 66), this::showStudioMenu, 1f);
         editorScreen.addView(editorToolbar, new LinearLayout.LayoutParams(-1, dp(48)));
 
         HorizontalScrollView tabScroller = new HorizontalScrollView(this);
         tabScroller.setHorizontalScrollBarEnabled(false);
-        tabScroller.setBackgroundColor(Color.rgb(16, 27, 40));
+        tabScroller.setBackgroundColor(Color.rgb(27, 20, 41));
         fileTabs = new LinearLayout(this);
         fileTabs.setOrientation(LinearLayout.HORIZONTAL);
         tabScroller.addView(fileTabs);
@@ -291,23 +291,23 @@ sourceText = exampleSource;
 
         LinearLayout codePane = new LinearLayout(this);
         codePane.setOrientation(LinearLayout.HORIZONTAL);
-        codePane.setBackgroundColor(Color.rgb(11, 19, 29));
+        codePane.setBackgroundColor(Color.rgb(16, 12, 27));
         lineNumbers = new TextView(this);
         lineNumbers.setText("1");
-        lineNumbers.setTextColor(Color.rgb(112, 139, 160));
+        lineNumbers.setTextColor(Color.rgb(133, 115, 163));
         lineNumbers.setTextSize(editorFontSize);
         lineNumbers.setTypeface(fixedUiFontBold);
         lineNumbers.setMaxLines(Integer.MAX_VALUE);
         lineNumbers.setIncludeFontPadding(false);
         lineNumbers.setGravity(Gravity.TOP | Gravity.RIGHT);
         lineNumbers.setPadding(dp(10), dp(12), dp(9), dp(10));
-        lineNumbers.setBackgroundColor(Color.rgb(15, 25, 37));
+        lineNumbers.setBackgroundColor(Color.rgb(25, 18, 39));
         codePane.addView(lineNumbers, new LinearLayout.LayoutParams(dp(42), -1));
 
         editor = new LineNumberEditText();
         editor.setGravity(Gravity.TOP | Gravity.START);
-        editor.setTextColor(Color.rgb(226, 237, 246));
-        editor.setHintTextColor(Color.rgb(105, 126, 145));
+        editor.setTextColor(Color.rgb(240, 234, 251));
+        editor.setHintTextColor(Color.rgb(151, 136, 174));
         editor.setHint("Write TRG source here");
         editor.setTextSize(editorFontSize);
         editor.setTypeface(fixedUiFont);
@@ -322,7 +322,7 @@ sourceText = exampleSource;
         editor.setImeOptions(android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI
                 | android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
         editor.setPadding(dp(12), dp(12), dp(12), dp(10));
-        editor.setBackgroundColor(Color.rgb(11, 19, 29));
+        editor.setBackgroundColor(Color.rgb(16, 12, 27));
         editor.setVerticalScrollBarEnabled(true);
         editor.setFilters(new InputFilter[]{new TrgIndentFilter()});
         codePane.addView(editor, new LinearLayout.LayoutParams(0, -1, 1));
@@ -331,21 +331,21 @@ sourceText = exampleSource;
 
         outputScreen = new LinearLayout(this);
         outputScreen.setOrientation(LinearLayout.VERTICAL);
-        outputScreen.setBackgroundColor(Color.rgb(8, 14, 22));
+        outputScreen.setBackgroundColor(Color.rgb(13, 9, 23));
         TextView outputHeader = new TextView(this);
         outputHeader.setText("  >   PROGRAM OUTPUT");
         outputHeader.setTypeface(fixedUiFontBold);
-        outputHeader.setTextColor(Color.rgb(113, 222, 207));
+        outputHeader.setTextColor(Color.rgb(190, 160, 255));
         outputHeader.setTextSize(11);
         outputHeader.setGravity(Gravity.CENTER_VERTICAL);
-        outputHeader.setBackgroundColor(Color.rgb(17, 29, 42));
+        outputHeader.setBackgroundColor(Color.rgb(25, 18, 39));
         outputScreen.addView(outputHeader, new LinearLayout.LayoutParams(-1, dp(36)));
 
         ScrollView outputScroll = new ScrollView(this);
         outputScroll.setFillViewport(true);
-        outputScroll.setBackgroundColor(Color.rgb(8, 14, 22));
+        outputScroll.setBackgroundColor(Color.rgb(13, 9, 23));
         output = new TextView(this);
-        output.setTextColor(Color.rgb(213, 226, 237));
+        output.setTextColor(Color.rgb(230, 220, 246));
         output.setTextSize(14);
         output.setTypeface(fixedUiFont);
         output.setPadding(dp(14), dp(12), dp(12), dp(12));
@@ -357,10 +357,10 @@ sourceText = exampleSource;
 
         status = new TextView(this);
         status.setTypeface(fixedUiFontBold);
-        status.setTextColor(Color.rgb(151, 177, 194));
+        status.setTextColor(Color.rgb(170, 154, 194));
         status.setTextSize(11);
         status.setPadding(dp(12), dp(4), dp(10), dp(4));
-        status.setBackgroundColor(Color.rgb(16, 27, 40));
+        status.setBackgroundColor(Color.rgb(27, 20, 41));
         status.setText("Ready  |  TRG C++ interpreter");
         root.addView(status, new LinearLayout.LayoutParams(-1, dp(24)));
 
@@ -543,7 +543,7 @@ sourceText = exampleSource;
                     studioMenuDialog = dialog;
                     studioMenuPreview = menuView;
                     FrameLayout surface = new FrameLayout(this);
-                    surface.setBackgroundColor(Color.rgb(10, 16, 25));
+                    surface.setBackgroundColor(Color.rgb(15, 11, 26));
                     surface.addView(menuView, new FrameLayout.LayoutParams(-1, -1));
                     dialog.setCancelable(true);
                     dialog.setOnCancelListener(ignored -> {
@@ -887,7 +887,7 @@ sourceText = exampleSource;
                                         Runnable action, float weight) {
         TextView button = new TextView(this);
         button.setText(label);
-        button.setTextColor(Color.rgb(238, 246, 250));
+        button.setTextColor(Color.rgb(246, 240, 255));
         button.setTextSize(11);
         button.setTypeface(fixedUiFontBold);
         button.setGravity(Gravity.CENTER);
@@ -936,8 +936,8 @@ sourceText = exampleSource;
             tab.setTextSize(12);
             tab.setGravity(Gravity.CENTER_VERTICAL);
             tab.setPadding(dp(12), 0, dp(12), 0);
-            tab.setTextColor(name.equals(currentDocumentName) ? Color.rgb(224, 250, 246) : Color.rgb(139, 160, 178));
-            tab.setBackgroundColor(name.equals(currentDocumentName) ? Color.rgb(24, 75, 78) : Color.TRANSPARENT);
+            tab.setTextColor(name.equals(currentDocumentName) ? Color.rgb(246, 240, 255) : Color.rgb(173, 158, 196));
+            tab.setBackgroundColor(name.equals(currentDocumentName) ? Color.rgb(83, 54, 130) : Color.TRANSPARENT);
             tab.setOnClickListener(view -> {
                 openDocuments.put(currentDocumentName, editor.getText().toString());
                 currentDocumentName = name;
@@ -1012,7 +1012,7 @@ sourceText = exampleSource;
         menuButton.setTextSize(12);
         menuButton.setGravity(Gravity.CENTER);
         menuButton.setPadding(dp(14), dp(8), dp(14), dp(8));
-        menuButton.setBackgroundColor(Color.rgb(20, 105, 99));
+        menuButton.setBackgroundColor(Color.rgb(91, 52, 170));
         FrameLayout.LayoutParams menuLayout = new FrameLayout.LayoutParams(-2, -2, Gravity.TOP | Gravity.END);
         menuLayout.setMargins(0, dp(16), dp(16), 0);
         fullScreen.addView(menuButton, menuLayout);
@@ -1023,7 +1023,7 @@ sourceText = exampleSource;
         closeButton.setTextColor(Color.WHITE);
         closeButton.setTextSize(25);
         closeButton.setGravity(Gravity.CENTER);
-        closeButton.setBackgroundColor(Color.rgb(22, 43, 58));
+        closeButton.setBackgroundColor(Color.rgb(38, 27, 59));
         FrameLayout.LayoutParams closeLayout = new FrameLayout.LayoutParams(dp(44), dp(44), Gravity.TOP | Gravity.START);
         closeLayout.setMargins(dp(14), dp(14), 0, 0);
         fullScreen.addView(closeButton, closeLayout);
@@ -1140,7 +1140,7 @@ sourceText = exampleSource;
         android.view.Window window = dialog.getWindow();
         window.setLayout(-1, -1);
         window.setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(
-                Color.rgb(10, 16, 25)));
+                Color.rgb(15, 11, 26)));
         window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         window.setStatusBarColor(Color.TRANSPARENT);
         window.setNavigationBarColor(Color.TRANSPARENT);
@@ -1212,7 +1212,7 @@ sourceText = exampleSource;
             int leading = 0;
             while (leading < line.length() && Character.isWhitespace(line.charAt(leading))) leading++;
                 int comment = line.indexOf("//");
-                if (comment >= 0) source.setSpan(new ForegroundColorSpan(Color.rgb(123, 148, 126)),
+                if (comment >= 0) source.setSpan(new ForegroundColorSpan(Color.rgb(150, 128, 180)),
                         lineStart + comment, lineEnd, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
                 int quote = -1;
                 boolean escaped = false;
