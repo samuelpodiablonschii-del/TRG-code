@@ -1244,7 +1244,7 @@ LRESULT CALLBACK outputWindowProc(HWND control, UINT message, WPARAM wParam, LPA
         }
     }
     if (message == WM_CONTEXTMENU) {
-        POINT point = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+        POINT point = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
         if (point.x == -1 && point.y == -1) GetCursorPos(&point);
         HMENU menu = CreatePopupMenu();
         if (menu) {
@@ -6359,7 +6359,9 @@ void updateDesktop3DLayout(HWND window, const DesktopLayout& layout) {
         scaleForDpi(window, 168), scaleForDpi(window, 224));
     const LONG inspectorWidth = std::clamp<LONG>(width / 4,
         scaleForDpi(window, 194), scaleForDpi(window, 258));
-    desktop3DToolbarRect = {margin, margin, width - margin, margin + toolbarHeight};
+    desktop3DToolbarRect = {margin, margin,
+        std::max<LONG>(margin + scaleForDpi(window, 360),
+            width - margin - scaleForDpi(window, 86)), margin + toolbarHeight};
     desktop3DHierarchyRect = {margin, sideTop, margin + hierarchyWidth, shelfTop - gap};
     desktop3DInspectorRect = {width - margin - inspectorWidth, sideTop,
         width - margin, shelfTop - gap};
@@ -7145,7 +7147,11 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         ScreenToClient(window, &cursor);
         const int delta = GET_WHEEL_DELTA_WPARAM(wParam);
         if (PtInRect(&desktop3DHierarchyRect, cursor)) {
-            const int maximum = std::max(0, static_cast<int>(ui3DObjects.size()) - 11);
+            const LONG rowTop = desktop3DHierarchyRect.top + scaleForDpi(window, 60);
+            const LONG rowHeight = scaleForDpi(window, 25);
+            const int visibleRows = std::max(1, static_cast<int>(
+                (desktop3DHierarchyRect.bottom - rowTop - scaleForDpi(window, 8)) / rowHeight));
+            const int maximum = std::max(0, static_cast<int>(ui3DObjects.size()) - visibleRows);
             desktop3DHierarchyScroll = std::clamp(desktop3DHierarchyScroll + (delta > 0 ? -3 : 3),
                 0, maximum);
         } else if (PtInRect(&desktop3DViewportRect, cursor)) {
