@@ -7097,24 +7097,9 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
     }
     if (message == WM_KEYDOWN && desktop3DEngineActive && previewMode && !terminalInputActive) {
         const double step = (GetKeyState(VK_SHIFT) & 0x8000) ? 0.9 : 0.32;
-        const double yaw = desktop3DCameraYaw;
         switch (wParam) {
-            case 'W':
-                desktop3DCameraX += std::sin(yaw) * step;
-                desktop3DCameraZ += std::cos(yaw) * step;
-                break;
-            case 'S':
-                desktop3DCameraX -= std::sin(yaw) * step;
-                desktop3DCameraZ -= std::cos(yaw) * step;
-                break;
-            case 'A':
-                desktop3DCameraX -= std::cos(yaw) * step;
-                desktop3DCameraZ += std::sin(yaw) * step;
-                break;
-            case 'D':
-                desktop3DCameraX += std::cos(yaw) * step;
-                desktop3DCameraZ -= std::sin(yaw) * step;
-                break;
+            case 'W': case 'A': case 'S': case 'D':
+                return 0; // WASD movement is updated continuously by the camera timer.
             case 'Q': desktop3DCameraY -= step; break;
             case 'E': desktop3DCameraY += step; break;
             case VK_LEFT: desktop3DCameraYaw -= 0.055; break;
@@ -7126,12 +7111,40 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         InvalidateRect(window, nullptr, FALSE);
         return 0;
     }
+    if (message == WM_TIMER && wParam == 3 && desktop3DEngineActive && previewMode) {
+        if (terminalInputActive || GetFocus() != window) return 0;
+        const double step = (GetAsyncKeyState(VK_SHIFT) & 0x8000) ? 0.23 : 0.075;
+        const double yaw = desktop3DCameraYaw;
+        bool moved = false;
+        if (GetAsyncKeyState('W') & 0x8000) {
+            desktop3DCameraX += std::sin(yaw) * step;
+            desktop3DCameraZ += std::cos(yaw) * step;
+            moved = true;
+        }
+        if (GetAsyncKeyState('S') & 0x8000) {
+            desktop3DCameraX -= std::sin(yaw) * step;
+            desktop3DCameraZ -= std::cos(yaw) * step;
+            moved = true;
+        }
+        if (GetAsyncKeyState('A') & 0x8000) {
+            desktop3DCameraX -= std::cos(yaw) * step;
+            desktop3DCameraZ += std::sin(yaw) * step;
+            moved = true;
+        }
+        if (GetAsyncKeyState('D') & 0x8000) {
+            desktop3DCameraX += std::cos(yaw) * step;
+            desktop3DCameraZ -= std::sin(yaw) * step;
+            moved = true;
+        }
+        if (moved) InvalidateRect(window, nullptr, FALSE);
+        return 0;
+    }
     if (message == WM_MOUSEWHEEL && desktop3DEngineActive && previewMode) {
         POINT cursor = {};
         GetCursorPos(&cursor);
         ScreenToClient(window, &cursor);
         const int delta = GET_WHEEL_DELTA_WPARAM(wParam);
-        if (cursor.x < desktop3DViewportRect.left) {
+        if (PtInRect(&desktop3DHierarchyRect, cursor)) {
             const int maximum = std::max(0, static_cast<int>(ui3DObjects.size()) - 11);
             desktop3DHierarchyScroll = std::clamp(desktop3DHierarchyScroll + (delta > 0 ? -3 : 3),
                 0, maximum);
@@ -7143,6 +7156,8 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         return 0;
     }
     if (message == WM_RBUTTONDOWN && desktop3DEngineActive && previewMode) {
+        const POINT point = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
+        if (!PtInRect(&desktop3DViewportRect, point)) return 0;
         desktop3DDraggingCamera = true;
         desktop3DRightClickMoved = false;
         desktop3DMouseDown = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
@@ -7177,7 +7192,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 RECT client = {};
                 GetClientRect(window, &client);
                 const LONG popupWidth = scaleForDpi(window, 224);
-                const LONG popupHeight = scaleForDpi(window, 204);
+                const LONG popupHeight = scaleForDpi(window, 236);
                 const LONG x = std::clamp<LONG>(point.x, desktop3DViewportRect.left + 4,
                     std::max<LONG>(desktop3DViewportRect.left + 4,
                         desktop3DViewportRect.right - popupWidth - 4));
@@ -7196,35 +7211,40 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
     }
     if (message == WM_LBUTTONDOWN && desktop3DEngineActive && previewMode) {
         const POINT point = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
-        RECT client = {};
-        GetClientRect(window, &client);
         SetFocus(window);
+        desktop3DMouseDown = point;
+        desktop3DMouseCurrent = point;
+        desktop3DAssetCandidate = -1;
+        desktop3DAssetDragging = false;
+
         if (desktop3DContextOpen) {
             if (PtInRect(&desktop3DContextRect, point)) {
-                const int rowHeight = scaleForDpi(window, 28);
-                const int row = (point.y - desktop3DContextRect.top - scaleForDpi(window, 48)) / rowHeight;
+                const int row = (point.y - desktop3DContextRect.top - scaleForDpi(window, 43)) /
+                    scaleForDpi(window, 29);
                 auto selected = std::find_if(ui3DObjects.begin(), ui3DObjects.end(),
                     [](const Ui3DObject& model) { return model.name == desktop3DSelectedName; });
-                if (selected != ui3DObjects.end() && row >= 0) {
+                if (selected != ui3DObjects.end() && row >= 0 && row < 6) {
                     if (row == 0) {
                         std::string newName;
                         if (askForInput("Rename object:", newName) && validName(newName)) {
                             const bool used = std::any_of(ui3DObjects.begin(), ui3DObjects.end(),
                                 [&](const Ui3DObject& model) { return model.name == newName && model.name != selected->name; });
-                            if (!used) selected->name = newName;
-                            else appendOutput("ERROR That object name is already in use.\r\n");
+                            if (!used) {
+                                selected->name = newName;
+                                desktop3DSelectedName = newName;
+                            } else appendOutput("ERROR That object name is already in use.\r\n");
                         }
                     } else if (row == 1) {
                         Ui3DObject copy = *selected;
-                        copy.name = desktop3DUniqueName(selected->shape == "sphere" ? "Sphere" : "Object");
+                        copy.name = desktop3DUniqueName(copy.shape == "sphere" ? "Sphere" :
+                            copy.shape == "camera" ? "Camera" : copy.shape == "spawn" ? "Spawn" : "Object");
                         copy.x += 1.0;
                         copy.z += 1.0;
                         ui3DObjects.push_back(copy);
                         desktop3DSelectedName = copy.name;
                     } else if (row == 2) {
-                        const std::string erasedName = selected->name;
                         ui3DObjects.erase(selected);
-                        if (desktop3DSelectedName == erasedName) desktop3DSelectedName.clear();
+                        desktop3DSelectedName.clear();
                     } else if (row == 3) {
                         if (selected->texture == "smooth") selected->texture = "grid";
                         else if (selected->texture == "grid") selected->texture = "metal";
@@ -7232,6 +7252,12 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                         else if (selected->texture == "wood") selected->texture = "stone";
                         else selected->texture = "smooth";
                     } else if (row == 4) {
+                        desktop3DCameraX = selected->x;
+                        desktop3DCameraY = selected->y + 2.0;
+                        desktop3DCameraZ = selected->z - 8.0;
+                        desktop3DCameraYaw = 0.0;
+                        desktop3DCameraPitch = 0.15;
+                    } else if (row == 5) {
                         std::string value;
                         double number = 0;
                         if (askForInput("Set X position:", value) && parseNumber(value, number)) selected->x = number;
@@ -7246,46 +7272,91 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             }
             desktop3DContextOpen = false;
         }
-        desktop3DMouseDown = point;
-        desktop3DMouseCurrent = point;
-        desktop3DAssetCandidate = -1;
-        desktop3DAssetDragging = false;
-        const double canvasWidth = std::max<LONG>(1, client.right);
-        const double canvasHeight = std::max<LONG>(1, desktopLayout(window, client).canvasHeight);
-        const double px = point.x * 100.0 / canvasWidth;
-        const double py = (point.y - desktopLayout(window, client).headerHeight) * 100.0 / canvasHeight;
-        if (py >= 83.0 && py <= 98.0) {
-            if (px >= 20.0 && px < 36.0) desktop3DAssetCandidate = 0;
-            else if (px >= 36.0 && px < 52.0) desktop3DAssetCandidate = 1;
-            else if (px >= 52.0 && px < 68.0) desktop3DAssetCandidate = 2;
-            else if (px >= 68.0 && px < 84.0) desktop3DAssetCandidate = 3;
-            else if (px >= 84.0 && px <= 100.0) desktop3DAssetCandidate = 4;
+
+        for (std::size_t index = 0; index < desktop3DToolRects.size(); ++index) {
+            if (!PtInRect(&desktop3DToolRects[index], point)) continue;
+            if (index < 4) desktop3DToolMode = static_cast<int>(index);
+            else if (index == 4) runDesktop3DCommand("3d save \"scene.trgscene\"");
+            else if (index == 5) runDesktop3DCommand("3d load \"scene.trgscene\"");
+            else {
+                desktop3DCameraX = 0.0;
+                desktop3DCameraY = 0.0;
+                desktop3DCameraZ = -12.0;
+                desktop3DCameraYaw = 0.0;
+                desktop3DCameraPitch = 0.18;
+                desktop3DZoom = 1.0;
+            }
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
         }
-        if (desktop3DAssetCandidate < 0 && point.x < desktop3DViewportRect.left) {
-            const double rowY = py;
-            const int row = static_cast<int>((rowY - 25.0) / 4.2) + desktop3DHierarchyScroll;
+
+        for (std::size_t index = 0; index < desktop3DTextureRects.size(); ++index) {
+            if (!PtInRect(&desktop3DTextureRects[index], point)) continue;
+            auto selected = std::find_if(ui3DObjects.begin(), ui3DObjects.end(),
+                [](const Ui3DObject& model) { return model.name == desktop3DSelectedName; });
+            if (selected != ui3DObjects.end()) {
+                const char* textures[] = {"smooth", "grid", "metal", "wood", "stone"};
+                selected->texture = textures[index];
+                syncDesktop3DEditorState();
+            } else {
+                appendOutput("Select a model before applying a material.\r\n");
+            }
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
+        }
+
+        for (std::size_t index = 0; index < desktop3DAssetRects.size(); ++index) {
+            if (!PtInRect(&desktop3DAssetRects[index], point)) continue;
+            desktop3DAssetCandidate = static_cast<int>(index);
+            SetCapture(window);
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
+        }
+
+        if (PtInRect(&desktop3DHierarchyRect, point)) {
+            const LONG rowTop = desktop3DHierarchyRect.top + scaleForDpi(window, 60);
+            const LONG rowHeight = scaleForDpi(window, 25);
+            const int row = static_cast<int>((point.y - rowTop) / rowHeight) + desktop3DHierarchyScroll;
             if (row >= 0 && static_cast<std::size_t>(row) < ui3DObjects.size()) {
                 desktop3DSelectedName = ui3DObjects[static_cast<std::size_t>(row)].name;
                 syncDesktop3DEditorState();
-                return 0;
             }
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
         }
-        if (desktop3DAssetCandidate < 0) {
+        if (PtInRect(&desktop3DInspectorRect, point) ||
+            PtInRect(&desktop3DAssetShelfRect, point) ||
+            PtInRect(&desktop3DToolbarRect, point))
+            return 0;
+
+        if (PtInRect(&desktop3DViewportRect, point)) {
+            bool hitObject = false;
             for (auto hit = desktop3DProjectedHits.rbegin(); hit != desktop3DProjectedHits.rend(); ++hit) {
                 if (!PtInRect(&hit->second, point)) continue;
                 desktop3DSelectedName = hit->first;
                 auto selected = std::find_if(ui3DObjects.begin(), ui3DObjects.end(),
                     [&](const Ui3DObject& model) { return model.name == desktop3DSelectedName; });
-                if (selected != ui3DObjects.end()) {
+                if (selected != ui3DObjects.end() && desktop3DToolMode != 0) {
                     desktop3DDraggingObject = true;
                     desktop3DDragStartX = selected->x;
                     desktop3DDragStartY = selected->y;
                     desktop3DDragStartZ = selected->z;
+                    desktop3DDragStartWidth = selected->width;
+                    desktop3DDragStartHeight = selected->height;
+                    desktop3DDragStartDepth = selected->depth;
+                    desktop3DDragStartRotX = selected->rotateX;
+                    desktop3DDragStartRotY = selected->rotateY;
+                    SetCapture(window);
                 }
-                syncDesktop3DEditorState();
+                hitObject = true;
                 break;
             }
+            if (!hitObject) desktop3DSelectedName.clear();
+            syncDesktop3DEditorState();
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
         }
+        return 0;
     }
     if (message == WM_MOUSEMOVE && desktop3DEngineActive && previewMode &&
         (GetKeyState(VK_LBUTTON) & 0x8000)) {
@@ -7301,34 +7372,45 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 [](const Ui3DObject& model) { return model.name == desktop3DSelectedName; });
             if (selected != ui3DObjects.end()) {
                 const double scale = std::max(8.0, desktop3DWorldScale);
-                const double horizontal = (point.x - desktop3DMouseDown.x) / scale;
-                selected->x = desktop3DDragStartX + horizontal * std::cos(desktop3DCameraYaw);
-                selected->z = desktop3DDragStartZ - horizontal * std::sin(desktop3DCameraYaw);
-                selected->y = desktop3DDragStartY - (point.y - desktop3DMouseDown.y) / scale;
+                const double dx = point.x - desktop3DMouseDown.x;
+                const double dy = point.y - desktop3DMouseDown.y;
+                if (desktop3DToolMode == 1) {
+                    const double horizontal = dx / scale;
+                    selected->x = desktop3DDragStartX + horizontal * std::cos(desktop3DCameraYaw);
+                    selected->z = desktop3DDragStartZ - horizontal * std::sin(desktop3DCameraYaw);
+                    selected->y = desktop3DDragStartY - dy / scale;
+                } else if (desktop3DToolMode == 2) {
+                    selected->rotateY = desktop3DDragStartRotY + dx * 0.65;
+                    selected->rotateX = desktop3DDragStartRotX + dy * 0.65;
+                } else if (desktop3DToolMode == 3) {
+                    const double factor = std::clamp(std::exp((dx - dy) * 0.004), 0.08, 12.0);
+                    selected->width = std::max(0.05, desktop3DDragStartWidth * factor);
+                    selected->height = std::max(0.05, desktop3DDragStartHeight * factor);
+                    selected->depth = std::max(0.05, desktop3DDragStartDepth * factor);
+                }
                 syncDesktop3DEditorState();
             }
         }
         InvalidateRect(window, nullptr, FALSE);
     }
     if (message == WM_LBUTTONUP && desktop3DEngineActive && previewMode) {
-        if (desktop3DAssetDragging && desktop3DAssetCandidate >= 0) {
-            RECT client = {};
-            GetClientRect(window, &client);
+        if (desktop3DAssetCandidate >= 0) {
             const POINT point = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
-            if (PtInRect(&desktop3DViewportRect, point)) {
+            double worldX = desktop3DCameraX + std::sin(desktop3DCameraYaw) * 12.0;
+            double worldZ = desktop3DCameraZ + std::cos(desktop3DCameraYaw) * 12.0;
+            double worldY = 0.0;
+            if (desktop3DAssetDragging && PtInRect(&desktop3DViewportRect, point)) {
                 const double scale = std::max(8.0, desktop3DWorldScale);
                 const double centerX = (desktop3DViewportRect.left + desktop3DViewportRect.right) * 0.5;
                 const double centerY = (desktop3DViewportRect.top + desktop3DViewportRect.bottom) * 0.5;
                 const double screenX = (point.x - centerX) / scale;
                 const double screenY = (centerY - point.y) / scale;
-                const double depth = 12.0;
-                const double worldX = desktop3DCameraX + std::sin(desktop3DCameraYaw) * depth +
-                    std::cos(desktop3DCameraYaw) * screenX;
-                const double worldZ = desktop3DCameraZ + std::cos(desktop3DCameraYaw) * depth -
-                    std::sin(desktop3DCameraYaw) * screenX;
-                const double worldY = desktop3DCameraY + screenY;
-                createDesktop3DAsset(desktop3DAssetCandidate, worldX, worldY, worldZ);
+                worldX += std::cos(desktop3DCameraYaw) * screenX;
+                worldZ -= std::sin(desktop3DCameraYaw) * screenX;
+                worldY = std::max(-1.0, desktop3DCameraY + screenY);
             }
+            if (!desktop3DAssetDragging || PtInRect(&desktop3DViewportRect, point))
+                createDesktop3DAsset(desktop3DAssetCandidate, worldX, worldY, worldZ);
             desktop3DAssetCandidate = -1;
             desktop3DAssetDragging = false;
             desktop3DDraggingObject = false;
@@ -7338,9 +7420,9 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         }
         if (desktop3DDraggingObject) {
             desktop3DDraggingObject = false;
-            desktop3DAssetCandidate = -1;
             if (GetCapture() == window) ReleaseCapture();
             syncDesktop3DEditorState();
+            InvalidateRect(window, nullptr, FALSE);
             return 0;
         }
         desktop3DAssetCandidate = -1;
