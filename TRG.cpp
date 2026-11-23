@@ -5755,7 +5755,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         editor2DButton = CreateWindowExW(0, L"BUTTON", L"2D Editor",
             WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(editor2DButtonId), GetModuleHandleW(nullptr), nullptr);
-        editor3DButton = CreateWindowExW(0, L"BUTTON", L"3D Editor",
+        editor3DButton = CreateWindowExW(0, L"BUTTON", L"3D Engine",
             WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(editor3DButtonId), GetModuleHandleW(nullptr), nullptr);
         richEditModule = LoadLibraryW(L"Msftedit.dll");
