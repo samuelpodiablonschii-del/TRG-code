@@ -321,7 +321,6 @@ sourceText = exampleSource;
                 | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD;
         editor.setInputType(trgCodeInputType);
         editor.setRawInputType(trgCodeInputType);
-        editor.setPrivateImeOptions("nm");
         editor.setImeOptions(android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI
                 | android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
         editor.setPadding(dp(12), dp(12), dp(12), dp(10));
