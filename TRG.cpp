@@ -5235,7 +5235,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
 
         if (cmd == "3d") {
             if (!threeDEnabled) { reportError(i + 1, "3D commands need add (3d)"); continue; }
-            if (tokens.size() < 2) { reportError(i + 1, "use 3d box|sphere|move|rotate|scale|color|rename|delete|clear"); continue; }
+            if (tokens.size() < 2) { reportError(i + 1, "use 3d box|sphere|camera|spawn|plane|texture|move|rotate|scale|color|rename|delete|clear"); continue; }
             const std::string action = lower(tokens[1]);
             const auto unique3DName = [&]() {
                 std::string candidate;
@@ -7607,8 +7607,10 @@ void applyEditorSyntaxHighlighting() {
         L"set",L"remove",L"pop",L"join",L"split",L"upper",L"lower",L"trim",L"length",
         L"contains",L"index_of",L"replace",L"substring",L"find",L"find_position",L"replace_text",
         L"count_text",L"starts_with",L"ends_with",L"add_numbers",L"subtract_numbers",L"multiply_numbers",
-        L"divide_numbers",L"square_root",L"round_number",L"absolute_number",L"minimum",L"maximum",L"distance_between",L"math",L"ai",L"text",L"button",
-        L"rectangle",L"circle",L"image",L"animate",L"true",L"false",L"none"
+        L"divide_numbers",L"square_root",L"round_number",L"absolute_number",L"minimum",L"maximum",L"distance_between",
+        L"math",L"ai",L"text",L"button",L"rectangle",L"circle",L"image",L"animate",
+        L"3d",L"box",L"sphere",L"camera",L"spawn",L"plane",L"texture",L"save",L"load",
+        L"move",L"rotate",L"scale",L"duplicate",L"rename",L"delete",L"true",L"false",L"none"
     };
     auto paint = [&](std::size_t start, std::size_t count, COLORREF color, bool bold = false) {
         if (!count) return;
