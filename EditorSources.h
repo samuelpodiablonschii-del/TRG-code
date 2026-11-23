@@ -433,4 +433,10 @@ button asset_plane "▱  PLANE" x 84 y 84 w 14 h 12 color #315044 (
     set_text viewport_status selectedName
 )
 )TRGEDITOR3D";
+inline constexpr const char* desktopEditor3D = R"TRGDESKTOP3D(// Native Windows editor owns the desktop 3D workspace and renders the scene UI.
+// Start with an empty scene; use the Content Browser to add models, cameras and spawn points.
+add (ui)
+add (3d)
+)TRGDESKTOP3D";
+
 } // namespace trg_builtin
