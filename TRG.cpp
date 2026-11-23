@@ -844,12 +844,28 @@ LRESULT CALLBACK codeEditorWindowProc(HWND control, UINT message, WPARAM wParam,
         std::wstring text(static_cast<std::size_t>(textLength) + 1, L'\0');
         GetWindowTextW(control, text.data(), textLength + 1);
         text.resize(static_cast<std::size_t>(textLength));
-        if (selectionStart == selectionEnd && wParam == L')' &&
-            selectionStart < text.size() && text[selectionStart] == L')') {
+        if (selectionStart == selectionEnd &&
+            (wParam == L')' || wParam == L'"' || wParam == L'\'') &&
+            selectionStart < text.size() && text[selectionStart] == static_cast<wchar_t>(wParam)) {
             SendMessageW(control, EM_SETSEL, selectionStart + 1, selectionStart + 1);
             return 0;
         }
-        if (selectionStart == selectionEnd && (wParam == L'(' || wParam == L'"' || wParam == L'\'')) {
+        if (selectionStart != selectionEnd &&
+            (wParam == L'(' || wParam == L'"' || wParam == L'\'')) {
+            const std::wstring selected = text.substr(selectionStart, selectionEnd - selectionStart);
+            const wchar_t closing = wParam == L'(' ? L')' : static_cast<wchar_t>(wParam);
+            std::wstring wrapped;
+            wrapped.reserve(selected.size() + 2);
+            wrapped.push_back(static_cast<wchar_t>(wParam));
+            wrapped += selected;
+            wrapped.push_back(closing);
+            SendMessageW(control, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(wrapped.c_str()));
+            SendMessageW(control, EM_SETSEL, selectionStart + 1,
+                selectionStart + 1 + static_cast<DWORD>(selected.size()));
+            return 0;
+        }
+        if (selectionStart == selectionEnd &&
+            (wParam == L'(' || wParam == L'"' || wParam == L'\'')) {
             const wchar_t pair[] = {static_cast<wchar_t>(wParam),
                 wParam == L'(' ? L')' : static_cast<wchar_t>(wParam), L'\0'};
             SendMessageW(control, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(pair));
@@ -8307,16 +8323,20 @@ void applyEditorSyntaxHighlighting() {
     SendMessageW(codeEditor, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&base));
     static const std::unordered_set<std::wstring> keywords = {
         L"let",L"num",L"word",L"toggle",L"color",L"list",L"record",L"struct",L"class",L"new",
-        L"if",L"else",L"loop",L"every",L"wait",L"break",L"stop",L"return",L"function",L"call",
-        L"say",L"print",L"show",L"ask",L"random",L"add",L"create",L"json",L"read_file",
-        L"write_file",L"append_file",L"file_exists",L"delete_file",L"push",L"insert",L"get",
-        L"set",L"remove",L"pop",L"join",L"split",L"upper",L"lower",L"trim",L"length",
-        L"contains",L"index_of",L"replace",L"substring",L"find",L"find_position",L"replace_text",
-        L"count_text",L"starts_with",L"ends_with",L"add_numbers",L"subtract_numbers",L"multiply_numbers",
-        L"divide_numbers",L"square_root",L"round_number",L"absolute_number",L"minimum",L"maximum",L"distance_between",
-        L"math",L"ai",L"text",L"button",L"rectangle",L"circle",L"image",L"animate",
-        L"3d",L"box",L"sphere",L"camera",L"spawn",L"plane",L"texture",L"save",L"load",
-        L"move",L"rotate",L"scale",L"duplicate",L"rename",L"delete",L"true",L"false",L"none"
+        L"if",L"else",L"loop",L"every",L"wait",L"break",L"stop",L"exit",L"continue",L"return",
+        L"function",L"define",L"call",L"for",L"each",L"group",L"hide",L"show",
+        L"say",L"print",L"ask",L"random",L"add",L"create",L"run",L"json",L"database",L"table",
+        L"query",L"sql",L"read_file",L"write_file",L"append_file",L"file_exists",L"delete_file",
+        L"push",L"insert",L"get",L"set",L"remove",L"pop",L"join",L"split",L"upper",L"lower",
+        L"trim",L"ttrim",L"length",L"contains",L"index_of",L"replace",L"substring",L"find",
+        L"find_position",L"replace_text",L"count_text",L"starts_with",L"ends_with",
+        L"dictionary",L"dict_set",L"dict_get",L"dict_has",L"dict_remove",L"dict_keys",L"dict_count",
+        L"binary",L"bit",L"checksum",L"regex",L"compress",L"http_get",L"http_post",L"run_wasm",
+        L"math",L"stats",L"units",L"convert",L"time",L"physics",L"collides",L"watch_collision",
+        L"particle",L"scroll",L"set_text",L"set_color",L"ai",L"text",L"button",L"block",
+        L"rectangle",L"circle",L"image",L"sprite",L"animate",L"ui",L"3d",L"box",L"sphere",
+        L"camera",L"spawn",L"plane",L"texture",L"save",L"load",L"move",L"rotate",L"scale",
+        L"duplicate",L"rename",L"delete",L"true",L"false",L"none"
     };
     auto paint = [&](std::size_t start, std::size_t count, COLORREF color, bool bold = false) {
         if (!count) return;
