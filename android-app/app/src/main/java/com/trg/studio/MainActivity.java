@@ -157,6 +157,8 @@ public final class MainActivity extends Activity {
     private boolean studioMenuOpening;
     private boolean menuReturnShowingOutput;
     private final Handler everyHandler = new Handler(Looper.getMainLooper());
+    private final Handler workspaceSaveHandler = new Handler(Looper.getMainLooper());
+    private final Runnable workspaceSaveRunnable = this::saveWorkspace;
     private final HashMap<Integer, Runnable> scheduledEveryTasks = new HashMap<>();
     private String everyScheduleSignature = "";
 
@@ -206,6 +208,7 @@ public final class MainActivity extends Activity {
             }
 sourceText = exampleSource;
             openDocuments.put("program.trg", sourceText);
+            restoreWorkspace();
         } catch (Exception exception) {
             showError("Could not load the TRG Studio app", exception);
             return;
@@ -236,7 +239,15 @@ sourceText = exampleSource;
     }
 
     @Override
+    protected void onPause() {
+        saveWorkspace();
+        super.onPause();
+    }
+
+    @Override
     protected void onDestroy() {
+        saveWorkspace();
+        workspaceSaveHandler.removeCallbacks(workspaceSaveRunnable);
         cancelEverySchedules();
         nativeStop();
         if (activeAudio != null) { activeAudio.release(); activeAudio = null; }
@@ -302,8 +313,12 @@ sourceText = exampleSource;
         editor.setTypeface(fixedUiFont);
         editor.setMaxLines(Integer.MAX_VALUE);
         editor.setIncludeFontPadding(false);
-        editor.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE
-                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD);
+        // Treat TRG source as code, never prose: disable keyboard corrections and suggestions.
+        int trgCodeInputType = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD;
+        editor.setInputType(trgCodeInputType);
+        editor.setRawInputType(trgCodeInputType);
+        editor.setPrivateImeOptions("nm");
         editor.setImeOptions(android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI
                 | android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
         editor.setPadding(dp(12), dp(12), dp(12), dp(10));
@@ -358,6 +373,7 @@ sourceText = exampleSource;
             public void onTextChanged(CharSequence value, int start, int before, int count) {
                 sourceText = value.toString();
                 openDocuments.put(currentDocumentName, sourceText);
+                scheduleWorkspaceSave();
                 updateLineNumbers(value);
                 if (value instanceof Editable) applyEditorHighlighting((Editable) value);
             }
@@ -474,18 +490,13 @@ sourceText = exampleSource;
         }
         cancelEverySchedules();
         nativeStop();
+        saveWorkspace();
         if (editor != null && !showingOutput) {
             sourceText = editor.getText().toString();
             openDocuments.put(currentDocumentName, sourceText);
         }
-        currentDocumentName = name;
-        sourceText = source;
-        openDocuments.put(currentDocumentName, sourceText);
-        if (editor != null) {
-            editor.setText(sourceText);
-            editor.setSelection(0);
-            refreshFileTabs();
-        }
+        // Built-in editors are app workspaces, not user documents or files.
+        // Keep the current source tab and its contents untouched.
         InputMethodManager keyboard =
                 (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
         if (keyboard != null && editor != null) {
@@ -814,6 +825,55 @@ sourceText = exampleSource;
         return (format.startsWith("##") ? "##" : "#") + body;
     }
 
+    private void restoreWorkspace() {
+        android.content.SharedPreferences preferences = getPreferences(MODE_PRIVATE);
+        String savedDocuments = preferences.getString("workspace_documents", null);
+        if (savedDocuments == null || savedDocuments.isEmpty()) return;
+        try {
+            JSONObject stored = new JSONObject(savedDocuments);
+            LinkedHashMap<String, String> restored = new LinkedHashMap<>();
+            java.util.Iterator<String> names = stored.keys();
+            while (names.hasNext()) {
+                String name = names.next();
+                restored.put(name, stored.optString(name, ""));
+            }
+            if (!restored.isEmpty()) {
+                openDocuments.clear();
+                openDocuments.putAll(restored);
+                currentDocumentName = preferences.getString("workspace_current_document",
+                        restored.keySet().iterator().next());
+                if (!openDocuments.containsKey(currentDocumentName))
+                    currentDocumentName = restored.keySet().iterator().next();
+                sourceText = openDocuments.get(currentDocumentName);
+            }
+        } catch (JSONException ignored) {
+            // A damaged autosave must not prevent Studio from opening.
+        }
+    }
+
+    private void scheduleWorkspaceSave() {
+        workspaceSaveHandler.removeCallbacks(workspaceSaveRunnable);
+        workspaceSaveHandler.postDelayed(workspaceSaveRunnable, 350);
+    }
+
+    private void saveWorkspace() {
+        if (editor != null && !showingOutput) {
+            sourceText = editor.getText().toString();
+            openDocuments.put(currentDocumentName, sourceText);
+        }
+        try {
+            JSONObject stored = new JSONObject();
+            for (java.util.Map.Entry<String, String> entry : openDocuments.entrySet())
+                stored.put(entry.getKey(), entry.getValue());
+            getPreferences(MODE_PRIVATE).edit()
+                    .putString("workspace_documents", stored.toString())
+                    .putString("workspace_current_document", currentDocumentName)
+                    .apply();
+        } catch (JSONException ignored) {
+            // Keep the in-memory editor usable if an autosave cannot be serialized.
+        }
+    }
+
     private void showCodeScreen() {
         cancelEverySchedules();
         nativeStop();
@@ -842,6 +902,7 @@ sourceText = exampleSource;
     private void createNewDocument() {
         final EditText nameInput = new EditText(this);
         nameInput.setSingleLine(true);
+        nameInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         nameInput.setText("program" + (openDocuments.size() + 1) + ".trg");
         nameInput.setHint("filename.trg");
         new AlertDialog.Builder(this)
