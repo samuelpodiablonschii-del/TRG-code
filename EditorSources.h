@@ -358,12 +358,14 @@ button delete "DELETE" x 59 y 19 w 10 h 4 color #652A45 (
             )
             get objects selectedIndex selectedName
             set_text model_label selectedName
-        set_text hierarchy_selected selectedName
-        set_text viewport_status selectedName
+            set_text hierarchy_selected selectedName
+            set_text viewport_status selectedName
         )
         else (
             selectedName = ""
             set_text model_label "No object selected"
+            set_text hierarchy_selected "No object selected"
+            set_text viewport_status "No object selected"
         )
         set_text object_count objectCount
     )
