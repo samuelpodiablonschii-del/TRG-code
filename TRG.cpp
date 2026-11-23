@@ -6539,35 +6539,10 @@ std::vector<std::string> readProgram(std::istream& source) {
         rawLines.push_back(stripComment(line));
     }
 
-    // Discover user-defined function names before typo correction so calls to
-    // names resembling built-in commands are never silently rewritten.
-    std::unordered_set<std::string> functionNames;
-    for (const std::string& rawLine : rawLines) {
-        const auto tokens = tokenize(trim(rawLine));
-        if (tokens.size() >= 2 && lower(tokens[0]) == "define" && validName(tokens[1]))
-            functionNames.insert(lower(tokens[1]));
-    }
-
+    // Preserve source exactly as written. TRG never rewrites command names.
     std::vector<std::string> program;
     program.reserve(rawLines.size());
-    for (std::string cleanLine : rawLines) {
-        const std::size_t first = cleanLine.find_first_not_of(" \t");
-        if (first != std::string::npos) {
-            std::size_t last = first;
-            while (last < cleanLine.size() &&
-                   (std::isalnum(static_cast<unsigned char>(cleanLine[last])) || cleanLine[last] == '_')) ++last;
-            if (last > first) {
-                const std::string typed = cleanLine.substr(first, last - first);
-                const std::string corrected = suggestedCommand(typed);
-                if (!functionNames.count(lower(typed)) &&
-                    !corrected.empty() && lower(typed) != corrected) {
-                    cleanLine.replace(first, last - first, corrected);
-                    appendOutput("AUTO-CORRECTED command '" + typed + "' to '" + corrected + "'\r\n");
-                }
-            }
-        }
-        program.push_back(std::move(cleanLine));
-    }
+    for (std::string& cleanLine : rawLines) program.push_back(std::move(cleanLine));
     return program;
 }
 void executeProgram(const std::vector<std::string>& program) {
@@ -6804,17 +6779,6 @@ bool saveSourceFile() {
 
 bool launchDesktopVisualEditor(const std::string& fileName) {
     if (!codeEditor) return false;
-    if (!desktopVisualEditorActive) {
-        const int length = GetWindowTextLengthW(codeEditor);
-        std::wstring current(static_cast<std::size_t>(length) + 1, L'\0');
-        GetWindowTextW(codeEditor, current.data(), length + 1);
-        current.resize(static_cast<std::size_t>(length));
-        desktopPreviousSource = current;
-        desktopPreviousPath = currentSourcePath;
-        desktopPreviousDirty = editorDirty;
-        desktopVisualEditorActive = true;
-    }
-
     const char* embeddedSource = nullptr;
     if (fileName == "2DEditor.trg" || fileName == "2D Editor")
         embeddedSource = trg_builtin::editor2D;
@@ -6822,29 +6786,28 @@ bool launchDesktopVisualEditor(const std::string& fileName) {
         embeddedSource = trg_builtin::editor3D;
 
     if (!embeddedSource) {
-        appendOutput("ERROR Unknown built-in visual editor.\r\n");
-        desktopVisualEditorActive = false;
+        appendOutput("ERROR Unknown built-in visual editor.\\r\\n");
         return false;
     }
 
-    const int wideLength = MultiByteToWideChar(CP_UTF8, 0, embeddedSource, -1, nullptr, 0);
-    if (wideLength <= 0) {
-        appendOutput("ERROR Could not decode the built-in visual editor.\r\n");
-        desktopVisualEditorActive = false;
-        return false;
+    if (!desktopVisualEditorActive) {
+        const int length = GetWindowTextLengthW(codeEditor);
+        std::wstring current(static_cast<std::size_t>(length) + 1, L'\\0');
+        GetWindowTextW(codeEditor, current.data(), length + 1);
+        current.resize(static_cast<std::size_t>(length));
+        desktopPreviousSource = current;
+        desktopPreviousPath = currentSourcePath;
+        desktopPreviousDirty = editorDirty;
     }
-    std::wstring wideSource(static_cast<std::size_t>(wideLength), L'\0');
-    MultiByteToWideChar(CP_UTF8, 0, embeddedSource, -1, wideSource.data(), wideLength);
-    SetWindowTextW(codeEditor, wideSource.c_str());
-    currentSourcePath.clear();
+    desktopVisualEditorActive = true;
     projectRoot = std::filesystem::current_path();
-    editorDirty = false;
-    applyEditorSyntaxHighlighting();
-    updateEditorWindowTitle();
-
-    runEditorSource();
+    outputBuffer.clear();
+    appendOutput("Opening built-in " + fileName + " workspace...\\r\\n\\r\\n");
+    std::istringstream builtInStream(embeddedSource);
+    const std::vector<std::string> builtInProgram = readProgram(builtInStream);
+    executeProgram(builtInProgram);
     previewMode = true;
-    SetWindowTextW(previewButton, L"Code");
+    if (previewButton) SetWindowTextW(previewButton, L"Code");
     layoutOutputControls(mainWindow);
     InvalidateRect(mainWindow, nullptr, TRUE);
     return true;
