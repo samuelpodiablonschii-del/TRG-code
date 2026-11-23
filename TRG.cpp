@@ -6685,7 +6685,7 @@ void applyEditorSyntaxHighlighting() {
         if (source[i] == L'/' && i + 1 < source.size() && source[i + 1] == L'/') {
             const std::size_t start = i;
             while (i < source.size() && source[i] != L'\n') ++i;
-            paint(start, i - start, RGB(106, 153, 85));
+            paint(start, i - start, RGB(143, 124, 171));
         } else if (source[i] == L'"') {
             const std::size_t start = i++;
             bool escaped = false;
@@ -6699,13 +6699,13 @@ void applyEditorSyntaxHighlighting() {
         } else if (std::iswdigit(source[i])) {
             const std::size_t start = i++;
             while (i < source.size() && (std::iswalnum(source[i]) || source[i] == L'.')) ++i;
-            paint(start, i - start, RGB(181, 206, 168));
+            paint(start, i - start, RGB(190, 170, 220));
         } else if (std::iswalpha(source[i]) || source[i] == L'_') {
             const std::size_t start = i++;
             while (i < source.size() && (iswalnum(source[i]) || source[i] == L'_')) ++i;
             std::wstring word = source.substr(start, i - start);
             std::transform(word.begin(), word.end(), word.begin(), [](wchar_t ch) { return static_cast<wchar_t>(std::towlower(ch)); });
-            if (keywords.count(word)) paint(start, i - start, RGB(86, 156, 214), true);
+            if (keywords.count(word)) paint(start, i - start, RGB(168, 139, 255), true);
         } else if (source[i] == L'#') {
             const std::size_t start = i++;
             while (i < source.size() && std::iswxdigit(source[i])) ++i;
