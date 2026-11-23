@@ -6858,6 +6858,8 @@ bool launchDesktopVisualEditor(const std::string& fileName) {
     std::istringstream builtInStream(embeddedSource);
     const std::vector<std::string> builtInProgram = readProgram(builtInStream);
     executeProgram(builtInProgram);
+    currentSourcePath = desktopPreviousPath;
+    projectRoot = currentSourcePath.empty() ? std::filesystem::current_path() : currentSourcePath.parent_path();
     previewMode = true;
     if (previewButton) SetWindowTextW(previewButton, L"Code");
     layoutOutputControls(mainWindow);
