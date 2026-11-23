@@ -241,6 +241,9 @@ sourceText = exampleSource;
     @Override
     protected void onPause() {
         saveWorkspace();
+        getPreferences(MODE_PRIVATE).edit()
+                .putLong("workspace_last_saved", System.currentTimeMillis())
+                .commit();
         super.onPause();
     }
 
