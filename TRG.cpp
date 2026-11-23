@@ -724,8 +724,7 @@ void layoutOutputControls(HWND window) {
     GetClientRect(window, &client);
     const LONG width = std::max<LONG>(0, client.right - client.left);
     const LONG height = std::max<LONG>(0, client.bottom - client.top);
-    const LONG headerHeight = std::min<LONG>(scaleForDpi(window, 76),
-        std::max<LONG>(scaleForDpi(window, 48), height / 5));
+    const LONG headerHeight = scaleForDpi(window, 84);
     const LONG gap = scaleForDpi(window, 5);
     const LONG margin = scaleForDpi(window, 12);
 
@@ -748,21 +747,24 @@ void layoutOutputControls(HWND window) {
             }
         }
     } else {
-        const LONG available = std::max<LONG>(scaleForDpi(window, 10 * 45 + 9 * 5),
-            width - scaleForDpi(window, 170) - margin * 2);
-        const LONG buttonWidth = std::clamp<LONG>((available - gap * 9) / 10,
-            scaleForDpi(window, 45), scaleForDpi(window, 72));
-        const LONG buttonHeight = scaleForDpi(window, 34);
         const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton,
             buildButton, dictionaryButton, editor2DButton, editor3DButton, exportButton};
-        LONG x = width - margin - (buttonWidth + gap) * 10 + gap;
-        const LONG y = std::max<LONG>(0, (headerHeight - buttonHeight) / 2);
-        for (HWND button : buttons) {
-            if (button) {
-                MoveWindow(button, x, y, buttonWidth, buttonHeight, TRUE);
-                ShowWindow(button, SW_SHOW);
+        const LONG toolbarLeft = scaleForDpi(window, 170);
+        const LONG usableWidth = std::max<LONG>(scaleForDpi(window, 5 * 58),
+            width - toolbarLeft - margin);
+        const LONG buttonWidth = std::max<LONG>(scaleForDpi(window, 1),
+            (usableWidth - gap * 4) / 5);
+        const LONG buttonHeight = scaleForDpi(window, 30);
+        const LONG rowGap = scaleForDpi(window, 5);
+        for (std::size_t index = 0; index < std::size(buttons); ++index) {
+            const LONG row = static_cast<LONG>(index / 5);
+            const LONG column = static_cast<LONG>(index % 5);
+            const LONG x = toolbarLeft + column * (buttonWidth + gap);
+            const LONG y = scaleForDpi(window, 8) + row * (buttonHeight + rowGap);
+            if (buttons[index]) {
+                MoveWindow(buttons[index], x, y, buttonWidth, buttonHeight, TRUE);
+                ShowWindow(buttons[index], SW_SHOW);
             }
-            x += buttonWidth + gap;
         }
         if (previewButton) SetWindowTextW(previewButton, L"Preview");
     }
@@ -6222,19 +6224,14 @@ DesktopLayout desktopLayout(HWND window, const RECT& client) {
     const LONG height = std::max<LONG>(0, client.bottom - client.top);
     const LONG margin = scaleForDpi(window, 20);
     if (previewMode) {
-        return {width, height, 0, height, std::max<LONG>(1, height),
-            margin, height, height};
-    }
-    if (previewMode) {
         const LONG outputHeight = std::min<LONG>(
             std::max<LONG>(scaleForDpi(window, 116), height / 5),
             std::max<LONG>(scaleForDpi(window, 90), height / 3));
         const LONG panelTop = std::max<LONG>(scaleForDpi(window, 120), height - outputHeight);
         return {width, height, 0, panelTop, std::max<LONG>(1, panelTop),
-            margin, panelTop, height - margin};
+            margin, panelTop, std::max<LONG>(panelTop, height - margin)};
     }
-    const LONG headerHeight = std::min<LONG>(scaleForDpi(window, 76),
-        std::max<LONG>(scaleForDpi(window, 48), height / 5));
+    const LONG headerHeight = scaleForDpi(window, 84);
     const LONG outputMinimum = scaleForDpi(window, 112);
     const LONG canvasMinimum = scaleForDpi(window, 100);
     const LONG panelMinimum = std::min(height, headerHeight + canvasMinimum);
