@@ -288,12 +288,10 @@ text "DRAG TO MOVE  •  TWO FINGERS TO ORBIT + ZOOM" x 50 y 46.3 size 0.78 colo
 // Hierarchy / inspector navigation tabs.
 block z 1 x 0 y 47.7 w 100 h 5.4 color #160F23 name EDITOR_TABS
 button tab_hierarchy "▰  Hierarchy" x 1.5 y 48.2 w 48 h 4.7 color #572A9B (
-    set_text panel_heading "HIERARCHY"
-    set_text panel_hint "Cube is selected"
+    say "Hierarchy selected."
 )
 button tab_inspector "⚙  Inspector" x 50.5 y 48.2 w 48 h 4.7 color #281B3A (
-    set_text panel_heading "INSPECTOR"
-    set_text panel_hint "Edit the selected object below"
+    say "Inspector selected."
 )
 
 // Inspector card, matching the reference's compact stacked form.
@@ -303,16 +301,16 @@ text model_label "Cube (Selected)" x 14 y 57.3 size 1.8 color #F5EEFF bold true
 block z 2 x 4 y 59.1 w 92 h 0.12 color #342447 name INSPECTOR_DIVIDER
 
 text "Name" x 4 y 62.3 size 1.35 color #D8CBEA
-button rename "Cube" x 28 y 60.5 w 68 h 3.9 color #2B203D (
+button rename_action "EDIT NAME" x 80 y 60.5 w 16 h 3.9 color #39264F (
     if objectCount > 0 (
         ask "Object name:" renameInput
         3d rename selectedName renameInput
         selectedName = renameInput
         set_text model_label selectedName
-        set_text hierarchy_selected selectedName
-        set_text rename selectedName
+        set_text rename_value selectedName
     )
-)
+ )
+text rename_value "Cube" x 31 y 63 size 1.25 color #F1E9FF
 
 text "Position" x 4 y 67.2 size 1.3 color #D8CBEA
 button pos_x "X  0.00" x 28 y 65.1 w 21 h 3.6 color #2B203D (
@@ -337,19 +335,20 @@ button scale_z "1.00" x 74 y 69.7 w 22 h 3.6 color #2B203D (
 )
 
 text "Material" x 4 y 76.5 size 1.3 color #D8CBEA
-button material "●  Purple                         ▾" x 28 y 74.3 w 68 h 3.8 color #2B203D (
+button material "CHANGE  ▾" x 78 y 74.3 w 18 h 3.8 color #39264F (
     if objectCount > 0 (
         if currentColor = "#8B42F5" ( currentColor = "#438FF5" )
         else ( if currentColor = "#438FF5" ( currentColor = "#E2A34D" )
         else ( if currentColor = "#E2A34D" ( currentColor = "#58B985" )
         else ( currentColor = "#8B42F5" ) ) )
         3d color selectedName currentColor
-        if currentColor = "#8B42F5" ( set_text material "●  Purple                         ▾" )
-        else ( if currentColor = "#438FF5" ( set_text material "●  Blue                           ▾" )
-        else ( if currentColor = "#E2A34D" ( set_text material "●  Gold                           ▾" )
-        else ( set_text material "●  Green                          ▾" ) ) )
+        if currentColor = "#8B42F5" ( set_text material_value "●  Purple" )
+        else ( if currentColor = "#438FF5" ( set_text material_value "●  Blue" )
+        else ( if currentColor = "#E2A34D" ( set_text material_value "●  Gold" )
+        else ( set_text material_value "●  Green" ) ) )
     )
-)
+ )
+text material_value "●  Purple" x 32 y 76.8 size 1.2 color #DCCEFF
 
 // Asset browser dock.
 block z 1 x 0.7 y 80.2 w 98.6 h 19.2 color #191226 edges round name ASSET_BROWSER
@@ -364,8 +363,6 @@ button asset_box "◆\nBox" x 3 y 85 w 17.5 h 12.2 color #302044 (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text model_label selectedName
-    set_text hierarchy_selected selectedName
-    set_text object_count objectCount
 )
 button asset_sphere "●\nSphere" x 22 y 85 w 17.5 h 12.2 color #302044 (
     3d sphere auto x 0 y 0 z 0 size 1.7 color #8D62F4
@@ -374,8 +371,6 @@ button asset_sphere "●\nSphere" x 22 y 85 w 17.5 h 12.2 color #302044 (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text model_label selectedName
-    set_text hierarchy_selected selectedName
-    set_text object_count objectCount
 )
 button asset_camera "◉\nCamera" x 41 y 85 w 17.5 h 12.2 color #302044 (
     3d camera auto x 0 y 1 z 0 w 1.1 h 0.8 d 1.4 color #B79BEA
@@ -384,8 +379,6 @@ button asset_camera "◉\nCamera" x 41 y 85 w 17.5 h 12.2 color #302044 (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text model_label selectedName
-    set_text hierarchy_selected selectedName
-    set_text object_count objectCount
 )
 button asset_spawn "▶\nSpawn" x 60 y 85 w 17.5 h 12.2 color #302044 (
     3d spawn auto x 0 y 0 z 0 size 1 color #58C78D
@@ -394,8 +387,6 @@ button asset_spawn "▶\nSpawn" x 60 y 85 w 17.5 h 12.2 color #302044 (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text model_label selectedName
-    set_text hierarchy_selected selectedName
-    set_text object_count objectCount
 )
 button asset_plane "◇\nPlane" x 79 y 85 w 18 h 12.2 color #302044 (
     3d plane auto x 0 y -1 z 0 w 6 h 0.15 d 6 color #70B68A
@@ -404,8 +395,6 @@ button asset_plane "◇\nPlane" x 79 y 85 w 18 h 12.2 color #302044 (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text model_label selectedName
-    set_text hierarchy_selected selectedName
-    set_text object_count objectCount
 )
 )TRGEDITOR3D";
 inline constexpr const char* desktopEditor3D = R"TRGDESKTOP3D(// Native Windows editor owns the desktop 3D workspace and renders the scene UI.
