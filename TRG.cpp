@@ -7254,9 +7254,10 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 LONG minX = desktop3DViewportRect.left + 4;
                 LONG maxX = desktop3DViewportRect.right - popupWidth - 4;
                 LONG minY = desktop3DViewportRect.top + 4;
-                LONG maxY = desktopLayout(window, RECT{0, 0,
-                    desktop3DViewportRect.right + scaleForDpi(window, 300),
-                    desktop3DViewportRect.bottom + scaleForDpi(window, 200)}).panelTop;
+                RECT client = {};
+                GetClientRect(window, &client);
+                const DesktopLayout layout = desktopLayout(window, client);
+                LONG maxY = layout.panelTop;
                 if (PtInRect(&desktop3DHierarchyRect, point)) {
                     minX = desktop3DHierarchyRect.right + scaleForDpi(window, 6);
                     maxX = std::max<LONG>(minX, client.right - popupWidth - scaleForDpi(window, 10));
