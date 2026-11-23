@@ -707,9 +707,15 @@ sourceText = exampleSource;
                 + "3D SCENE OBJECTS (after add (3d))\n"
                 + "3d box NAME x X y Y z Z w W h H d D color COLOR\n"
                 + "3d sphere NAME x X y Y z Z size SIZE color COLOR\n"
+                + "3d camera NAME x X y Y z Z w W h H d D color COLOR\n"
+                + "3d spawn NAME x X y Y z Z size SIZE color COLOR\n"
+                + "3d plane NAME x X y Y z Z w W h H d D color COLOR\n"
                 + "3d duplicate SOURCE NAME | 3d move NAME DX DY DZ | 3d rotate NAME RX RY RZ\n"
-                + "3d scale NAME FACTOR | 3d color NAME COLOR | 3d rename OLD NEW | 3d delete NAME\n"
-                + "The current 3D renderer is an isometric primitive renderer, not a full mesh/camera engine.\n\n"
+                + "3d scale NAME FACTOR | 3d color NAME COLOR | 3d texture NAME smooth|grid|metal|wood|stone\n"
+                + "3d rename OLD NEW | 3d delete NAME | 3d save FILE.trgscene | 3d load FILE.trgscene\n"
+                + "DESKTOP 3D EDITOR\n"
+                + "W A S D move the editor camera; Q/E move vertically; arrow keys look around.\n"
+                + "Right-drag to orbit, mouse wheel to zoom, drag assets into the viewport, right-click models for properties.\n\n"
                 + "Commands ignore letter case. Colors accept #RRGGBB or 0xRRGGBB.";
         TextView text = new TextView(this);
         text.setText(guide);
