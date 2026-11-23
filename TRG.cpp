@@ -5780,6 +5780,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             GetModuleHandleW(nullptr), nullptr);
         SendMessageW(codeEditor, EM_SETLIMITTEXT, 8 * 1024 * 1024, 0);
         setOpenButtonFont(window);
+        restoreDesktopAutosave();
         if (codeEditor && richEditModule) {
             SendMessageW(codeEditor, EM_SETBKGNDCOLOR, 0, RGB(19, 13, 31));
             CHARFORMAT2W baseFormat = {};
@@ -5872,6 +5873,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         if (!loadingEditorText && !highlightingEditor) {
             editorDirty = true;
             updateEditorWindowTitle();
+            SetTimer(window, 2, 500, nullptr);
             applyEditorSyntaxHighlighting();
         }
         return 0;
@@ -5954,6 +5956,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             loadingEditorText = true;
             SetWindowTextW(codeEditor, L"");
             loadingEditorText = false;
+            saveDesktopAutosave();
             SetWindowTextW(previewButton, L"Preview");
             outputBuffer.clear();
             projectRoot = std::filesystem::current_path();
@@ -6017,6 +6020,11 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 return 0;
             }
         }
+    }
+    if (message == WM_TIMER && wParam == 2) {
+        KillTimer(window, 2);
+        saveDesktopAutosave();
+        return 0;
     }
     if (message == WM_TIMER) {
         const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - uiStart).count();
@@ -6365,7 +6373,8 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         return 0;
     }
     if (message == WM_CLOSE) {
-        if (!confirmDiscardEditorChanges(window)) return 0;
+        KillTimer(window, 2);
+        saveDesktopAutosave();
         DestroyWindow(window);
         return 0;
     }
@@ -6742,6 +6751,7 @@ bool loadSourceFile(const std::filesystem::path& path) {
     projectRoot = currentSourcePath.parent_path();
     editorDirty = false;
     previewMode = false;
+    saveDesktopAutosave();
     if (previewButton) SetWindowTextW(previewButton, L"Preview");
     updateEditorWindowTitle();
     layoutOutputControls(mainWindow);
@@ -6749,6 +6759,75 @@ bool loadSourceFile(const std::filesystem::path& path) {
     appendOutput("Opened: " + currentSourcePath.u8string() + "\r\n");
     InvalidateRect(mainWindow, nullptr, TRUE);
     return true;
+}
+
+std::filesystem::path desktopAutosavePath() {
+    static const std::filesystem::path path = [] {
+        const DWORD required = GetEnvironmentVariableW(L"LOCALAPPDATA", nullptr, 0);
+        if (required > 1) {
+            std::wstring root(static_cast<std::size_t>(required), L'\0');
+            const DWORD copied = GetEnvironmentVariableW(L"LOCALAPPDATA", root.data(), required);
+            if (copied > 0 && copied < required) {
+                root.resize(copied);
+                return std::filesystem::path(root) / L"TRG Studio" / L"desktop-autosave.trg";
+            }
+        }
+        return std::filesystem::temp_directory_path() / L"TRG Studio" / L"desktop-autosave.trg";
+    }();
+    return path;
+}
+
+void saveDesktopAutosave() {
+    if (!codeEditor) return;
+    try {
+        const std::filesystem::path path = desktopAutosavePath();
+        std::filesystem::create_directories(path.parent_path());
+        const int length = GetWindowTextLengthW(codeEditor);
+        std::wstring wideSource(static_cast<std::size_t>(length) + 1, L'\0');
+        GetWindowTextW(codeEditor, wideSource.data(), length + 1);
+        wideSource.resize(static_cast<std::size_t>(length));
+        const std::string source = utf8FromWide(wideSource);
+        std::ofstream output(path, std::ios::binary | std::ios::trunc);
+        if (!output) return;
+        output.write(source.data(), static_cast<std::streamsize>(source.size()));
+        if (!output) return;
+        std::ofstream metadata(path.string() + ".meta", std::ios::binary | std::ios::trunc);
+        if (metadata) metadata << currentSourcePath.u8string() << "\n" << (editorDirty ? "1" : "0");
+    } catch (...) {
+        // Autosave is best-effort and must never interrupt editing.
+    }
+}
+
+void restoreDesktopAutosave() {
+    if (!codeEditor) return;
+    try {
+        const std::filesystem::path path = desktopAutosavePath();
+        std::ifstream input(path, std::ios::binary);
+        if (!input) return;
+        std::ostringstream contents;
+        contents << input.rdbuf();
+        const std::string source = contents.str();
+        std::string sourcePath;
+        bool wasDirty = true;
+        std::ifstream metadata(path.string() + ".meta", std::ios::binary);
+        if (metadata) {
+            std::getline(metadata, sourcePath);
+            std::string dirty;
+            std::getline(metadata, dirty);
+            wasDirty = dirty != "0";
+        }
+        loadingEditorText = true;
+        SetWindowTextW(codeEditor, wideFromUtf8(source).c_str());
+        loadingEditorText = false;
+        if (!sourcePath.empty()) {
+            currentSourcePath = std::filesystem::u8path(sourcePath);
+            projectRoot = currentSourcePath.parent_path();
+        }
+        editorDirty = wasDirty;
+        updateEditorWindowTitle();
+    } catch (...) {
+        loadingEditorText = false;
+    }
 }
 
 bool saveSourceFile() {
@@ -6773,6 +6852,7 @@ bool saveSourceFile() {
     projectRoot = currentSourcePath.parent_path();
     editorDirty = false;
     updateEditorWindowTitle();
+    saveDesktopAutosave();
     appendOutput("Saved: " + currentSourcePath.u8string() + "\r\n");
     return true;
 }
@@ -6792,7 +6872,7 @@ bool launchDesktopVisualEditor(const std::string& fileName) {
 
     if (!desktopVisualEditorActive) {
         const int length = GetWindowTextLengthW(codeEditor);
-        std::wstring current(static_cast<std::size_t>(length) + 1, L'\\0');
+        std::wstring current(static_cast<std::size_t>(length) + 1, L'\0');
         GetWindowTextW(codeEditor, current.data(), length + 1);
         current.resize(static_cast<std::size_t>(length));
         desktopPreviousSource = current;
