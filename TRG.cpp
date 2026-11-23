@@ -574,6 +574,8 @@ std::unordered_map<std::string, std::unique_ptr<Gdiplus::Image>> desktopSpriteCa
 bool runSourceFile(const std::filesystem::path& path);
 bool loadSourceFile(const std::filesystem::path& path);
 bool saveSourceFile();
+void saveDesktopAutosave();
+void restoreDesktopAutosave();
 bool runEditorSource();
 void applyEditorSyntaxHighlighting();
 bool launchDesktopVisualEditor(const std::string& fileName);
