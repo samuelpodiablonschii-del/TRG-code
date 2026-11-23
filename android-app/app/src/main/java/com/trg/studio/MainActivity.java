@@ -164,10 +164,34 @@ public final class MainActivity extends Activity {
 
     private final class LineNumberEditText extends EditText {
         LineNumberEditText() { super(MainActivity.this); }
+
         @Override
         protected void onScrollChanged(int x, int y, int oldX, int oldY) {
             super.onScrollChanged(x, y, oldX, oldY);
             if (lineNumbers != null) lineNumbers.scrollTo(0, y);
+        }
+
+        @Override
+        public boolean onKeyDown(int keyCode, android.view.KeyEvent event) {
+            if (keyCode == android.view.KeyEvent.KEYCODE_ENTER &&
+                    event.getAction() == android.view.KeyEvent.ACTION_DOWN) {
+                int start = getSelectionStart();
+                int end = getSelectionEnd();
+                Editable content = getText();
+                if (start == end && start > 0 && start < content.length() &&
+                        content.charAt(start - 1) == '(' && content.charAt(start) == ')') {
+                    int lineStart = start - 1;
+                    while (lineStart > 0 && content.charAt(lineStart - 1) != '\\n') lineStart--;
+                    int indent = 0;
+                    while (lineStart + indent < content.length() &&
+                            content.charAt(lineStart + indent) == ' ') indent++;
+                    String insertion = "\\n" + repeatSpaces(indent + 4) + "\\n" + repeatSpaces(indent);
+                    content.replace(start, end, insertion);
+                    setSelection(start + 1 + indent + 4);
+                    return true;
+                }
+            }
+            return super.onKeyDown(keyCode, event);
         }
     }
 
@@ -373,6 +397,17 @@ sourceText = exampleSource;
 
             @Override
             public void onTextChanged(CharSequence value, int start, int before, int count) {
+                if (!formattingEditor && count == 1 && before == 0 &&
+                        start < value.length() && value.charAt(start) == '(') {
+                    Editable editable = editor.getText();
+                    if (start + 1 >= editable.length() || editable.charAt(start + 1) != ')') {
+                        formattingEditor = true;
+                        editable.insert(start + 1, ")");
+                        editor.setSelection(start + 1);
+                        formattingEditor = false;
+                    }
+                    value = editor.getText();
+                }
                 sourceText = value.toString();
                 openDocuments.put(currentDocumentName, sourceText);
                 scheduleWorkspaceSave();
@@ -683,18 +718,18 @@ sourceText = exampleSource;
         text.setTextColor(Color.WHITE);
         text.setPadding(dp(16), dp(12), dp(16), dp(12));
         android.graphics.drawable.GradientDrawable dictionaryPanel = new android.graphics.drawable.GradientDrawable();
-        dictionaryPanel.setColor(Color.rgb(7, 7, 12));
+        dictionaryPanel.setColor(Color.BLACK);
         dictionaryPanel.setCornerRadius(dp(12));
         dictionaryPanel.setStroke(dp(2), Color.rgb(139, 92, 246));
         text.setBackground(dictionaryPanel);
         ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(Color.rgb(7, 7, 12));
+        scroll.setBackgroundColor(Color.BLACK);
         scroll.addView(text);
         AlertDialog dictionaryDialog = new AlertDialog.Builder(this).setTitle("TRG language guide")
                 .setView(scroll).setPositiveButton("Close", null).create();
         dictionaryDialog.setOnShowListener(ignored -> {
             if (dictionaryDialog.getWindow() != null)
-                dictionaryDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.rgb(7, 7, 12)));
+                dictionaryDialog.getWindow().setBackgroundDrawable(new android.graphics.drawable.ColorDrawable(Color.BLACK));
             dictionaryDialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(Color.rgb(190, 160, 255));
         });
         dictionaryDialog.show();
