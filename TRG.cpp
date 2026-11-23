@@ -7232,25 +7232,43 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         desktop3DDraggingCamera = false;
         const POINT point = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
         if (!desktop3DRightClickMoved) {
+            bool selectedObject = false;
             for (auto hit = desktop3DProjectedHits.rbegin(); hit != desktop3DProjectedHits.rend(); ++hit) {
                 if (!PtInRect(&hit->second, point)) continue;
                 desktop3DSelectedName = hit->first;
-                RECT client = {};
-                GetClientRect(window, &client);
+                selectedObject = true;
+                break;
+            }
+            if (!selectedObject && PtInRect(&desktop3DHierarchyRect, point)) {
+                const LONG rowTop = desktop3DHierarchyRect.top + scaleForDpi(window, 60);
+                const LONG rowHeight = scaleForDpi(window, 25);
+                const int row = static_cast<int>((point.y - rowTop) / rowHeight) + desktop3DHierarchyScroll;
+                if (row >= 0 && static_cast<std::size_t>(row) < ui3DObjects.size()) {
+                    desktop3DSelectedName = ui3DObjects[static_cast<std::size_t>(row)].name;
+                    selectedObject = true;
+                }
+            }
+            if (selectedObject) {
                 const LONG popupWidth = scaleForDpi(window, 224);
                 const LONG popupHeight = scaleForDpi(window, 236);
-                const LONG x = std::clamp<LONG>(point.x, desktop3DViewportRect.left + 4,
-                    std::max<LONG>(desktop3DViewportRect.left + 4,
-                        desktop3DViewportRect.right - popupWidth - 4));
-                const LONG y = std::clamp<LONG>(point.y, desktop3DViewportRect.top + 4,
-                    std::max<LONG>(desktop3DViewportRect.top + 4,
-                        desktop3DViewportRect.bottom - popupHeight - 4));
+                LONG minX = desktop3DViewportRect.left + 4;
+                LONG maxX = desktop3DViewportRect.right - popupWidth - 4;
+                LONG minY = desktop3DViewportRect.top + 4;
+                LONG maxY = desktopLayout(window, RECT{0, 0,
+                    desktop3DViewportRect.right + scaleForDpi(window, 300),
+                    desktop3DViewportRect.bottom + scaleForDpi(window, 200)}).panelTop;
+                if (PtInRect(&desktop3DHierarchyRect, point)) {
+                    minX = desktop3DHierarchyRect.right + scaleForDpi(window, 6);
+                    maxX = std::max<LONG>(minX, client.right - popupWidth - scaleForDpi(window, 10));
+                }
+                maxY = std::max<LONG>(minY, maxY - popupHeight - scaleForDpi(window, 4));
+                const LONG x = std::clamp<LONG>(point.x, minX, maxX);
+                const LONG y = std::clamp<LONG>(point.y, minY, maxY);
                 desktop3DContextRect = {x, y, x + popupWidth, y + popupHeight};
                 desktop3DContextPoint = point;
                 desktop3DContextOpen = true;
                 syncDesktop3DEditorState();
                 InvalidateRect(window, nullptr, FALSE);
-                break;
             }
         }
         return 0;
