@@ -7297,6 +7297,16 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                     SelectObject(dc, previousDetailPen);
                     DeleteObject(detailPen);
                 }
+                if (desktop3DEngineActive && model.name == desktop3DSelectedName) {
+                    HPEN selectedPen = CreatePen(PS_SOLID, 2, RGB(196, 164, 255));
+                    HGDIOBJ oldSelectedPen = SelectObject(dc, selectedPen);
+                    HGDIOBJ oldSelectedBrush = SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+                    Ellipse(dc, sphereArea.left - 5, sphereArea.top - 5,
+                        sphereArea.right + 5, sphereArea.bottom + 5);
+                    SelectObject(dc, oldSelectedBrush);
+                    SelectObject(dc, oldSelectedPen);
+                    DeleteObject(selectedPen);
+                }
                 SelectObject(dc, oldBrush); SelectObject(dc, oldPen);
                 DeleteObject(sphereBrush); DeleteObject(spherePen);
                 continue;
@@ -7311,6 +7321,16 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 Polyline(dc, lens, 3);
                 MoveToEx(dc, shapeCenterX + 24, shapeCenterY + 12, nullptr);
                 LineTo(dc, shapeCenterX + 12, shapeCenterY + 5);
+                if (desktop3DEngineActive && model.name == desktop3DSelectedName) {
+                    HPEN selectionPen = CreatePen(PS_SOLID, 2, RGB(196, 164, 255));
+                    HGDIOBJ oldSelectionPen = SelectObject(dc, selectionPen);
+                    HGDIOBJ oldSelectionBrush = SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+                    Rectangle(dc, shapeCenterX - 19, shapeCenterY - 14,
+                        shapeCenterX + 29, shapeCenterY + 14);
+                    SelectObject(dc, oldSelectionBrush);
+                    SelectObject(dc, oldSelectionPen);
+                    DeleteObject(selectionPen);
+                }
                 SelectObject(dc, oldCameraPen);
                 DeleteObject(cameraPen);
                 continue;
