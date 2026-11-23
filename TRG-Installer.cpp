@@ -173,22 +173,40 @@ void writeEmbeddedFile(UINT resourceId, const std::filesystem::path& destination
     const DWORD size = SizeofResource(module, resource);
     if (!loaded || !data || size == 0) throw std::runtime_error("Could not read an embedded installation file.");
 
-    std::ofstream output(destination, std::ios::binary | std::ios::trunc);
-    if (!output) throw std::runtime_error("Could not create an installation file.");
     updateProgress(L"Installing " + displayName + L"...");
+    HANDLE output = CreateFileW(destination.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                                FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (output == INVALID_HANDLE_VALUE) {
+        const DWORD error = GetLastError();
+        throw std::runtime_error("Could not create installation file '" +
+            destination.string() + "' (Windows error " + std::to_string(error) +
+            "). Check folder permissions, antivirus protection, and available disk space.");
+    }
+
     constexpr DWORD chunkSize = 64 * 1024;
     DWORD offset = 0;
     while (offset < size) {
         const DWORD count = (std::min)(chunkSize, size - offset);
-        output.write(reinterpret_cast<const char*>(data + offset), count);
-        if (!output) throw std::runtime_error("Could not write an installation file.");
-        offset += count;
-        completedStorage += count;
+        DWORD written = 0;
+        if (!WriteFile(output, data + offset, count, &written, nullptr) || written != count) {
+            const DWORD error = GetLastError();
+            CloseHandle(output);
+            throw std::runtime_error("Could not write installation file '" +
+                destination.string() + "' (Windows error " + std::to_string(error) + ").");
+        }
+        offset += written;
+        completedStorage += written;
         updateProgress(L"Installing " + displayName + L"...");
         Sleep(12);
     }
-    output.close();
-    if (!output) throw std::runtime_error("Could not finish writing an installation file.");
+
+    if (!FlushFileBuffers(output)) {
+        const DWORD error = GetLastError();
+        CloseHandle(output);
+        throw std::runtime_error("Could not finish writing installation file '" +
+            destination.string() + "' (Windows error " + std::to_string(error) + ").");
+    }
+    CloseHandle(output);
 }
 
 [[maybe_unused]] void setRegistryString(HKEY root, const std::wstring& keyName, const std::wstring& valueName,
@@ -213,10 +231,10 @@ void registerTrgFileType() {
     setRegistryString(HKEY_LOCAL_MACHINE, L"Software\\Classes\\" + applicationId, L"", L"TRG source file");
     setRegistryString(HKEY_LOCAL_MACHINE,
         L"Software\\Classes\\" + applicationId + L"\\DefaultIcon", L"",
-        L"\"" + runtimePath.wstring() + L"\",0");
+        L"\\\"" + runtimePath.wstring() + L"\\\",0");
     setRegistryString(HKEY_LOCAL_MACHINE,
         L"Software\\Classes\\" + applicationId + L"\\shell\\open\\command", L"",
-        L"\"" + runtimePath.wstring() + L"\" \"%1\"");
+        L"\\\"" + runtimePath.wstring() + L"\\\" \\\"%1\\\"");
     SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
 #endif
 }
@@ -268,7 +286,7 @@ void installPackage() {
 
 void openExample() {
     const HINSTANCE result = ShellExecuteW(installerWindow, L"open", runtimePath.c_str(),
-        (L"\"" + examplePath.wstring() + L"\"").c_str(), installDirectory.c_str(), SW_SHOWNORMAL);
+        (L"\\\"" + examplePath.wstring() + L"\\\"").c_str(), installDirectory.c_str(), SW_SHOWNORMAL);
     if (reinterpret_cast<INT_PTR>(result) <= 32) {
         MessageBoxW(installerWindow, L"TRG was installed, but the example could not be opened.",
                     L"TRG Installer", MB_OK | MB_ICONERROR);
