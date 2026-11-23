@@ -569,6 +569,7 @@ HWND terminalInputControl = nullptr;
 HWND terminalSendButton = nullptr;
 HWND dictionaryWindow = nullptr;
 HWND dictionaryEdit = nullptr;
+HFONT dictionaryFont = nullptr;
 HBRUSH terminalInputBrush = nullptr;
 HBRUSH outputControlBrush = nullptr;
 HBRUSH dictionaryEditBrush = nullptr;
@@ -896,10 +897,11 @@ LRESULT CALLBACK dictionaryWindowProc(HWND window, UINT message, WPARAM wParam, 
             WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE |
                 ES_READONLY | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_NOHIDESEL,
             0, 0, 100, 100, window, nullptr, GetModuleHandleW(nullptr), nullptr);
-        HFONT font = CreateFontW(-15, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+        dictionaryFont = CreateFontW(-15, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
             FIXED_PITCH | FF_MODERN, L"Consolas");
-        if (dictionaryEdit && font) SendMessageW(dictionaryEdit, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+        if (dictionaryEdit && dictionaryFont)
+            SendMessageW(dictionaryEdit, WM_SETFONT, reinterpret_cast<WPARAM>(dictionaryFont), TRUE);
         return 0;
     }
     if (message == WM_CTLCOLOREDIT && reinterpret_cast<HWND>(lParam) == dictionaryEdit) {
@@ -921,7 +923,9 @@ LRESULT CALLBACK dictionaryWindowProc(HWND window, UINT message, WPARAM wParam, 
         dictionaryWindow = nullptr;
         dictionaryEdit = nullptr;
         if (dictionaryEditBrush) DeleteObject(dictionaryEditBrush);
+        if (dictionaryFont) DeleteObject(dictionaryFont);
         dictionaryEditBrush = nullptr;
+        dictionaryFont = nullptr;
         return 0;
     }
     return DefWindowProcW(window, message, wParam, lParam);
@@ -3277,7 +3281,15 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 trgStudioActionAndroid(tokens[1]);
             }
 #else
+#ifdef _WIN32
+            if (tokens.size() == 2 && lower(tokens[1]) == "code" && desktopVisualEditorActive) {
+                returnFromDesktopVisualEditor();
+            } else {
+                reportError(i + 1, "desktop studio supports studio code while a built-in visual editor is open");
+            }
+#else
             reportError(i + 1, "studio actions are only available in TRG Studio");
+#endif
 #endif
             continue;
         }
@@ -6377,6 +6389,8 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         }
         if (terminalInputControl && codeEditorFont)
             SendMessageW(terminalInputControl, WM_SETFONT, reinterpret_cast<WPARAM>(codeEditorFont), TRUE);
+        if (outputControl && codeEditorFont)
+            SendMessageW(outputControl, WM_SETFONT, reinterpret_cast<WPARAM>(codeEditorFont), TRUE);
         if (terminalSendButton && openButtonFont)
             SendMessageW(terminalSendButton, WM_SETFONT, reinterpret_cast<WPARAM>(openButtonFont), TRUE);
         terminalInputBrush = CreateSolidBrush(RGB(12, 9, 19));
