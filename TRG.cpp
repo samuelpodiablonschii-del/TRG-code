@@ -6206,6 +6206,9 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         editor3DButton = CreateWindowExW(0, L"BUTTON", L"3D Engine",
             WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(editor3DButtonId), GetModuleHandleW(nullptr), nullptr);
+        exportButton = CreateWindowExW(0, L"BUTTON", L"Export .TRG",
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
+            reinterpret_cast<HMENU>(exportButtonId), GetModuleHandleW(nullptr), nullptr);
         richEditModule = LoadLibraryW(L"Msftedit.dll");
         const wchar_t* editorClass = richEditModule ? MSFTEDIT_CLASS : L"EDIT";
         codeEditor = CreateWindowExW(WS_EX_CLIENTEDGE, editorClass, L"",
