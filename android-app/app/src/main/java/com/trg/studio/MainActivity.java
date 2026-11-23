@@ -548,7 +548,8 @@ sourceText = exampleSource;
             String result = nativeRun(source);
             runOnUiThread(() -> {
                 applyState(result);
-                showProgramPreview();
+                showProgramPreview(name.equalsIgnoreCase("2D Editor"),
+                        name.equalsIgnoreCase("3D Editor"));
             });
         });
     }
@@ -1038,6 +1039,10 @@ sourceText = exampleSource;
     private void showProgramPreview() {
         boolean editor2D = "2DEditor.trg".equalsIgnoreCase(currentDocumentName);
         boolean editor3D = "3DEditor.trg".equalsIgnoreCase(currentDocumentName);
+        showProgramPreview(editor2D, editor3D);
+    }
+
+    private void showProgramPreview(boolean editor2D, boolean editor3D) {
         PreviewView programPreview = new PreviewView(false, editor2D, editor3D);
         JSONObject previewSnapshot;
         try { previewSnapshot = new JSONObject(lastRunState.toString()); }
@@ -1810,7 +1815,9 @@ sourceText = exampleSource;
             paint.setTypeface(fixedUiFontBold);
             paint.setTextSize(dp(10));
             paint.setTextAlign(Paint.Align.LEFT);
-            canvas.drawText("DRAG OBJECT  •  TWO FINGERS: ORBIT + ZOOM", dp(12), height - dp(14), paint);
+            float hintY = editor3D ? height * 0.615f : height - dp(14);
+            canvas.drawText(editor3D ? "DRAG MODEL  •  PINCH TO ORBIT + ZOOM"
+                    : "DRAG OBJECT  •  TWO FINGERS: ORBIT + ZOOM", dp(12), hintY, paint);
         }
 
         private void drawSelected2DOutline(Canvas canvas, float width, float height) {
@@ -1934,11 +1941,21 @@ sourceText = exampleSource;
                 paint.setTextAlign("center".equals(text.optString("align")) ? Paint.Align.CENTER :
                         "right".equals(text.optString("align")) ? Paint.Align.RIGHT : Paint.Align.LEFT);
                 paint.setTypeface(text.optBoolean("bold", true) ? fixedUiFontBold : fixedUiFont);
-                paint.setTextSize((float) (height * text.optDouble("size") / 100));
+                String textValue = text.optString("value");
+                float textSize = (float) (Math.min(width, height) * text.optDouble("size") / 100);
+                paint.setTextSize(Math.max(dp(6), textSize));
                 float[] textPosition = animatedPosition(text.optString("name"),
                         (float) text.optDouble("x"), (float) text.optDouble("y"), elapsed, animations);
-                canvas.drawText(text.optString("value"),
-                        textPosition[0] * width / 100, textPosition[1] * height / 100, paint);
+                float textX = textPosition[0] * width / 100;
+                float textY = textPosition[1] * height / 100;
+                float availableTextWidth = paint.getTextAlign() == Paint.Align.RIGHT
+                        ? textX : paint.getTextAlign() == Paint.Align.CENTER
+                        ? 2f * Math.min(textX, width - textX) : width - textX;
+                float measuredTextWidth = paint.measureText(textValue);
+                if (measuredTextWidth > availableTextWidth && availableTextWidth > dp(6)) {
+                    paint.setTextSize(paint.getTextSize() * availableTextWidth / measuredTextWidth);
+                }
+                canvas.drawText(textValue, textX, textY, paint);
             }
             drawSelected2DOutline(canvas, width, height);
             JSONArray buttons = state.optJSONArray("buttons");
@@ -1968,7 +1985,13 @@ sourceText = exampleSource;
                             Math.min(1f, (float) button.optDouble("opacity", 1.0)))), Color.red(labelColor),
                             Color.green(labelColor), Color.blue(labelColor)));
                     paint.setTypeface(button.optBoolean("bold", true) ? fixedUiFontBold : fixedUiFont);
-                    paint.setTextSize((float) (button.optDouble("text_size", 0.34) * buttonRect.height()));
+                    paint.setTextSize((float) (button.optDouble("text_size", 0.34)
+                            * Math.min(buttonRect.height(), buttonRect.width())));
+                    float labelWidth = paint.measureText(button.optString("label"));
+                    float labelLimit = buttonRect.width() * 0.88f;
+                    if (labelWidth > labelLimit && labelWidth > 0) {
+                        paint.setTextSize(paint.getTextSize() * labelLimit / labelWidth);
+                    }
                     canvas.drawText(button.optString("label"), (left + right) / 2,
                             (top + bottom) / 2 - (paint.ascent() + paint.descent()) / 2, paint);
                 }
