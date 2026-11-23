@@ -5058,6 +5058,26 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     reportError(i + 1, "3D scene contains invalid or incomplete object data", scenePath.string()); continue;
                 }
                 ui3DObjects = std::move(loadedObjects);
+                if (variables.count("objects") && types["objects"] == "list") {
+                    if (auto* names = std::get_if<VariableList>(&variables["objects"].value)) {
+                        names->clear();
+                        names->reserve(ui3DObjects.size());
+                        for (const Ui3DObject& item : ui3DObjects)
+                            names->push_back(std::make_shared<VariableValue>(item.name));
+                    }
+                }
+                if (variables.count("objectCount")) {
+                    variables["objectCount"] = static_cast<double>(ui3DObjects.size());
+                    types["objectCount"] = "num";
+                }
+                if (variables.count("selectedIndex")) {
+                    variables["selectedIndex"] = 0.0;
+                    types["selectedIndex"] = "num";
+                }
+                if (variables.count("selectedName")) {
+                    variables["selectedName"] = ui3DObjects.empty() ? std::string() : ui3DObjects.front().name;
+                    types["selectedName"] = "word";
+                }
                 appendOutput("Loaded 3D scene: " + scenePath.string() + "\r\n");
                 continue;
             }
