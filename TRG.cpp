@@ -1087,6 +1087,10 @@ void appendOutput(const std::string& text) {
     if (mainWindow) InvalidateRect(mainWindow, nullptr, FALSE);
 #endif
 }
+void clearDesktopOutput() {
+    outputBuffer.clear();
+    if (outputControl) SetWindowTextW(outputControl, L"");
+}
 #else
 void appendOutput(const std::string& text) {
 #ifdef __ANDROID__
@@ -6436,7 +6440,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             loadingEditorText = false;
             saveDesktopAutosave();
             SetWindowTextW(previewButton, L"Preview");
-            outputBuffer.clear();
+            clearDesktopOutput();
             projectRoot = std::filesystem::current_path();
             uiBlocks.clear(); ui3DObjects.clear(); uiSprites.clear(); uiAnimations.clear();
             everyTasks.clear(); uiButtons.clear(); uiTexts.clear();
@@ -6713,12 +6717,16 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                     (buttonY + button->height) * canvasHeight / 100.0)
             };
             if (PtInRect(&area, POINT{mouseX, mouseY})) {
-                outputBuffer.clear();
+                clearDesktopOutput();
                 appendOutput("--- " + button->label + " ---\r\n");
                 conditionIsTrue("false", uiVariables);
                 Flow flow;
                 executeBlock(button->body, 0, button->body.size(), uiVariables, uiTypes,
                              uiDefaults, flow, false, true);
+                if (desktop3DEngineActive) {
+                    desktop3DSelectedName = static_cast<std::string>(uiVariables["selectedName"]);
+                    syncDesktop3DEditorState();
+                }
                 refreshCollisionWatches(uiVariables, uiTypes);
                 if (flow.stopped) everyTasks.clear();
                 if (!uiAnimations.empty() || !everyTasks.empty()) SetTimer(window, 1, 16, nullptr);
@@ -6951,6 +6959,8 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         const LONG viewportBottom = layout.headerHeight + static_cast<LONG>(canvasHeight * 0.78);
         desktop3DViewportRect = {viewportLeft, viewportTop, viewportRight, viewportBottom};
         if (desktop3DEngineActive && previewMode) {
+            desktop3DWorldScale = std::min<LONG>(viewportRight - viewportLeft,
+                viewportBottom - viewportTop) * 0.19 * desktop3DZoom;
             IntersectClipRect(dc, viewportLeft, viewportTop, viewportRight, viewportBottom);
             desktop3DProjectedHits.clear();
         }
@@ -7033,6 +7043,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                         sphereArea.right + 5, sphereArea.bottom + 5);
                     MoveToEx(dc, shapeCenterX, sphereArea.top - 12, nullptr);
                     LineTo(dc, shapeCenterX, sphereArea.bottom + 12);
+                    SelectObject(dc, sphereBrush);
                     Ellipse(dc, sphereArea.left, sphereArea.top, sphereArea.right, sphereArea.bottom);
                 } else {
                     Ellipse(dc, sphereArea.left, sphereArea.top, sphereArea.right, sphereArea.bottom);
@@ -7085,9 +7096,9 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                     else if (model.texture == "wood") hatch = HS_FDIAGONAL;
                     else if (model.texture == "stone") hatch = HS_BDIAGONAL;
                     HBRUSH textureBrush = CreateHatchBrush(hatch,
-                        RGB(static_cast<BYTE>(std::min(255, red + 28)),
-                            static_cast<BYTE>(std::min(255, green + 28)),
-                            static_cast<BYTE>(std::min(255, blue + 28))));
+                        RGB(static_cast<BYTE>(std::min(255u, red + 28u)),
+                            static_cast<BYTE>(std::min(255u, green + 28u)),
+                            static_cast<BYTE>(std::min(255u, blue + 28u))));
                     HGDIOBJ oldTextureBrush = SelectObject(dc, textureBrush);
                     const int previousBackgroundMode = SetBkMode(dc, TRANSPARENT);
                     Polygon(dc, polygon, 4);
@@ -7181,7 +7192,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                     rowRight, rowTop + rowHeight};
                 DrawTextW(dc, L"No objects yet", -1, &emptyRow, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
             }
-            for (std::size_t index = 0; index < ui3DObjects.size() && index < 15; ++index) {
+            for (std::size_t index = 0; index < ui3DObjects.size() && index < 11; ++index) {
                 const Ui3DObject& model = ui3DObjects[index];
                 RECT row = {rowLeft, rowTop + static_cast<LONG>(index) * rowHeight,
                     rowRight, rowTop + static_cast<LONG>(index + 1) * rowHeight};
@@ -7671,7 +7682,7 @@ bool loadSourceFile(const std::filesystem::path& path) {
     if (previewButton) SetWindowTextW(previewButton, L"Preview");
     updateEditorWindowTitle();
     layoutOutputControls(mainWindow);
-    outputBuffer.clear();
+    clearDesktopOutput();
     appendOutput("Opened: " + currentSourcePath.u8string() + "\r\n");
     InvalidateRect(mainWindow, nullptr, TRUE);
     return true;
@@ -7813,7 +7824,7 @@ bool launchDesktopVisualEditor(const std::string& fileName) {
     }
     currentSourcePath.clear();
     projectRoot = std::filesystem::current_path();
-    outputBuffer.clear();
+    clearDesktopOutput();
     appendOutput("Opening built-in " + fileName + " workspace...\r\n\r\n");
     std::istringstream builtInStream(embeddedSource);
     const std::vector<std::string> builtInProgram = readProgram(builtInStream);
@@ -7858,7 +7869,7 @@ bool runEditorSource() {
     const std::string source = utf8FromWide(wideSource);
     if (!currentSourcePath.empty()) projectRoot = currentSourcePath.parent_path();
     else projectRoot = std::filesystem::current_path();
-    outputBuffer.clear();
+    clearDesktopOutput();
     appendOutput("Running: " + (currentSourcePath.empty() ? std::string("Untitled.trg") : currentSourcePath.u8string()) + "\r\n\r\n");
     std::istringstream input(source);
     executeProgram(readProgram(input));
