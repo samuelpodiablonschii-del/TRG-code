@@ -5781,11 +5781,11 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         SendMessageW(codeEditor, EM_SETLIMITTEXT, 8 * 1024 * 1024, 0);
         setOpenButtonFont(window);
         if (codeEditor && richEditModule) {
-            SendMessageW(codeEditor, EM_SETBKGNDCOLOR, 0, RGB(13, 22, 33));
+            SendMessageW(codeEditor, EM_SETBKGNDCOLOR, 0, RGB(19, 13, 31));
             CHARFORMAT2W baseFormat = {};
             baseFormat.cbSize = sizeof(baseFormat);
             baseFormat.dwMask = CFM_COLOR | CFM_FACE | CFM_SIZE | CFM_BOLD;
-            baseFormat.crTextColor = RGB(220, 234, 243);
+            baseFormat.crTextColor = RGB(239, 232, 250);
             baseFormat.yHeight = 195;
             baseFormat.dwEffects = 0;
             std::wcsncpy(baseFormat.szFaceName, L"Consolas", LF_FACESIZE - 1);
@@ -5799,16 +5799,16 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
     if (message == WM_DRAWITEM) {
         auto* item = reinterpret_cast<DRAWITEMSTRUCT*>(lParam);
         if (item && item->CtlType == ODT_BUTTON) {
-            COLORREF fill = RGB(29, 48, 65);
-            COLORREF textColor = RGB(226, 239, 246);
+            COLORREF fill = RGB(43, 31, 63);
+            COLORREF textColor = RGB(244, 238, 252);
             switch (item->CtlID) {
-                case runButtonId: fill = RGB(20, 119, 111); break;
-                case previewButtonId: fill = RGB(35, 76, 91); break;
-                case buildButtonId: fill = RGB(35, 63, 82); break;
-                case newButtonId: fill = RGB(47, 56, 72); break;
-                case dictionaryButtonId: fill = RGB(35, 48, 65); break;
+                case runButtonId: fill = RGB(103, 69, 168); break;
+                case previewButtonId: fill = RGB(76, 49, 123); break;
+                case buildButtonId: fill = RGB(64, 45, 94); break;
+                case newButtonId: fill = RGB(53, 39, 75); break;
+                case dictionaryButtonId: fill = RGB(48, 35, 68); break;
                 case editor2DButtonId:
-                case editor3DButtonId: fill = RGB(27, 59, 72); break;
+                case editor3DButtonId: fill = RGB(82, 55, 133); break;
                 default: break;
             }
             if (item->itemState & ODS_SELECTED) {
@@ -5817,7 +5817,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             }
             RECT area = item->rcItem;
             HBRUSH brush = CreateSolidBrush(fill);
-            HPEN pen = CreatePen(PS_SOLID, 1, RGB(48, 76, 94));
+            HPEN pen = CreatePen(PS_SOLID, 1, RGB(104, 76, 151));
             HGDIOBJ oldBrush = SelectObject(item->hDC, brush);
             HGDIOBJ oldPen = SelectObject(item->hDC, pen);
             RoundRect(item->hDC, area.left + 1, area.top + 1, area.right - 1,
@@ -6044,17 +6044,17 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         HDC dc = BeginPaint(window, &paint);
         RECT client;
         GetClientRect(window, &client);
-        HBRUSH background = CreateSolidBrush(RGB(24, 22, 32));
+        HBRUSH background = CreateSolidBrush(RGB(17, 12, 27));
         FillRect(dc, &client, background);
         DeleteObject(background);
         const DesktopLayout layout = desktopLayout(window, client);
         RECT header = {0, 0, layout.width, layout.headerHeight};
-        HBRUSH headerBrush = CreateSolidBrush(RGB(10, 16, 25));
+        HBRUSH headerBrush = CreateSolidBrush(RGB(24, 17, 38));
         FillRect(dc, &header, headerBrush);
         DeleteObject(headerBrush);
         if (layout.headerHeight > 0) {
             RECT accentBar = {0, 0, layout.width, scaleForDpi(window, 4)};
-            HBRUSH accentBrush = CreateSolidBrush(RGB(85, 214, 190));
+            HBRUSH accentBrush = CreateSolidBrush(RGB(155, 105, 255));
             FillRect(dc, &accentBar, accentBrush);
             DeleteObject(accentBrush);
         }
@@ -6073,7 +6073,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         DeleteObject(titleFont);
         const LONG panelTop = layout.panelTop;
         RECT canvas = {0, layout.headerHeight, layout.width, panelTop};
-        HBRUSH canvasBrush = CreateSolidBrush(RGB(12, 20, 30));
+        HBRUSH canvasBrush = CreateSolidBrush(RGB(15, 10, 25));
         FillRect(dc, &canvas, canvasBrush);
         DeleteObject(canvasBrush);
         HFONT bodyFont = CreateFontW(-scaleForDpi(window, 13), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
@@ -6268,7 +6268,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 RECT sphereArea = {static_cast<LONG>(centerX) - radiusX, static_cast<LONG>(centerY) - radiusY,
                     static_cast<LONG>(centerX) + radiusX, static_cast<LONG>(centerY) + radiusY};
                 HBRUSH sphereBrush = CreateSolidBrush(RGB(red, green, blue));
-                HPEN spherePen = CreatePen(PS_SOLID, 1, RGB(35, 27, 49));
+                HPEN spherePen = CreatePen(PS_SOLID, 1, RGB(47, 34, 70));
                 HGDIOBJ oldBrush = SelectObject(dc, sphereBrush), oldPen = SelectObject(dc, spherePen);
                 Ellipse(dc, sphereArea.left, sphereArea.top, sphereArea.right, sphereArea.bottom);
                 SelectObject(dc, oldBrush); SelectObject(dc, oldPen); DeleteObject(sphereBrush); DeleteObject(spherePen);
@@ -6288,7 +6288,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 const COLORREF faceColor = RGB(static_cast<BYTE>(red * shade),
                     static_cast<BYTE>(green * shade), static_cast<BYTE>(blue * shade));
                 HBRUSH faceBrush = CreateSolidBrush(faceColor);
-                HPEN facePen = CreatePen(PS_SOLID, 1, RGB(28, 22, 40));
+                HPEN facePen = CreatePen(PS_SOLID, 1, RGB(38, 27, 57));
                 HGDIOBJ oldBrush = SelectObject(dc, faceBrush), oldPen = SelectObject(dc, facePen);
                 Polygon(dc, polygon, 4);
                 SelectObject(dc, oldBrush); SelectObject(dc, oldPen); DeleteObject(faceBrush); DeleteObject(facePen);
