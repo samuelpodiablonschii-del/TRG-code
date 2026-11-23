@@ -6606,6 +6606,16 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 graphics.DrawImage(image.get(), destination);
             }
         }
+        const int sceneClipSave = SaveDC(dc);
+        const LONG viewportLeft = static_cast<LONG>(canvasWidth * 0.19);
+        const LONG viewportRight = static_cast<LONG>(canvasWidth * 0.80);
+        const LONG viewportTop = layout.headerHeight + static_cast<LONG>(canvasHeight * 0.13);
+        const LONG viewportBottom = layout.headerHeight + static_cast<LONG>(canvasHeight * 0.78);
+        desktop3DViewportRect = {viewportLeft, viewportTop, viewportRight, viewportBottom};
+        if (desktop3DEngineActive && previewMode) {
+            IntersectClipRect(dc, viewportLeft, viewportTop, viewportRight, viewportBottom);
+            desktop3DProjectedHits.clear();
+        }
         const std::array<std::array<int, 4>, 6> modelFaces = {{
             {{0, 1, 2, 3}}, {{4, 5, 6, 7}}, {{0, 3, 7, 4}},
             {{1, 2, 6, 5}}, {{0, 1, 5, 4}}, {{3, 2, 6, 7}}
@@ -6630,9 +6640,12 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             }};
             std::array<std::array<double, 3>, 8> rotated{};
             std::array<POINT, 8> projected{};
-            const double modelScale = std::min(canvasWidth, canvasHeight) * 0.115;
-            const double centerX = canvasWidth * 0.5;
-            const double centerY = layout.headerHeight + canvasHeight * 0.53;
+            const double viewWidth = std::max<LONG>(1, viewportRight - viewportLeft);
+            const double viewHeight = std::max<LONG>(1, viewportBottom - viewportTop);
+            const double modelScale = std::min(viewWidth, viewHeight) * 0.19;
+            desktop3DWorldScale = modelScale * desktop3DZoom;
+            const double centerX = (viewportLeft + viewportRight) * 0.5;
+            const double centerY = (viewportTop + viewportBottom) * 0.5;
             for (std::size_t vertex = 0; vertex < local.size(); ++vertex) {
                 const double x1 = local[vertex][0];
                 const double y1 = local[vertex][1] * cosineX - local[vertex][2] * sineX;
@@ -6644,19 +6657,71 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 const double y3 = x2 * sineZ + y2 * cosineZ + model.y;
                 const double z3 = z2 + model.z;
                 rotated[vertex] = {{x3, y3, z3}};
-                projected[vertex].x = static_cast<LONG>(centerX + (x3 - z3 * 0.48) * modelScale);
-                projected[vertex].y = static_cast<LONG>(centerY - (y3 - (x3 + z3) * 0.27) * modelScale);
+                const double dx = x3 - desktop3DCameraX;
+                const double dy = y3 - desktop3DCameraY;
+                const double dz = z3 - desktop3DCameraZ;
+                const double cosYaw = std::cos(desktop3DCameraYaw);
+                const double sinYaw = std::sin(desktop3DCameraYaw);
+                const double viewX = dx * cosYaw - dz * sinYaw;
+                const double forwardZ = dx * sinYaw + dz * cosYaw;
+                const double cosPitch = std::cos(desktop3DCameraPitch);
+                const double sinPitch = std::sin(desktop3DCameraPitch);
+                const double viewY = dy * cosPitch - forwardZ * sinPitch;
+                const double depth = forwardZ * cosPitch + dy * sinPitch;
+                const double perspective = depth > 0.25 ? 12.0 / depth : 0.0;
+                projected[vertex].x = static_cast<LONG>(centerX + viewX * modelScale * perspective);
+                projected[vertex].y = static_cast<LONG>(centerY - viewY * modelScale * perspective);
             }
-            if (model.shape == "sphere") {
-                const LONG radiusX = static_cast<LONG>(std::max(2.0, halfW * modelScale));
-                const LONG radiusY = static_cast<LONG>(std::max(2.0, halfH * modelScale * 0.82));
-                RECT sphereArea = {static_cast<LONG>(centerX) - radiusX, static_cast<LONG>(centerY) - radiusY,
-                    static_cast<LONG>(centerX) + radiusX, static_cast<LONG>(centerY) + radiusY};
+            LONG minX = projected[0].x, maxX = projected[0].x;
+            LONG minY = projected[0].y, maxY = projected[0].y;
+            for (const POINT& point : projected) {
+                minX = std::min(minX, point.x); maxX = std::max(maxX, point.x);
+                minY = std::min(minY, point.y); maxY = std::max(maxY, point.y);
+            }
+            RECT objectHit = {minX - 8, minY - 8, maxX + 8, maxY + 8};
+            desktop3DProjectedHits.emplace_back(model.name, objectHit);
+            const LONG shapeCenterX = (minX + maxX) / 2;
+            const LONG shapeCenterY = (minY + maxY) / 2;
+            if (model.shape == "sphere" || model.shape == "spawn") {
+                const LONG diameter = std::max<LONG>(10, std::min(maxX - minX, maxY - minY));
+                RECT sphereArea = {shapeCenterX - diameter / 2, shapeCenterY - diameter / 2,
+                    shapeCenterX + diameter / 2, shapeCenterY + diameter / 2};
                 HBRUSH sphereBrush = CreateSolidBrush(RGB(red, green, blue));
-                HPEN spherePen = CreatePen(PS_SOLID, 1, RGB(47, 34, 70));
+                HPEN spherePen = CreatePen(PS_SOLID, 2, RGB(47, 34, 70));
                 HGDIOBJ oldBrush = SelectObject(dc, sphereBrush), oldPen = SelectObject(dc, spherePen);
-                Ellipse(dc, sphereArea.left, sphereArea.top, sphereArea.right, sphereArea.bottom);
-                SelectObject(dc, oldBrush); SelectObject(dc, oldPen); DeleteObject(sphereBrush); DeleteObject(spherePen);
+                if (model.shape == "spawn") {
+                    SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+                    Ellipse(dc, sphereArea.left - 5, sphereArea.top - 5,
+                        sphereArea.right + 5, sphereArea.bottom + 5);
+                    MoveToEx(dc, shapeCenterX, sphereArea.top - 12, nullptr);
+                    LineTo(dc, shapeCenterX, sphereArea.bottom + 12);
+                    Ellipse(dc, sphereArea.left, sphereArea.top, sphereArea.right, sphereArea.bottom);
+                } else {
+                    Ellipse(dc, sphereArea.left, sphereArea.top, sphereArea.right, sphereArea.bottom);
+                    HPEN detailPen = CreatePen(PS_SOLID, 1, RGB(220, 206, 255));
+                    HGDIOBJ previousDetailPen = SelectObject(dc, detailPen);
+                    Arc(dc, sphereArea.left + diameter / 5, sphereArea.top + diameter / 5,
+                        sphereArea.right - diameter / 5, sphereArea.bottom - diameter / 5,
+                        sphereArea.left, shapeCenterY, sphereArea.right, shapeCenterY);
+                    SelectObject(dc, previousDetailPen);
+                    DeleteObject(detailPen);
+                }
+                SelectObject(dc, oldBrush); SelectObject(dc, oldPen);
+                DeleteObject(sphereBrush); DeleteObject(spherePen);
+                continue;
+            }
+            if (model.shape == "camera") {
+                HPEN cameraPen = CreatePen(PS_SOLID, 2, RGB(red, green, blue));
+                HGDIOBJ oldCameraPen = SelectObject(dc, cameraPen);
+                SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+                Rectangle(dc, shapeCenterX - 14, shapeCenterY - 9, shapeCenterX + 12, shapeCenterY + 9);
+                POINT lens[3] = {{shapeCenterX + 12, shapeCenterY - 5},
+                    {shapeCenterX + 24, shapeCenterY - 12}, {shapeCenterX + 24, shapeCenterY + 12}};
+                Polyline(dc, lens, 3);
+                MoveToEx(dc, shapeCenterX + 24, shapeCenterY + 12, nullptr);
+                LineTo(dc, shapeCenterX + 12, shapeCenterY + 5);
+                SelectObject(dc, oldCameraPen);
+                DeleteObject(cameraPen);
                 continue;
             }
             std::array<int, 6> faceOrder = {{0, 1, 2, 3, 4, 5}};
@@ -6676,9 +6741,35 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 HPEN facePen = CreatePen(PS_SOLID, 1, RGB(38, 27, 57));
                 HGDIOBJ oldBrush = SelectObject(dc, faceBrush), oldPen = SelectObject(dc, facePen);
                 Polygon(dc, polygon, 4);
+                if (model.texture != "smooth") {
+                    int hatch = HS_DIAGCROSS;
+                    if (model.texture == "grid") hatch = HS_CROSS;
+                    else if (model.texture == "wood") hatch = HS_FDIAGONAL;
+                    else if (model.texture == "stone") hatch = HS_BDIAGONAL;
+                    HBRUSH textureBrush = CreateHatchBrush(hatch,
+                        RGB(static_cast<BYTE>(std::min(255, red + 28)),
+                            static_cast<BYTE>(std::min(255, green + 28)),
+                            static_cast<BYTE>(std::min(255, blue + 28))));
+                    HGDIOBJ oldTextureBrush = SelectObject(dc, textureBrush);
+                    const int previousBackgroundMode = SetBkMode(dc, TRANSPARENT);
+                    Polygon(dc, polygon, 4);
+                    SetBkMode(dc, previousBackgroundMode);
+                    SelectObject(dc, oldTextureBrush);
+                    DeleteObject(textureBrush);
+                }
+                if (desktop3DEngineActive && model.name == desktop3DSelectedName) {
+                    HPEN selectionPen = CreatePen(PS_SOLID, 2, RGB(196, 164, 255));
+                    HGDIOBJ oldSelectionPen = SelectObject(dc, selectionPen);
+                    HGDIOBJ oldHollowBrush = SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+                    Polygon(dc, polygon, 4);
+                    SelectObject(dc, oldHollowBrush);
+                    SelectObject(dc, oldSelectionPen);
+                    DeleteObject(selectionPen);
+                }
                 SelectObject(dc, oldBrush); SelectObject(dc, oldPen); DeleteObject(faceBrush); DeleteObject(facePen);
             }
         }
+        if (sceneClipSave) RestoreDC(dc, sceneClipSave);
         for (const UiButton& button : uiButtons) {
             if (!button.visible || !uiGroupIsVisible(button.group)) continue;
             const double buttonX = button.x - viewportX;
