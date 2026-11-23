@@ -1701,7 +1701,7 @@ sourceText = exampleSource;
             double perspective = Math.max(0.42, Math.min(1.85, 28.0 / Math.max(8.0, 28.0 + depth)));
             float scale = Math.min(width, height) * 0.115f * cameraZoom;
             return new float[] { width * 0.5f + (float) (viewX * scale * perspective),
-                    height * 0.53f - (float) (viewY * scale * perspective), (float) perspective };
+                    height * 0.302f - (float) (viewY * scale * perspective), (float) perspective };
         }
 
         private void draw3DModels(Canvas canvas, float width, float height) {
@@ -2098,7 +2098,7 @@ sourceText = exampleSource;
             if (getWidth() <= 0 || getHeight() <= 0) return null;
             float x = px * 100f / getWidth();
             float y = py * 100f / getHeight();
-            if (y < 14 || y > 64) return null;
+            if (y < 13 || y > 48) return null;
             if (editor3D) {
                 for (int i = models.size() - 1; i >= 0; i--) {
                     JSONObject model = models.get(i);
@@ -2175,12 +2175,14 @@ sourceText = exampleSource;
                     editorGestureMode = 1;
                 } else {
                     editorObjectDragging = false;
-                    if (editor3D) editorGestureMode = 2;
+                    if (editor3D && lastEditorY * 100f / Math.max(1, getHeight()) >= 13f
+                            && lastEditorY * 100f / Math.max(1, getHeight()) <= 48f) editorGestureMode = 2;
                 }
                 invalidate();
                 return true;
             }
-            if (action == MotionEvent.ACTION_POINTER_DOWN && editor3D && event.getPointerCount() >= 2) {
+            if (action == MotionEvent.ACTION_POINTER_DOWN && editor3D && editorGestureMode == 2
+                    && event.getPointerCount() >= 2) {
                 editorGestureMode = 3;
                 editorObjectDragging = false;
                 lastPinchSpan = Math.max(1, span(event));
@@ -2189,7 +2191,7 @@ sourceText = exampleSource;
                 return true;
             }
             if (action == MotionEvent.ACTION_MOVE) {
-                if (editor3D && event.getPointerCount() >= 2) {
+                if (editor3D && editorGestureMode == 3 && event.getPointerCount() >= 2) {
                     float currentSpan = Math.max(1, span(event));
                     float centerX = (event.getX(0) + event.getX(1)) * 0.5f;
                     float centerY = (event.getY(0) + event.getY(1)) * 0.5f;
@@ -2235,7 +2237,8 @@ sourceText = exampleSource;
             }
             if (action == MotionEvent.ACTION_POINTER_UP) {
                 if (editor3D) {
-                    editorGestureMode = 2;
+                    float touchY = event.getY(event.getActionIndex()) * 100f / Math.max(1, getHeight());
+                    editorGestureMode = touchY >= 13f && touchY <= 48f ? 2 : 0;
                     if (event.getPointerCount() > 1) {
                         int remaining = event.getActionIndex() == 0 ? 1 : 0;
                         lastEditorX = event.getX(remaining);
