@@ -653,7 +653,7 @@ void setOpenButtonFont(HWND window) {
     openButtonFont = CreateFontW(scaleForDpi(window, 13), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
         DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
-    const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton, buildButton, dictionaryButton, editor2DButton, editor3DButton};
+    const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton, buildButton, dictionaryButton, editor2DButton, editor3DButton, exportButton};
     if (openButtonFont) for (HWND button : buttons) if (button)
         SendMessageW(button, WM_SETFONT, reinterpret_cast<WPARAM>(openButtonFont), TRUE);
     if (codeEditorFont) DeleteObject(codeEditorFont);
@@ -710,7 +710,7 @@ void layoutOutputControls(HWND window) {
 
     if (previewMode) {
         const HWND controls[] = {openButton, saveButton, runButton, newButton, buildButton,
-            dictionaryButton, editor2DButton, editor3DButton};
+            dictionaryButton, editor2DButton, editor3DButton, exportButton};
         for (HWND control : controls) if (control) ShowWindow(control, SW_HIDE);
         if (previewButton) {
             if (standaloneAppMode) {
@@ -727,14 +727,14 @@ void layoutOutputControls(HWND window) {
             }
         }
     } else {
-        const LONG available = std::max<LONG>(scaleForDpi(window, 9 * 48 + 8 * 5),
+        const LONG available = std::max<LONG>(scaleForDpi(window, 10 * 45 + 9 * 5),
             width - scaleForDpi(window, 170) - margin * 2);
-        const LONG buttonWidth = std::clamp<LONG>((available - gap * 8) / 9,
-            scaleForDpi(window, 48), scaleForDpi(window, 78));
+        const LONG buttonWidth = std::clamp<LONG>((available - gap * 9) / 10,
+            scaleForDpi(window, 45), scaleForDpi(window, 72));
         const LONG buttonHeight = scaleForDpi(window, 34);
         const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton,
-            buildButton, dictionaryButton, editor2DButton, editor3DButton};
-        LONG x = width - margin - (buttonWidth + gap) * 9 + gap;
+            buildButton, dictionaryButton, editor2DButton, editor3DButton, exportButton};
+        LONG x = width - margin - (buttonWidth + gap) * 10 + gap;
         const LONG y = std::max<LONG>(0, (headerHeight - buttonHeight) / 2);
         for (HWND button : buttons) {
             if (button) {
@@ -746,17 +746,45 @@ void layoutOutputControls(HWND window) {
         if (previewButton) SetWindowTextW(previewButton, L"Preview");
     }
 
-    if (codeEditor) {
+    LONG panelTop = 0;
+    if (previewMode) {
+        const LONG outputHeight = std::min<LONG>(
+            std::max<LONG>(scaleForDpi(window, 116), height / 5),
+            std::max<LONG>(scaleForDpi(window, 90), height / 3));
+        panelTop = std::max<LONG>(scaleForDpi(window, 120), height - outputHeight);
+    } else {
         const LONG editorMargin = scaleForDpi(window, 10);
         const LONG top = headerHeight + editorMargin;
-        const LONG outputMinimum = scaleForDpi(window, 80);
+        const LONG outputMinimum = scaleForDpi(window, 112);
         const LONG canvasMinimum = scaleForDpi(window, 100);
         const LONG panelMinimum = std::min(height, headerHeight + canvasMinimum);
         const LONG panelMaximum = std::max(panelMinimum, height - outputMinimum);
-        const LONG panelTop = std::clamp<LONG>(height * 65 / 100, panelMinimum, panelMaximum);
-        const LONG bottom = std::max<LONG>(top + 1, panelTop - editorMargin);
-        MoveWindow(codeEditor, editorMargin, top, std::max<LONG>(1, width - editorMargin * 2), bottom - top, TRUE);
-        ShowWindow(codeEditor, previewMode ? SW_HIDE : SW_SHOW);
+        panelTop = std::clamp<LONG>(height * 65 / 100, panelMinimum, panelMaximum);
+        if (codeEditor) {
+            const LONG bottom = std::max<LONG>(top + 1, panelTop - editorMargin);
+            MoveWindow(codeEditor, editorMargin, top,
+                std::max<LONG>(1, width - editorMargin * 2), bottom - top, TRUE);
+            ShowWindow(codeEditor, SW_SHOW);
+        }
+    }
+    const LONG outputHeaderHeight = scaleForDpi(window, 25);
+    const LONG inputHeight = terminalInputActive ? scaleForDpi(window, terminalInputHeight + 5) : 0;
+    const LONG outputTop = panelTop + outputHeaderHeight;
+    const LONG outputBottom = std::max<LONG>(outputTop + 1, height - margin - inputHeight);
+    if (outputControl) {
+        MoveWindow(outputControl, margin, outputTop, std::max<LONG>(1, width - margin * 2),
+            outputBottom - outputTop, TRUE);
+        ShowWindow(outputControl, SW_SHOW);
+    }
+    if (terminalInputControl && terminalSendButton) {
+        const LONG inputWidth = std::min<LONG>(scaleForDpi(window, 430),
+            std::max<LONG>(scaleForDpi(window, 150), width - margin * 2 - scaleForDpi(window, 82)));
+        const LONG inputY = height - margin - scaleForDpi(window, terminalInputHeight);
+        MoveWindow(terminalInputControl, margin, inputY, inputWidth, scaleForDpi(window, 28), TRUE);
+        MoveWindow(terminalSendButton, margin + inputWidth + scaleForDpi(window, 7), inputY,
+            scaleForDpi(window, 72), scaleForDpi(window, 28), TRUE);
+        ShowWindow(terminalInputControl, terminalInputActive ? SW_SHOW : SW_HIDE);
+        ShowWindow(terminalSendButton, terminalInputActive ? SW_SHOW : SW_HIDE);
     }
 }
 
@@ -5751,18 +5779,24 @@ DesktopLayout desktopLayout(HWND window, const RECT& client) {
         return {width, height, 0, height, std::max<LONG>(1, height),
             margin, height, height};
     }
+    if (previewMode) {
+        const LONG outputHeight = std::min<LONG>(
+            std::max<LONG>(scaleForDpi(window, 116), height / 5),
+            std::max<LONG>(scaleForDpi(window, 90), height / 3));
+        const LONG panelTop = std::max<LONG>(scaleForDpi(window, 120), height - outputHeight);
+        return {width, height, 0, panelTop, std::max<LONG>(1, panelTop),
+            margin, panelTop, height - margin};
+    }
     const LONG headerHeight = std::min<LONG>(scaleForDpi(window, 76),
         std::max<LONG>(scaleForDpi(window, 48), height / 5));
-    const LONG outputMinimum = scaleForDpi(window, 80);
+    const LONG outputMinimum = scaleForDpi(window, 112);
     const LONG canvasMinimum = scaleForDpi(window, 100);
     const LONG panelMinimum = std::min(height, headerHeight + canvasMinimum);
     const LONG panelMaximum = std::max(panelMinimum, height - outputMinimum);
     const LONG panelTop = std::clamp<LONG>(height * 65 / 100, panelMinimum, panelMaximum);
     return {width, height, headerHeight, panelTop,
-        std::max<LONG>(1, panelTop - headerHeight), margin,
-        panelTop + scaleForDpi(window, 10),
-        std::max<LONG>(panelTop + scaleForDpi(window, 10),
-                       height - scaleForDpi(window, 16))};
+        std::max<LONG>(1, panelTop - headerHeight), margin, panelTop,
+        std::max<LONG>(panelTop, height - margin)};
 }
 
 LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -5803,7 +5837,37 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             0, 0, 100, 100, window, reinterpret_cast<HMENU>(codeEditorId),
             GetModuleHandleW(nullptr), nullptr);
         SendMessageW(codeEditor, EM_SETLIMITTEXT, 8 * 1024 * 1024, 0);
+        previousCodeEditorProc = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(
+            codeEditor, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(codeEditorWindowProc)));
+        outputControl = CreateWindowExW(WS_EX_CLIENTEDGE, editorClass, L"",
+            WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE |
+                ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | ES_NOHIDESEL,
+            0, 0, 100, 100, window, reinterpret_cast<HMENU>(outputControlId),
+            GetModuleHandleW(nullptr), nullptr);
+        terminalInputControl = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
+            WS_CHILD | WS_TABSTOP | ES_AUTOHSCROLL,
+            0, 0, 100, 28, window, reinterpret_cast<HMENU>(terminalInputControlId),
+            GetModuleHandleW(nullptr), nullptr);
+        terminalSendButton = CreateWindowExW(0, L"BUTTON", L"Send",
+            WS_CHILD | BS_OWNERDRAW | WS_TABSTOP, 0, 0, 72, 28, window,
+            reinterpret_cast<HMENU>(terminalSendButtonId), GetModuleHandleW(nullptr), nullptr);
+        if (terminalInputControl) previousTerminalInputProc = reinterpret_cast<WNDPROC>(
+            SetWindowLongPtrW(terminalInputControl, GWLP_WNDPROC,
+                reinterpret_cast<LONG_PTR>(terminalInputWindowProc)));
         setOpenButtonFont(window);
+        if (outputControl && richEditModule) {
+            SendMessageW(outputControl, EM_SETBKGNDCOLOR, 0, RGB(8, 7, 12));
+            CHARFORMAT2W outputFormat = {};
+            outputFormat.cbSize = sizeof(outputFormat);
+            outputFormat.dwMask = CFM_COLOR | CFM_FACE | CFM_SIZE;
+            outputFormat.crTextColor = RGB(235, 229, 245);
+            outputFormat.yHeight = 180;
+            std::wcsncpy(outputFormat.szFaceName, L"Consolas", LF_FACESIZE - 1);
+            outputFormat.szFaceName[LF_FACESIZE - 1] = L'\0';
+            SendMessageW(outputControl, EM_SETCHARFORMAT, SCF_ALL, reinterpret_cast<LPARAM>(&outputFormat));
+        }
+        if (terminalInputControl && codeEditorFont)
+            SendMessageW(terminalInputControl, WM_SETFONT, reinterpret_cast<WPARAM>(codeEditorFont), TRUE);
         restoreDesktopAutosave();
         if (codeEditor && richEditModule) {
             SendMessageW(codeEditor, EM_SETBKGNDCOLOR, 0, RGB(19, 13, 31));
