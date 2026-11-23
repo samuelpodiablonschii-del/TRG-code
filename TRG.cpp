@@ -575,6 +575,7 @@ HBRUSH outputControlBrush = nullptr;
 HBRUSH dictionaryEditBrush = nullptr;
 WNDPROC previousCodeEditorProc = nullptr;
 WNDPROC previousTerminalInputProc = nullptr;
+WNDPROC previousOutputProc = nullptr;
 bool terminalInputActive = false;
 std::wstring desktopDictionaryText;
 constexpr int outputControlId = 302;
@@ -610,8 +611,20 @@ int desktop3DHierarchyScroll = 0;
 POINT desktop3DContextPoint = {};
 POINT desktop3DMouseCurrent = {};
 RECT desktop3DContextRect = {};
+RECT desktop3DToolbarRect = {};
+RECT desktop3DHierarchyRect = {};
+RECT desktop3DInspectorRect = {};
+RECT desktop3DAssetShelfRect = {};
+std::array<RECT, 7> desktop3DToolRects = {};
+std::array<RECT, 5> desktop3DAssetRects = {};
+std::array<RECT, 5> desktop3DTextureRects = {};
+int desktop3DToolMode = 1;
+bool desktop3DGridVisible = true;
+double desktop3DDragStartWidth = 2.0, desktop3DDragStartHeight = 2.0, desktop3DDragStartDepth = 2.0;
+double desktop3DDragStartRotX = 0.0, desktop3DDragStartRotY = 0.0;
 LRESULT CALLBACK codeEditorWindowProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK terminalInputWindowProc(HWND, UINT, WPARAM, LPARAM);
+LRESULT CALLBACK outputWindowProc(HWND, UINT, WPARAM, LPARAM);
 LRESULT CALLBACK dictionaryWindowProc(HWND, UINT, WPARAM, LPARAM);
 
 bool runSourceFile(const std::filesystem::path& path);
@@ -623,6 +636,7 @@ bool runEditorSource();
 void applyEditorSyntaxHighlighting();
 bool launchDesktopVisualEditor(const std::string& fileName);
 bool returnFromDesktopVisualEditor();
+void clearDesktopOutput();
 
 int windowDpi(HWND window) {
     using GetDpiForWindowFunction = UINT (WINAPI*)(HWND);
@@ -1196,6 +1210,7 @@ void appendOutput(const std::string& text) {
         }
         SendMessageW(outputControl, EM_SETSEL, static_cast<WPARAM>(-1), static_cast<LPARAM>(-1));
         SendMessageW(outputControl, EM_SCROLLCARET, 0, 0);
+        SendMessageW(outputControl, WM_VSCROLL, SB_BOTTOM, 0);
     }
     if (mainWindow) InvalidateRect(mainWindow, nullptr, FALSE);
 #endif
@@ -1214,7 +1229,42 @@ void appendOutput(const std::string& text) {
 }
 #endif
 
-
+#ifdef _WIN32
+LRESULT CALLBACK outputWindowProc(HWND control, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (message == WM_KEYDOWN && (GetKeyState(VK_CONTROL) & 0x8000)) {
+        if (wParam == 'A') {
+            SendMessageW(control, EM_SETSEL, 0, -1);
+            return 0;
+        }
+        if (wParam == 'C') {
+            SendMessageW(control, WM_COPY, 0, 0);
+            return 0;
+        }
+    }
+    if (message == WM_CONTEXTMENU) {
+        POINT point = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+        if (point.x == -1 && point.y == -1) GetCursorPos(&point);
+        HMENU menu = CreatePopupMenu();
+        if (menu) {
+            AppendMenuW(menu, MF_STRING, 1, L"Copy");
+            AppendMenuW(menu, MF_STRING, 2, L"Select all");
+            AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+            AppendMenuW(menu, MF_STRING, 3, L"Clear output");
+            const UINT selected = TrackPopupMenu(menu,
+                TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY,
+                point.x, point.y, 0, GetParent(control), nullptr);
+            DestroyMenu(menu);
+            if (selected == 1) SendMessageW(control, WM_COPY, 0, 0);
+            else if (selected == 2) SendMessageW(control, EM_SETSEL, 0, -1);
+            else if (selected == 3) clearDesktopOutput();
+        }
+        return 0;
+    }
+    return previousOutputProc
+        ? CallWindowProcW(previousOutputProc, control, message, wParam, lParam)
+        : DefWindowProcW(control, message, wParam, lParam);
+}
+#endif
 
 
 std::string trim(const std::string& s) {
@@ -6367,7 +6417,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         newButton = CreateWindowExW(0, L"BUTTON", L"New",
             WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(newButtonId), GetModuleHandleW(nullptr), nullptr);
-        buildButton = CreateWindowExW(0, L"BUTTON", L"Compile",
+        buildButton = CreateWindowExW(0, L"BUTTON", L"Build EXE",
             WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(buildButtonId), GetModuleHandleW(nullptr), nullptr);
         dictionaryButton = CreateWindowExW(0, L"BUTTON", L"Dictionary",
@@ -6379,7 +6429,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         editor3DButton = CreateWindowExW(0, L"BUTTON", L"3D Engine",
             WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(editor3DButtonId), GetModuleHandleW(nullptr), nullptr);
-        exportButton = CreateWindowExW(0, L"BUTTON", L"Export .TRG",
+        exportButton = CreateWindowExW(0, L"BUTTON", L"Export TRG",
             WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(exportButtonId), GetModuleHandleW(nullptr), nullptr);
         richEditModule = LoadLibraryW(L"Msftedit.dll");
@@ -6397,6 +6447,9 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | ES_NOHIDESEL,
             0, 0, 100, 100, window, reinterpret_cast<HMENU>(outputControlId),
             GetModuleHandleW(nullptr), nullptr);
+        if (outputControl) previousOutputProc = reinterpret_cast<WNDPROC>(
+            SetWindowLongPtrW(outputControl, GWLP_WNDPROC,
+                reinterpret_cast<LONG_PTR>(outputWindowProc)));
         terminalInputControl = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
             WS_CHILD | WS_TABSTOP | ES_AUTOHSCROLL,
             0, 0, 100, 28, window, reinterpret_cast<HMENU>(terminalInputControlId),
@@ -7581,6 +7634,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         openButton = saveButton = runButton = previewButton = newButton = buildButton = dictionaryButton = nullptr;
         editor2DButton = editor3DButton = nullptr;
         exportButton = outputControl = terminalInputControl = terminalSendButton = nullptr;
+        previousOutputProc = nullptr;
         dictionaryWindow = dictionaryEdit = nullptr;
         if (terminalInputBrush) DeleteObject(terminalInputBrush);
         if (outputControlBrush) DeleteObject(outputControlBrush);
