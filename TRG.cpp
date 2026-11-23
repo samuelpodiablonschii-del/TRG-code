@@ -7203,9 +7203,12 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
     }
     if (message == WM_RBUTTONDOWN && desktop3DEngineActive && previewMode) {
         const POINT point = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
-        if (!PtInRect(&desktop3DViewportRect, point)) return 0;
-        desktop3DDraggingCamera = true;
         desktop3DRightClickMoved = false;
+        if (!PtInRect(&desktop3DViewportRect, point)) {
+            desktop3DDraggingCamera = false;
+            return 0;
+        }
+        desktop3DDraggingCamera = true;
         desktop3DMouseDown = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
         desktop3DMouseCurrent = desktop3DMouseDown;
         desktop3DDragStartYaw = desktop3DCameraYaw;
