@@ -7095,7 +7095,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
     }
     if (message == WM_COMMAND && LOWORD(wParam) == buildButtonId) {
         if (!saveSourceFile()) return 0;
-        appendOutput("Compiling standalone TRG executable...\r\n");
+        appendOutput("Building standalone Windows EXE with the TRG program embedded...\r\n");
         std::filesystem::path outputPath;
         std::string errorMessage;
         if (!buildStandaloneTrgExecutable(currentSourcePath, outputPath, errorMessage)) {
@@ -7208,6 +7208,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             desktop3DDraggingCamera = false;
             return 0;
         }
+        SetFocus(window);
         desktop3DDraggingCamera = true;
         desktop3DMouseDown = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
         desktop3DMouseCurrent = desktop3DMouseDown;
