@@ -837,6 +837,10 @@ sourceText = exampleSource;
             java.util.Iterator<String> names = stored.keys();
             while (names.hasNext()) {
                 String name = names.next();
+                String normalizedName = name.toLowerCase(Locale.ROOT);
+                if (normalizedName.equals("2d editor") || normalizedName.equals("3d editor")
+                        || normalizedName.equals("2deditor.trg") || normalizedName.equals("3deditor.trg"))
+                    continue;
                 restored.put(name, stored.optString(name, ""));
             }
             if (!restored.isEmpty()) {
