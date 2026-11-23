@@ -1154,7 +1154,7 @@ void showDesktopDictionary(HWND owner) {
         L"  Enter between () creates a blank body line with four-space indentation;\r\n"
         L"  the matching ) stays on its own line at the parent indentation level.\r\n"
         L"  Typing a closing bracket or quote skips over its existing pair.\r\n"
-        L"  Select text and type (, \\" or ' to wrap the selected text.\r\n"
+        L"  Select text and type (, \" or ' to wrap the selected text.\r\n"
         L"  The code editor highlights comments, strings, numbers and TRG commands.\r\n"
         L"  Build EXE creates a self-contained Windows TRG runtime package.\r\n"
         L"  Export TRG saves the current source as a .trg file.\r\n"
