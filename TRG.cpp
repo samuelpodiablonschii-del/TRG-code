@@ -562,7 +562,6 @@ HWND dictionaryButton = nullptr;
 HWND editor2DButton = nullptr;
 HWND editor3DButton = nullptr;
 HWND codeEditor = nullptr;
-std::wstring desktopPreviousSource;
 std::filesystem::path desktopPreviousPath;
 bool desktopPreviousDirty = false;
 bool desktopVisualEditorActive = false;
@@ -6844,11 +6843,6 @@ bool launchDesktopVisualEditor(const std::string& fileName) {
     }
 
     if (!desktopVisualEditorActive) {
-        const int length = GetWindowTextLengthW(codeEditor);
-        std::wstring current(static_cast<std::size_t>(length) + 1, L'\0');
-        GetWindowTextW(codeEditor, current.data(), length + 1);
-        current.resize(static_cast<std::size_t>(length));
-        desktopPreviousSource = current;
         desktopPreviousPath = currentSourcePath;
         desktopPreviousDirty = editorDirty;
     }
@@ -6871,16 +6865,12 @@ bool launchDesktopVisualEditor(const std::string& fileName) {
 
 bool returnFromDesktopVisualEditor() {
     if (!desktopVisualEditorActive || !codeEditor) return false;
-    loadingEditorText = true;
-    SetWindowTextW(codeEditor, desktopPreviousSource.c_str());
-    loadingEditorText = false;
     currentSourcePath = desktopPreviousPath;
     projectRoot = currentSourcePath.empty() ? std::filesystem::current_path() : currentSourcePath.parent_path();
     editorDirty = desktopPreviousDirty;
     desktopVisualEditorActive = false;
     previewMode = false;
     SetWindowTextW(previewButton, L"Preview");
-    applyEditorSyntaxHighlighting();
     updateEditorWindowTitle();
     layoutOutputControls(mainWindow);
     InvalidateRect(mainWindow, nullptr, TRUE);
