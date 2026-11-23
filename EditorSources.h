@@ -298,6 +298,7 @@ text object_count "0 OBJECTS" x 2 y 74 size 1.05 color #9F8DB8
 // Viewport overlays; 3D models are clipped to this central panel.
 text "PERSPECTIVE" x 21 y 16 size 1.1 color #BDA6E8 bold true
 text "GRID  |  WORLD AXES" x 78 y 16 size 1.0 color #8F7EA5 align right
+text "WASD MOVE  •  RIGHT-DRAG ORBIT  •  WHEEL ZOOM" x 21 y 20.5 size 0.9 color #7E6B96
 text viewport_status "Empty scene — drag an asset into the viewport" x 50 y 73 size 1.2 color #BCA8DA align center
 
 // Inspector.
