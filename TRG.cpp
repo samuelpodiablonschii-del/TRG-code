@@ -806,6 +806,244 @@ std::string utf8FromWide(const std::wstring& value) {
     return result;
 }
 
+
+LRESULT CALLBACK codeEditorWindowProc(HWND control, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (message == WM_KEYDOWN && wParam == VK_TAB) {
+        SendMessageW(control, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(L"    "));
+        return 0;
+    }
+    if (message == WM_CHAR) {
+        DWORD selectionStart = 0, selectionEnd = 0;
+        SendMessageW(control, EM_GETSEL, reinterpret_cast<WPARAM>(&selectionStart),
+                     reinterpret_cast<LPARAM>(&selectionEnd));
+        const int textLength = GetWindowTextLengthW(control);
+        std::wstring text(static_cast<std::size_t>(textLength) + 1, L'\0');
+        GetWindowTextW(control, text.data(), textLength + 1);
+        text.resize(static_cast<std::size_t>(textLength));
+        if (selectionStart == selectionEnd && wParam == L')' &&
+            selectionStart < text.size() && text[selectionStart] == L')') {
+            SendMessageW(control, EM_SETSEL, selectionStart + 1, selectionStart + 1);
+            return 0;
+        }
+        if (selectionStart == selectionEnd && (wParam == L'(' || wParam == L'"' || wParam == L'\'')) {
+            const wchar_t pair[] = {static_cast<wchar_t>(wParam),
+                wParam == L'(' ? L')' : static_cast<wchar_t>(wParam), L'\0'};
+            SendMessageW(control, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(pair));
+            SendMessageW(control, EM_SETSEL, selectionStart + 1, selectionStart + 1);
+            return 0;
+        }
+        if (wParam == L'\r' && selectionStart == selectionEnd) {
+            const std::wstring before = text.substr(0, selectionStart);
+            const std::size_t lineStart = before.find_last_of(L"\r\n") == std::wstring::npos
+                ? 0 : before.find_last_of(L"\r\n") + 1;
+            const std::wstring line = before.substr(lineStart);
+            std::size_t indent = 0;
+            while (indent < line.size() && (line[indent] == L' ' || line[indent] == L'\t'))
+                indent += line[indent] == L'\t' ? 4 : 1;
+            std::size_t first = indent;
+            while (first < line.size() && std::iswspace(line[first])) ++first;
+            const std::wstring trimmed = line.substr(first);
+            const bool betweenPair = selectionStart > 0 && selectionStart < text.size() &&
+                text[selectionStart - 1] == L'(' && text[selectionStart] == L')';
+            std::wstring insertion;
+            std::size_t caretOffset = 0;
+            if (betweenPair) {
+                const std::wstring outer(indent, L' ');
+                const std::wstring inner(indent + 4, L' ');
+                insertion = L"\r\n" + inner + L"\r\n" + outer;
+                caretOffset = 2 + inner.size();
+            } else {
+                std::size_t nextIndent = indent;
+                if (!trimmed.empty() && trimmed.back() == L'(') nextIndent += 4;
+                else if (trimmed.empty() && selectionStart < text.size() &&
+                         text[selectionStart] == L')' && nextIndent >= 4) nextIndent -= 4;
+                insertion = L"\r\n" + std::wstring(nextIndent, L' ');
+                caretOffset = insertion.size();
+            }
+            SendMessageW(control, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(insertion.c_str()));
+            const DWORD caret = selectionStart + static_cast<DWORD>(caretOffset);
+            SendMessageW(control, EM_SETSEL, caret, caret);
+            return 0;
+        }
+    }
+    return previousCodeEditorProc
+        ? CallWindowProcW(previousCodeEditorProc, control, message, wParam, lParam)
+        : DefWindowProcW(control, message, wParam, lParam);
+}
+
+LRESULT CALLBACK terminalInputWindowProc(HWND control, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (message == WM_KEYDOWN && wParam == VK_RETURN) {
+        if (mainWindow) SendMessageW(mainWindow, WM_COMMAND,
+            MAKEWPARAM(terminalSendButtonId, BN_CLICKED), reinterpret_cast<LPARAM>(terminalSendButton));
+        return 0;
+    }
+    return previousTerminalInputProc
+        ? CallWindowProcW(previousTerminalInputProc, control, message, wParam, lParam)
+        : DefWindowProcW(control, message, wParam, lParam);
+}
+
+LRESULT CALLBACK dictionaryWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (message == WM_CREATE) {
+        dictionaryEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", desktopDictionaryText.c_str(),
+            WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE |
+                ES_READONLY | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_NOHIDESEL,
+            0, 0, 100, 100, window, nullptr, GetModuleHandleW(nullptr), nullptr);
+        HFONT font = CreateFontW(-15, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+            FIXED_PITCH | FF_MODERN, L"Consolas");
+        if (dictionaryEdit && font) SendMessageW(dictionaryEdit, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
+        return 0;
+    }
+    if (message == WM_SIZE) {
+        if (dictionaryEdit) MoveWindow(dictionaryEdit, 10, 10,
+            std::max(1, LOWORD(lParam) - 20), std::max(1, HIWORD(lParam) - 20), TRUE);
+        return 0;
+    }
+    if (message == WM_CLOSE) {
+        DestroyWindow(window);
+        return 0;
+    }
+    if (message == WM_DESTROY) {
+        dictionaryWindow = nullptr;
+        dictionaryEdit = nullptr;
+        return 0;
+    }
+    return DefWindowProcW(window, message, wParam, lParam);
+}
+
+void showDesktopDictionary(HWND owner) {
+    desktopDictionaryText =
+        L"TRG LANGUAGE REFERENCE\\r\\n"
+        L"=====================\\r\\n\\r\\n"
+        L"PROGRAM STRUCTURE\\r\\n"
+        L"  TRG executes source from top to bottom. Commands are case-insensitive.\\r\\n"
+        L"  // comment\\r\\n"
+        L"  Blocks use parentheses: if score > 0 ( ... )\\r\\n"
+        L"  Libraries are declared at file scope: add (math), add (ui), add (3d)\\r\\n\\r\\n"
+        L"OUTPUT AND INPUT\\r\\n"
+        L"  say VALUE...              Print text, variables, and expression results\\r\\n"
+        L"  print VALUE...            Alias for say\\r\\n"
+        L"  show VALUE...             Alias for say\\r\\n"
+        L"  ask PROMPT VARIABLE       Read a value from the terminal input line\\r\\n\\r\\n"
+        L"VARIABLES AND TYPES\\r\\n"
+        L"  let NAME = VALUE          Declare a value\\r\\n"
+        L"  num NAME = EXPRESSION     Number\\r\\n"
+        L"  word NAME = TEXT          String\\r\\n"
+        L"  toggle NAME = true|false  Boolean\\r\\n"
+        L"  color NAME = #RRGGBB      Color value\\r\\n"
+        L"  list NAME                 Create a list\\r\\n"
+        L"  set NAME VALUE            Update a variable\\r\\n"
+        L"  increase NAME [AMOUNT]    Add to a number\\r\\n"
+        L"  decrease NAME [AMOUNT]    Subtract from a number\\r\\n"
+        L"  NAME.field                Read or update a record field\\r\\n\\r\\n"
+        L"EXPRESSIONS AND MATH\\r\\n"
+        L"  Operators: +  -  *  /  %  ^  ( )  <  >  <=  >=  ==  !=  &&  ||\\r\\n"
+        L"  random MIN MAX RESULT     Generate a random value\\r\\n"
+        L"  sqrt(VALUE)               Square root\\r\\n"
+        L"  add (math)                Enables sin, cos, tan, asin, acos, atan,\\r\\n"
+        L"                            sqrt, abs, floor, ceil, round, min, max,\\r\\n"
+        L"                            clamp, distance, and related math helpers\\r\\n\\r\\n"
+        L"FLOW CONTROL\\r\\n"
+        L"  if CONDITION ( ... )\\r\\n"
+        L"  else ( ... )\\r\\n"
+        L"  loop CONDITION ( ... )\\r\\n"
+        L"  break | continue | stop\\r\\n"
+        L"  wait 250ms | wait 2s\\r\\n"
+        L"  every 100ms ( ... )      Repeating timer block\\r\\n"
+        L"  group NAME ( ... )       Group variables and UI objects\\r\\n"
+        L"  define NAME PARAMS ( ... )   Define a function\\r\\n"
+        L"  call NAME ARGUMENTS      Call a function\\r\\n"
+        L"  return [VALUE]            Return from a function\\r\\n\\r\\n"
+        L"LISTS AND COLLECTIONS\\r\\n"
+        L"  push LIST VALUE          Append an item\\r\\n"
+        L"  insert LIST INDEX VALUE  Insert an item (zero-based index)\\r\\n"
+        L"  get LIST INDEX RESULT    Read an item\\r\\n"
+        L"  set LIST INDEX VALUE     Replace an item\\r\\n"
+        L"  remove LIST INDEX        Remove an item\\r\\n"
+        L"  pop LIST RESULT          Remove the final item\\r\\n"
+        L"  join LIST SEPARATOR RESULT\\r\\n"
+        L"  split TEXT SEPARATOR RESULT\\r\\n"
+        L"  record TYPE ( ... )      Declare a record type\\r\\n"
+        L"  struct TYPE ( ... )      Alias for record\\r\\n"
+        L"  class TYPE ( ... )       Alias for record\\r\\n"
+        L"  new TYPE VARIABLE        Create a record instance\\r\\n\\r\\n"
+        L"TEXT HELPERS\\r\\n"
+        L"  upper TEXT RESULT | lower TEXT RESULT | trim TEXT RESULT\\r\\n"
+        L"  length TEXT RESULT | contains TEXT SEARCH RESULT\\r\\n"
+        L"  index_of TEXT SEARCH RESULT\\r\\n"
+        L"  replace TEXT SEARCH WITH RESULT\\r\\n"
+        L"  substring TEXT START COUNT RESULT\\r\\n"
+        L"  starts_with TEXT PREFIX RESULT | ends_with TEXT SUFFIX RESULT\\r\\n\\r\\n"
+        L"FILES AND PROJECTS  (add (files))\\r\\n"
+        L"  read_file PATH VARIABLE\\r\\n"
+        L"  write_file PATH TEXT... | append_file PATH TEXT...\\r\\n"
+        L"  file_exists PATH VARIABLE | delete_file PATH\\r\\n"
+        L"  add (plugin.trg) | run (file.trg)\\r\\n"
+        L"  add global ( ... ) | add connect (file.trg)\\r\\n\\r\\n"
+        L"JSON  (add (json))\\r\\n"
+        L"  json GROUP clean RESULT\\r\\n"
+        L"  json GROUP compressed RESULT\\r\\n"
+        L"  json read (PATH)\\r\\n"
+        L"  create FILE (LOCATION) RESULT\\r\\n\\r\\n"
+        L"DATABASE  (add (database))\\r\\n"
+        L"  database open PATH | database save\\r\\n"
+        L"  table create NAME COLUMNS...\\r\\n"
+        L"  record add/get/update/delete ...\\r\\n"
+        L"  query ...\\r\\n\\r\\n"
+        L"UI AND 2D  (add (ui))\\r\\n"
+        L"  text NAME VALUE x X y Y size SIZE color COLOR\\r\\n"
+        L"  button NAME LABEL x X y Y w W h H color COLOR ( ... )\\r\\n"
+        L"  block z Z x X y Y w W h H color COLOR name NAME\\r\\n"
+        L"  sprite NAME FILE x X y Y w W h H\\r\\n"
+        L"  ui create block NAME x X y Y w W h H color COLOR shape SHAPE\\r\\n"
+        L"  ui duplicate SOURCE NAME | ui rename OLD NEW | ui delete NAME\\r\\n"
+        L"  ui move NAME DX DY | ui resize NAME DW DH\\r\\n"
+        L"  ui color NAME COLOR | ui shape NAME SHAPE\\r\\n"
+        L"  animate NAME x DX y DY fps FPS time SECONDS\\r\\n\\r\\n"
+        L"3D SCENES  (add (3d))\\r\\n"
+        L"  3d box NAME x X y Y z Z w W h H d D color COLOR\\r\\n"
+        L"  3d sphere NAME x X y Y z Z size SIZE color COLOR\\r\\n"
+        L"  3d camera NAME x X y Y z Z w W h H d D color COLOR\\r\\n"
+        L"  3d spawn NAME x X y Y z Z size SIZE color COLOR\\r\\n"
+        L"  3d plane NAME x X y Y z Z w W h H d D color COLOR\\r\\n"
+        L"  3d duplicate SOURCE NAME | 3d rename OLD NEW | 3d delete NAME\\r\\n"
+        L"  3d move NAME DX DY DZ | 3d rotate NAME RX RY RZ\\r\\n"
+        L"  3d scale NAME FACTOR | 3d color NAME COLOR\\r\\n"
+        L"  3d texture NAME smooth|grid|metal|wood|stone\\r\\n"
+        L"  3d save FILE.trgscene | 3d load FILE.trgscene\\r\\n"
+        L"  Desktop engine: WASD move, Q/E rise/drop, arrow keys look,\\r\\n"
+        L"  drag empty viewport to orbit, drag assets to add scene objects,\\r\\n"
+        L"  drag models to move, right-click a model for its properties.\\r\\n\\r\\n"
+        L"COLLISION AND CONTROLS\\r\\n"
+        L"  add (collision) | collides A B RESULT | watch_collision A B RESULT\\r\\n"
+        L"  add (controls) | add (animation)\\r\\n"
+        L"  move_ui OBJECT x DX y DY\\r\\n\\r\\n"
+        L"WEB, MEDIA, AND AI\\r\\n"
+        L"  add (web): web_page, web_heading, web_text, web_button, web_image, web_show\\r\\n"
+        L"  play_audio FILE | show_image FILE | play_video FILE\\r\\n"
+        L"  add (ai): ai create, teach, train, predict, classify\\r\\n"
+        L"  add (all) enables the built-in libraries.\\r\\n\\r\\n"
+        L"COLORS accept #RRGGBB or 0xRRGGBB.";
+    const wchar_t* className = L"TRGDictionaryWindow";
+    WNDCLASSW wc = {};
+    wc.lpfnWndProc = dictionaryWindowProc;
+    wc.hInstance = GetModuleHandleW(nullptr);
+    wc.lpszClassName = className;
+    wc.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
+    if (!RegisterClassW(&wc) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) return;
+    if (!dictionaryWindow) {
+        dictionaryWindow = CreateWindowExW(WS_EX_TOOLWINDOW, className,
+            L"TRG Command Dictionary", WS_OVERLAPPEDWINDOW,
+            CW_USEDEFAULT, CW_USEDEFAULT, scaleForDpi(owner, 760), scaleForDpi(owner, 680),
+            owner, nullptr, wc.hInstance, nullptr);
+    }
+    if (dictionaryWindow) {
+        ShowWindow(dictionaryWindow, SW_SHOW);
+        SetForegroundWindow(dictionaryWindow);
+    }
+}
+
+
 void updateEditorWindowTitle() {
     if (!mainWindow) return;
     std::wstring title = L"TRG Editor - ";
