@@ -307,6 +307,7 @@ length objects objectCount
 selectedIndex = 0
 get objects selectedIndex selectedName
 set_text model_label selectedName
+        set_text hierarchy_selected selectedName
 set_text hierarchy_selected selectedName
 set_text object_count objectCount
 set_text current_color_label currentColor
@@ -319,6 +320,7 @@ button add_box "＋ BOX" x 21 y 19 w 10 h 4 color #56368F (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text model_label selectedName
+        set_text hierarchy_selected selectedName
     set_text object_count objectCount
 )
 button add_sphere "＋ SPHERE" x 32 y 19 w 13 h 4 color #30243F (
@@ -328,6 +330,7 @@ button add_sphere "＋ SPHERE" x 32 y 19 w 13 h 4 color #30243F (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text model_label selectedName
+        set_text hierarchy_selected selectedName
     set_text object_count objectCount
 )
 button duplicate "DUPLICATE" x 46 y 19 w 12 h 4 color #30243F (
@@ -338,6 +341,7 @@ button duplicate "DUPLICATE" x 46 y 19 w 12 h 4 color #30243F (
         selectedIndex = objectCount - 1
         get objects selectedIndex selectedName
         set_text model_label selectedName
+        set_text hierarchy_selected selectedName
         set_text object_count objectCount
     )
 )
@@ -352,6 +356,7 @@ button delete "DELETE" x 59 y 19 w 10 h 4 color #652A45 (
             )
             get objects selectedIndex selectedName
             set_text model_label selectedName
+        set_text hierarchy_selected selectedName
         )
         else (
             selectedName = ""
@@ -365,17 +370,23 @@ button delete "DELETE" x 59 y 19 w 10 h 4 color #652A45 (
 button previous "PREV" x 2 y 60 w 7 h 4 color #30243F (
     if objectCount > 0 (
         selectedIndex = selectedIndex - 1
-        if selectedIndex < 0 ( selectedIndex = objectCount - 1 )
+        if selectedIndex < 0 (
+            selectedIndex = objectCount - 1
+        )
         get objects selectedIndex selectedName
         set_text model_label selectedName
+        set_text hierarchy_selected selectedName
     )
 )
 button next "NEXT" x 10 y 60 w 7 h 4 color #30243F (
     if objectCount > 0 (
         selectedIndex = selectedIndex + 1
-        if selectedIndex >= objectCount ( selectedIndex = 0 )
+        if selectedIndex >= objectCount (
+            selectedIndex = 0
+        )
         get objects selectedIndex selectedName
         set_text model_label selectedName
+        set_text hierarchy_selected selectedName
     )
 )
 button rename "RENAME" x 82 y 35 w 16 h 4 color #30243F (
@@ -386,6 +397,7 @@ button rename "RENAME" x 82 y 35 w 16 h 4 color #30243F (
         insert objects selectedIndex renameInput
         selectedName = renameInput
         set_text model_label selectedName
+        set_text hierarchy_selected selectedName
     )
 )
 button scale "SCALE" x 82 y 42 w 16 h 4 color #56368F (
@@ -415,6 +427,8 @@ button material "CHANGE MATERIAL" x 82 y 57 w 16 h 4 color #56368F (
         )
         3d color selectedName currentColor
         set_text model_label selectedName
+        set_text hierarchy_selected selectedName
+        set_text current_color_label currentColor
     )
 )
 
