@@ -6340,9 +6340,409 @@ void createDesktop3DAsset(int kind, double x, double y, double z) {
     }
     ui3DObjects.push_back(std::move(model));
     desktop3DSelectedName = ui3DObjects.back().name;
+
     syncDesktop3DEditorState();
 }
 
+void updateDesktop3DLayout(HWND window, const DesktopLayout& layout) {
+    const LONG width = std::max<LONG>(1, layout.width);
+    const LONG canvasBottom = layout.panelTop;
+    const LONG margin = scaleForDpi(window, 10);
+    const LONG gap = scaleForDpi(window, 7);
+    const LONG toolbarHeight = scaleForDpi(window, 40);
+    const LONG shelfHeight = std::clamp<LONG>(layout.canvasHeight / 5,
+        scaleForDpi(window, 96), scaleForDpi(window, 128));
+    const LONG sideTop = toolbarHeight + gap * 2;
+    const LONG shelfTop = std::max<LONG>(sideTop + scaleForDpi(window, 90),
+        canvasBottom - shelfHeight);
+    const LONG hierarchyWidth = std::clamp<LONG>(width / 5,
+        scaleForDpi(window, 168), scaleForDpi(window, 224));
+    const LONG inspectorWidth = std::clamp<LONG>(width / 4,
+        scaleForDpi(window, 194), scaleForDpi(window, 258));
+    desktop3DToolbarRect = {margin, margin, width - margin, margin + toolbarHeight};
+    desktop3DHierarchyRect = {margin, sideTop, margin + hierarchyWidth, shelfTop - gap};
+    desktop3DInspectorRect = {width - margin - inspectorWidth, sideTop,
+        width - margin, shelfTop - gap};
+    desktop3DViewportRect = {desktop3DHierarchyRect.right + gap, sideTop,
+        desktop3DInspectorRect.left - gap, shelfTop - gap};
+    desktop3DAssetShelfRect = {margin, shelfTop, width - margin,
+        std::max<LONG>(shelfTop + scaleForDpi(window, 72), canvasBottom - margin)};
+
+    const LONG toolGap = scaleForDpi(window, 6);
+    const LONG toolPadding = scaleForDpi(window, 8);
+    const LONG toolWidth = std::max<LONG>(scaleForDpi(window, 40),
+        (desktop3DToolbarRect.right - desktop3DToolbarRect.left -
+            toolPadding * 2 - toolGap * 6) / 7);
+    const wchar_t* toolLabels[] = {
+        L"SELECT", L"MOVE", L"ROTATE", L"SCALE", L"SAVE SCENE", L"LOAD SCENE", L"RESET VIEW"
+    };
+    LONG toolX = desktop3DToolbarRect.left + toolPadding;
+    for (std::size_t index = 0; index < desktop3DToolRects.size(); ++index) {
+        const LONG itemWidth = index == 4 || index == 5
+            ? std::max<LONG>(toolWidth, scaleForDpi(window, 78)) : toolWidth;
+        desktop3DToolRects[index] = {toolX, desktop3DToolbarRect.top + scaleForDpi(window, 5),
+            std::min<LONG>(desktop3DToolbarRect.right - toolPadding, toolX + itemWidth),
+            desktop3DToolbarRect.bottom - scaleForDpi(window, 5)};
+        toolX += itemWidth + toolGap;
+    }
+
+    const LONG shelfLabelHeight = scaleForDpi(window, 24);
+    const LONG cardTop = desktop3DAssetShelfRect.top + shelfLabelHeight + scaleForDpi(window, 4);
+    const LONG cardBottom = desktop3DAssetShelfRect.bottom - scaleForDpi(window, 7);
+    const LONG assetStart = desktop3DAssetShelfRect.left + scaleForDpi(window, 82);
+    const LONG textureWidth = std::clamp<LONG>((width - scaleForDpi(window, 40)) / 14,
+        scaleForDpi(window, 48), scaleForDpi(window, 70));
+    const LONG textureGap = scaleForDpi(window, 5);
+    const LONG textureStart = desktop3DAssetShelfRect.right -
+        (textureWidth * 5 + textureGap * 4);
+    const LONG assetEnd = textureStart - scaleForDpi(window, 18);
+    const LONG assetGap = scaleForDpi(window, 5);
+    const LONG assetWidth = std::max<LONG>(scaleForDpi(window, 48),
+        (assetEnd - assetStart - assetGap * 4) / 5);
+    for (std::size_t index = 0; index < desktop3DAssetRects.size(); ++index) {
+        const LONG left = assetStart + static_cast<LONG>(index) * (assetWidth + assetGap);
+        desktop3DAssetRects[index] = {left, cardTop,
+            std::min<LONG>(assetEnd, left + assetWidth), cardBottom};
+        const LONG textureLeft = textureStart +
+            static_cast<LONG>(index) * (textureWidth + textureGap);
+        desktop3DTextureRects[index] = {textureLeft, cardTop,
+            textureLeft + textureWidth, cardBottom};
+    }
+    desktop3DWorldScale = std::max<double>(8.0,
+        std::min<LONG>(desktop3DViewportRect.right - desktop3DViewportRect.left,
+                       desktop3DViewportRect.bottom - desktop3DViewportRect.top) *
+            0.19 * desktop3DZoom);
+}
+
+bool projectDesktop3DPoint(double x, double y, double z, POINT& result) {
+    const double dx = x - desktop3DCameraX;
+    const double dy = y - desktop3DCameraY;
+    const double dz = z - desktop3DCameraZ;
+    const double cosYaw = std::cos(desktop3DCameraYaw);
+    const double sinYaw = std::sin(desktop3DCameraYaw);
+    const double viewX = dx * cosYaw - dz * sinYaw;
+    const double forwardZ = dx * sinYaw + dz * cosYaw;
+    const double cosPitch = std::cos(desktop3DCameraPitch);
+    const double sinPitch = std::sin(desktop3DCameraPitch);
+    const double viewY = dy * cosPitch - forwardZ * sinPitch;
+    const double depth = forwardZ * cosPitch + dy * sinPitch;
+    if (depth <= 0.25) return false;
+    const double perspective = 12.0 / depth;
+    const double centerX = (desktop3DViewportRect.left + desktop3DViewportRect.right) * 0.5;
+    const double centerY = (desktop3DViewportRect.top + desktop3DViewportRect.bottom) * 0.5;
+    result.x = static_cast<LONG>(centerX + viewX * desktop3DWorldScale * perspective);
+    result.y = static_cast<LONG>(centerY - viewY * desktop3DWorldScale * perspective);
+    return true;
+}
+
+void drawDesktop3DGrid(HDC dc) {
+    if (!desktop3DGridVisible) return;
+    HPEN gridPen = CreatePen(PS_SOLID, 1, RGB(43, 37, 57));
+    HGDIOBJ oldPen = SelectObject(dc, gridPen);
+    for (int x = -24; x <= 24; ++x) {
+        POINT first{}, last{};
+        if (projectDesktop3DPoint(x, -1.35, -7, first) &&
+            projectDesktop3DPoint(x, -1.35, 34, last)) {
+            MoveToEx(dc, first.x, first.y, nullptr);
+            LineTo(dc, last.x, last.y);
+        }
+    }
+    for (int z = -7; z <= 34; ++z) {
+        POINT first{}, last{};
+        if (projectDesktop3DPoint(-24, -1.35, z, first) &&
+            projectDesktop3DPoint(24, -1.35, z, last)) {
+            MoveToEx(dc, first.x, first.y, nullptr);
+            LineTo(dc, last.x, last.y);
+        }
+    }
+    HPEN axisX = CreatePen(PS_SOLID, 2, RGB(173, 77, 93));
+    SelectObject(dc, axisX);
+    POINT x1{}, x2{};
+    if (projectDesktop3DPoint(-24, -1.34, 0, x1) &&
+        projectDesktop3DPoint(24, -1.34, 0, x2)) {
+        MoveToEx(dc, x1.x, x1.y, nullptr);
+        LineTo(dc, x2.x, x2.y);
+    }
+    HPEN axisZ = CreatePen(PS_SOLID, 2, RGB(82, 128, 194));
+    SelectObject(dc, axisZ);
+    POINT z1{}, z2{};
+    if (projectDesktop3DPoint(0, -1.34, -7, z1) &&
+        projectDesktop3DPoint(0, -1.34, 34, z2)) {
+        MoveToEx(dc, z1.x, z1.y, nullptr);
+        LineTo(dc, z2.x, z2.y);
+    }
+    SelectObject(dc, oldPen);
+    DeleteObject(gridPen);
+    DeleteObject(axisX);
+    DeleteObject(axisZ);
+}
+
+void runDesktop3DCommand(const std::string& command) {
+    const std::vector<std::string> lines = {command};
+    Flow commandFlow;
+    executeBlock(lines, 0, lines.size(), uiVariables, uiTypes, uiDefaults,
+        commandFlow, false, true);
+    syncDesktop3DEditorState();
+}
+
+void drawDesktop3DWorkspaceChrome(HDC dc, HWND window, const DesktopLayout& layout) {
+    auto fillPanel = [&](const RECT& rect, COLORREF fill, COLORREF border, int radius = 8) {
+        HBRUSH brush = CreateSolidBrush(fill);
+        HPEN pen = CreatePen(PS_SOLID, 1, border);
+        HGDIOBJ oldBrush = SelectObject(dc, brush);
+        HGDIOBJ oldPen = SelectObject(dc, pen);
+        RoundRect(dc, rect.left, rect.top, rect.right, rect.bottom,
+            scaleForDpi(window, radius), scaleForDpi(window, radius));
+        SelectObject(dc, oldBrush);
+        SelectObject(dc, oldPen);
+        DeleteObject(brush);
+        DeleteObject(pen);
+    };
+    auto drawLabel = [&](const std::wstring& value, RECT rect, COLORREF color,
+                         int size, bool bold = false, UINT format = DT_LEFT | DT_VCENTER | DT_SINGLELINE) {
+        HFONT font = CreateFontW(-scaleForDpi(window, size), 0, 0, 0,
+            bold ? FW_BOLD : FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+            OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+            DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+        HGDIOBJ oldFont = SelectObject(dc, font);
+        SetBkMode(dc, TRANSPARENT);
+        SetTextColor(dc, color);
+        DrawTextW(dc, value.c_str(), -1, &rect, format);
+        SelectObject(dc, oldFont);
+        DeleteObject(font);
+    };
+    auto drawButton = [&](const RECT& rect, const wchar_t* label, bool active) {
+        fillPanel(rect, active ? RGB(91, 61, 145) : RGB(39, 31, 54),
+            active ? RGB(165, 127, 236) : RGB(73, 61, 91), 6);
+        drawLabel(label, rect, RGB(242, 235, 255), 10, true,
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+    };
+
+    fillPanel(desktop3DToolbarRect, RGB(29, 22, 42), RGB(65, 51, 88), 8);
+    const wchar_t* toolbarLabels[] = {
+        L"SELECT", L"MOVE", L"ROTATE", L"SCALE", L"SAVE SCENE", L"LOAD SCENE", L"RESET VIEW"
+    };
+    for (std::size_t index = 0; index < desktop3DToolRects.size(); ++index)
+        drawButton(desktop3DToolRects[index], toolbarLabels[index],
+            index < 4 && desktop3DToolMode == static_cast<int>(index));
+
+    fillPanel(desktop3DHierarchyRect, RGB(24, 19, 35), RGB(58, 46, 77), 8);
+    fillPanel(desktop3DInspectorRect, RGB(24, 19, 35), RGB(58, 46, 77), 8);
+    fillPanel(desktop3DAssetShelfRect, RGB(24, 19, 35), RGB(58, 46, 77), 8);
+    RECT hierarchyTitle = {desktop3DHierarchyRect.left + scaleForDpi(window, 12),
+        desktop3DHierarchyRect.top + scaleForDpi(window, 8),
+        desktop3DHierarchyRect.right - scaleForDpi(window, 8),
+        desktop3DHierarchyRect.top + scaleForDpi(window, 32)};
+    drawLabel(L"WORLD  /  HIERARCHY", hierarchyTitle, RGB(207, 184, 246), 11, true);
+    RECT sceneTitle = hierarchyTitle;
+    sceneTitle.top += scaleForDpi(window, 27);
+    sceneTitle.bottom += scaleForDpi(window, 27);
+    drawLabel(L"Scene", sceneTitle, RGB(143, 130, 166), 10, true);
+
+    const LONG rowTop = desktop3DHierarchyRect.top + scaleForDpi(window, 60);
+    const LONG rowHeight = scaleForDpi(window, 25);
+    const LONG maxVisible = std::max<LONG>(0,
+        (desktop3DHierarchyRect.bottom - rowTop - scaleForDpi(window, 8)) / rowHeight);
+    if (ui3DObjects.empty()) {
+        RECT empty = {desktop3DHierarchyRect.left + scaleForDpi(window, 15), rowTop,
+            desktop3DHierarchyRect.right - scaleForDpi(window, 8), rowTop + rowHeight};
+        drawLabel(L"No objects in scene", empty, RGB(133, 121, 151), 10);
+    }
+    for (LONG visible = 0; visible < maxVisible; ++visible) {
+        const std::size_t index = static_cast<std::size_t>(desktop3DHierarchyScroll + visible);
+        if (index >= ui3DObjects.size()) break;
+        const Ui3DObject& model = ui3DObjects[index];
+        RECT row = {desktop3DHierarchyRect.left + scaleForDpi(window, 6),
+            rowTop + visible * rowHeight,
+            desktop3DHierarchyRect.right - scaleForDpi(window, 6),
+            rowTop + (visible + 1) * rowHeight};
+        if (model.name == desktop3DSelectedName) {
+            HBRUSH selectedBrush = CreateSolidBrush(RGB(55, 42, 78));
+            FillRect(dc, &row, selectedBrush);
+            DeleteObject(selectedBrush);
+            RECT accent = {row.left, row.top, row.left + scaleForDpi(window, 3), row.bottom};
+            HBRUSH accentBrush = CreateSolidBrush(RGB(171, 129, 255));
+            FillRect(dc, &accent, accentBrush);
+            DeleteObject(accentBrush);
+        }
+        RECT label = row;
+        InflateRect(&label, -scaleForDpi(window, 10), 0);
+        drawLabel(wideFromUtf8(model.name), label,
+            model.name == desktop3DSelectedName ? RGB(248, 242, 255) : RGB(190, 181, 207),
+            10, model.name == desktop3DSelectedName);
+    }
+    RECT hierarchyFoot = {desktop3DHierarchyRect.left + scaleForDpi(window, 12),
+        desktop3DHierarchyRect.bottom - scaleForDpi(window, 27),
+        desktop3DHierarchyRect.right - scaleForDpi(window, 8),
+        desktop3DHierarchyRect.bottom - scaleForDpi(window, 7)};
+    drawLabel(L"Scroll to browse objects", hierarchyFoot, RGB(119, 108, 137), 9);
+
+    RECT inspectorTitle = {desktop3DInspectorRect.left + scaleForDpi(window, 12),
+        desktop3DInspectorRect.top + scaleForDpi(window, 8),
+        desktop3DInspectorRect.right - scaleForDpi(window, 8),
+        desktop3DInspectorRect.top + scaleForDpi(window, 32)};
+    drawLabel(L"INSPECTOR", inspectorTitle, RGB(207, 184, 246), 11, true);
+    auto selected = std::find_if(ui3DObjects.begin(), ui3DObjects.end(),
+        [](const Ui3DObject& model) { return model.name == desktop3DSelectedName; });
+    LONG inspectorY = desktop3DInspectorRect.top + scaleForDpi(window, 48);
+    if (selected == ui3DObjects.end()) {
+        RECT hint = {desktop3DInspectorRect.left + scaleForDpi(window, 12), inspectorY,
+            desktop3DInspectorRect.right - scaleForDpi(window, 8), inspectorY + scaleForDpi(window, 68)};
+        drawLabel(L"Select an object to edit its properties.", hint,
+            RGB(145, 132, 166), 10, false, DT_LEFT | DT_TOP | DT_WORDBREAK);
+    } else {
+        const Ui3DObject& model = *selected;
+        auto field = [&](const wchar_t* name, const std::string& value) {
+            RECT label = {desktop3DInspectorRect.left + scaleForDpi(window, 12), inspectorY,
+                desktop3DInspectorRect.right - scaleForDpi(window, 8), inspectorY + scaleForDpi(window, 20)};
+            drawLabel(name, label, RGB(141, 126, 165), 9, true);
+            inspectorY += scaleForDpi(window, 17);
+            label.top = inspectorY;
+            label.bottom += scaleForDpi(window, 2);
+            drawLabel(wideFromUtf8(value), label, RGB(231, 222, 246), 10);
+            inspectorY += scaleForDpi(window, 27);
+        };
+        field(L"OBJECT", model.name + "  [" + model.shape + "]");
+        field(L"POSITION  X / Y / Z",
+            std::to_string(model.x) + "  /  " + std::to_string(model.y) + "  /  " + std::to_string(model.z));
+        field(L"ROTATION  X / Y / Z",
+            std::to_string(model.rotateX) + "  /  " + std::to_string(model.rotateY) + "  /  " + std::to_string(model.rotateZ));
+        field(L"SIZE  W / H / D",
+            std::to_string(model.width) + "  /  " + std::to_string(model.height) + "  /  " + std::to_string(model.depth));
+        field(L"MATERIAL", model.color);
+        field(L"TEXTURE", model.texture);
+        RECT hint = {desktop3DInspectorRect.left + scaleForDpi(window, 12),
+            desktop3DInspectorRect.bottom - scaleForDpi(window, 28),
+            desktop3DInspectorRect.right - scaleForDpi(window, 8),
+            desktop3DInspectorRect.bottom - scaleForDpi(window, 8)};
+        drawLabel(L"Right-click the model for actions", hint, RGB(143, 126, 166), 9);
+    }
+
+    RECT assetHeader = {desktop3DAssetShelfRect.left + scaleForDpi(window, 12),
+        desktop3DAssetShelfRect.top + scaleForDpi(window, 4),
+        desktop3DAssetShelfRect.right - scaleForDpi(window, 12),
+        desktop3DAssetShelfRect.top + scaleForDpi(window, 25)};
+    drawLabel(L"CONTENT BROWSER   /   ASSETS", assetHeader, RGB(207, 184, 246), 10, true);
+    const wchar_t* assetNames[] = {L"BOX", L"SPHERE", L"CAMERA", L"SPAWN", L"PLANE"};
+    const COLORREF assetColors[] = {
+        RGB(139, 92, 246), RGB(78, 153, 232), RGB(183, 155, 234),
+        RGB(229, 168, 89), RGB(102, 171, 133)
+    };
+    for (std::size_t index = 0; index < desktop3DAssetRects.size(); ++index) {
+        const RECT& card = desktop3DAssetRects[index];
+        fillPanel(card, RGB(36, 29, 51), RGB(72, 59, 93), 6);
+        const LONG cx = (card.left + card.right) / 2;
+        const LONG cy = card.top + scaleForDpi(window, 15);
+        const LONG unit = scaleForDpi(window, 8);
+        HBRUSH objectBrush = CreateSolidBrush(assetColors[index]);
+        HPEN objectPen = CreatePen(PS_SOLID, 1, assetColors[index]);
+        HGDIOBJ oldBrush = SelectObject(dc, objectBrush);
+        HGDIOBJ oldPen = SelectObject(dc, objectPen);
+        if (index == 1 || index == 3) {
+            if (index == 3) SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+            Ellipse(dc, cx - unit, cy - unit, cx + unit, cy + unit);
+        } else if (index == 2) {
+            SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+            Rectangle(dc, cx - unit - 2, cy - unit / 2, cx + unit - 2, cy + unit / 2);
+            MoveToEx(dc, cx + unit - 2, cy - unit / 2, nullptr);
+            LineTo(dc, cx + unit + 6, cy - unit);
+            LineTo(dc, cx + unit + 6, cy + unit);
+            LineTo(dc, cx + unit - 2, cy + unit / 2);
+        } else if (index == 4) {
+            Rectangle(dc, cx - unit - 4, cy - unit / 2, cx + unit + 4, cy + unit / 2);
+        } else {
+            Rectangle(dc, cx - unit, cy - unit, cx + unit, cy + unit);
+        }
+        SelectObject(dc, oldBrush);
+        SelectObject(dc, oldPen);
+        DeleteObject(objectBrush);
+        DeleteObject(objectPen);
+        RECT nameRect = {card.left + scaleForDpi(window, 2),
+            card.bottom - scaleForDpi(window, 19),
+            card.right - scaleForDpi(window, 2), card.bottom - scaleForDpi(window, 2)};
+        drawLabel(assetNames[index], nameRect, RGB(225, 215, 241), 9, true,
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+    }
+
+    const wchar_t* textureNames[] = {L"SMOOTH", L"GRID", L"METAL", L"WOOD", L"STONE"};
+    const COLORREF textureColors[] = {
+        RGB(130, 100, 177), RGB(70, 100, 137), RGB(130, 139, 153),
+        RGB(137, 90, 57), RGB(100, 104, 117)
+    };
+    for (std::size_t index = 0; index < desktop3DTextureRects.size(); ++index) {
+        const RECT& card = desktop3DTextureRects[index];
+        fillPanel(card, RGB(35, 29, 49), RGB(70, 59, 87), 5);
+        RECT swatch = {card.left + scaleForDpi(window, 5), card.top + scaleForDpi(window, 5),
+            card.right - scaleForDpi(window, 5), card.top + scaleForDpi(window, 24)};
+        HBRUSH swatchBrush = CreateSolidBrush(textureColors[index]);
+        FillRect(dc, &swatch, swatchBrush);
+        DeleteObject(swatchBrush);
+        if (index > 0) {
+            HBRUSH hatch = CreateHatchBrush(index == 1 ? HS_CROSS :
+                index == 2 ? HS_DIAGCROSS : index == 3 ? HS_FDIAGONAL : HS_BDIAGONAL,
+                RGB(225, 217, 238));
+            HGDIOBJ old = SelectObject(dc, hatch);
+            const int oldMode = SetBkMode(dc, TRANSPARENT);
+            Rectangle(dc, swatch.left, swatch.top, swatch.right, swatch.bottom);
+            SetBkMode(dc, oldMode);
+            SelectObject(dc, old);
+            DeleteObject(hatch);
+        }
+        RECT label = {card.left + scaleForDpi(window, 1),
+            card.bottom - scaleForDpi(window, 19), card.right - scaleForDpi(window, 1),
+            card.bottom - scaleForDpi(window, 2)};
+        drawLabel(textureNames[index], label, RGB(225, 215, 241), 8, true,
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+    }
+
+    if (desktop3DEngineActive && desktop3DAssetDragging && desktop3DAssetCandidate >= 0) {
+        const wchar_t* ghostNames[] = {L"BOX", L"SPHERE", L"CAMERA", L"SPAWN", L"PLANE"};
+        HPEN ghostPen = CreatePen(PS_DASH, 2, RGB(190, 150, 255));
+        HGDIOBJ oldPen = SelectObject(dc, ghostPen);
+        HGDIOBJ oldBrush = SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+        Ellipse(dc, desktop3DMouseCurrent.x - scaleForDpi(window, 19),
+            desktop3DMouseCurrent.y - scaleForDpi(window, 19),
+            desktop3DMouseCurrent.x + scaleForDpi(window, 19),
+            desktop3DMouseCurrent.y + scaleForDpi(window, 19));
+        RECT ghost = {desktop3DMouseCurrent.x - scaleForDpi(window, 46),
+            desktop3DMouseCurrent.y + scaleForDpi(window, 22),
+            desktop3DMouseCurrent.x + scaleForDpi(window, 46),
+            desktop3DMouseCurrent.y + scaleForDpi(window, 42)};
+        drawLabel(ghostNames[std::clamp(desktop3DAssetCandidate, 0, 4)], ghost,
+            RGB(225, 212, 255), 9, true, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        SelectObject(dc, oldBrush);
+        SelectObject(dc, oldPen);
+        DeleteObject(ghostPen);
+    }
+
+    if (desktop3DContextOpen) {
+        const RECT popup = desktop3DContextRect;
+        fillPanel(popup, RGB(30, 24, 43), RGB(119, 89, 163), 8);
+        RECT title = {popup.left + scaleForDpi(window, 12),
+            popup.top + scaleForDpi(window, 7),
+            popup.right - scaleForDpi(window, 8),
+            popup.top + scaleForDpi(window, 38)};
+        drawLabel(wideFromUtf8(desktop3DSelectedName), title,
+            RGB(239, 228, 255), 11, true, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+        const wchar_t* actions[] = {
+            L"Rename object", L"Duplicate object", L"Delete object",
+            L"Change texture", L"Focus selected object", L"Edit position..."
+        };
+        for (int row = 0; row < 6; ++row) {
+            RECT item = {popup.left + scaleForDpi(window, 7),
+                popup.top + scaleForDpi(window, 43 + row * 29),
+                popup.right - scaleForDpi(window, 7),
+                popup.top + scaleForDpi(window, 43 + (row + 1) * 29)};
+            if (row == 2) {
+                HBRUSH danger = CreateSolidBrush(RGB(74, 37, 55));
+                FillRect(dc, &item, danger);
+                DeleteObject(danger);
+            }
+            drawLabel(actions[row], item, row == 2 ? RGB(255, 163, 190) : RGB(222, 211, 239),
+                10, row == 0, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+        }
+    }
+}
 
 bool buildStandaloneTrgExecutable(const std::filesystem::path& sourcePath,
                                   std::filesystem::path& outputPath,
