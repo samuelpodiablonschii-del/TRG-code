@@ -239,7 +239,6 @@ word currentColor = "#8B5CF6"
 word renameInput = ""
 word scaleFactor = ""
 word rotateAmount = ""
-word objectCountText = ""
 list objects
 num objectCount = 0
 num selectedIndex = 0
@@ -284,7 +283,7 @@ text "Select with PREV/NEXT" x 2 y 55 size 1.05 color #8D7AA8
 
 text "SCENE VIEW" x 21 y 16 size 1.4 color #D7C5F4 bold true
 text "PERSPECTIVE   |   GRID ON" x 78 y 16 size 1.1 color #9E8AB8 align right
-text "No object selected" x 50 y 74 size 1.5 color #BDA6E8 align center
+text viewport_status "No object selected" x 50 y 74 size 1.5 color #BDA6E8 align center
 
 text "INSPECTOR" x 82 y 17 size 1.6 color #EDE4FA bold true
 text "TRANSFORM" x 82 y 23 size 1.2 color #BDA6E8 bold true
@@ -308,7 +307,7 @@ selectedIndex = 0
 get objects selectedIndex selectedName
 set_text model_label selectedName
         set_text hierarchy_selected selectedName
-set_text hierarchy_selected selectedName
+        set_text viewport_status selectedName
 set_text object_count objectCount
 set_text current_color_label currentColor
 
@@ -321,6 +320,7 @@ button add_box "＋ BOX" x 21 y 19 w 10 h 4 color #56368F (
     get objects selectedIndex selectedName
     set_text model_label selectedName
         set_text hierarchy_selected selectedName
+        set_text viewport_status selectedName
     set_text object_count objectCount
 )
 button add_sphere "＋ SPHERE" x 32 y 19 w 13 h 4 color #30243F (
@@ -331,6 +331,7 @@ button add_sphere "＋ SPHERE" x 32 y 19 w 13 h 4 color #30243F (
     get objects selectedIndex selectedName
     set_text model_label selectedName
         set_text hierarchy_selected selectedName
+        set_text viewport_status selectedName
     set_text object_count objectCount
 )
 button duplicate "DUPLICATE" x 46 y 19 w 12 h 4 color #30243F (
@@ -342,6 +343,7 @@ button duplicate "DUPLICATE" x 46 y 19 w 12 h 4 color #30243F (
         get objects selectedIndex selectedName
         set_text model_label selectedName
         set_text hierarchy_selected selectedName
+        set_text viewport_status selectedName
         set_text object_count objectCount
     )
 )
@@ -357,6 +359,7 @@ button delete "DELETE" x 59 y 19 w 10 h 4 color #652A45 (
             get objects selectedIndex selectedName
             set_text model_label selectedName
         set_text hierarchy_selected selectedName
+        set_text viewport_status selectedName
         )
         else (
             selectedName = ""
@@ -376,6 +379,7 @@ button previous "PREV" x 2 y 60 w 7 h 4 color #30243F (
         get objects selectedIndex selectedName
         set_text model_label selectedName
         set_text hierarchy_selected selectedName
+        set_text viewport_status selectedName
     )
 )
 button next "NEXT" x 10 y 60 w 7 h 4 color #30243F (
@@ -387,6 +391,7 @@ button next "NEXT" x 10 y 60 w 7 h 4 color #30243F (
         get objects selectedIndex selectedName
         set_text model_label selectedName
         set_text hierarchy_selected selectedName
+        set_text viewport_status selectedName
     )
 )
 button rename "RENAME" x 82 y 35 w 16 h 4 color #30243F (
@@ -398,6 +403,7 @@ button rename "RENAME" x 82 y 35 w 16 h 4 color #30243F (
         selectedName = renameInput
         set_text model_label selectedName
         set_text hierarchy_selected selectedName
+        set_text viewport_status selectedName
     )
 )
 button scale "SCALE" x 82 y 42 w 16 h 4 color #56368F (
@@ -428,6 +434,7 @@ button material "CHANGE MATERIAL" x 82 y 57 w 16 h 4 color #56368F (
         3d color selectedName currentColor
         set_text model_label selectedName
         set_text hierarchy_selected selectedName
+        set_text viewport_status selectedName
         set_text current_color_label currentColor
     )
 )
