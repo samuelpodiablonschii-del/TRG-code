@@ -602,6 +602,7 @@ double desktop3DDragStartX = 0.0, desktop3DDragStartY = 0.0;
 double desktop3DDragStartYaw = 0.0, desktop3DDragStartPitch = 0.0;
 bool desktop3DContextOpen = false;
 bool desktop3DRightClickMoved = false;
+int desktop3DHierarchyScroll = 0;
 POINT desktop3DContextPoint = {};
 POINT desktop3DMouseCurrent = {};
 RECT desktop3DContextRect = {};
@@ -6095,6 +6096,8 @@ void syncDesktop3DEditorState() {
         selected = ui3DObjects.begin();
         desktop3DSelectedName = selected->name;
     }
+    desktop3DHierarchyScroll = std::clamp(desktop3DHierarchyScroll, 0,
+        std::max(0, static_cast<int>(ui3DObjects.size()) - 11));
     const std::size_t index = selected == ui3DObjects.end() ? 0 :
         static_cast<std::size_t>(std::distance(ui3DObjects.begin(), selected));
     uiVariables["selectedIndex"] = static_cast<double>(index);
@@ -6483,8 +6486,18 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         return 0;
     }
     if (message == WM_MOUSEWHEEL && desktop3DEngineActive && previewMode) {
-        const double factor = GET_WHEEL_DELTA_WPARAM(wParam) > 0 ? 1.12 : 0.89;
-        desktop3DZoom = std::clamp(desktop3DZoom * factor, 0.35, 3.5);
+        POINT cursor = {};
+        GetCursorPos(&cursor);
+        ScreenToClient(window, &cursor);
+        const int delta = GET_WHEEL_DELTA_WPARAM(wParam);
+        if (cursor.x < desktop3DViewportRect.left) {
+            const int maximum = std::max(0, static_cast<int>(ui3DObjects.size()) - 11);
+            desktop3DHierarchyScroll = std::clamp(desktop3DHierarchyScroll + (delta > 0 ? -3 : 3),
+                0, maximum);
+        } else if (PtInRect(&desktop3DViewportRect, cursor)) {
+            const double factor = delta > 0 ? 1.12 : 0.89;
+            desktop3DZoom = std::clamp(desktop3DZoom * factor, 0.35, 3.5);
+        }
         InvalidateRect(window, nullptr, FALSE);
         return 0;
     }
@@ -6524,8 +6537,12 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 GetClientRect(window, &client);
                 const LONG popupWidth = scaleForDpi(window, 224);
                 const LONG popupHeight = scaleForDpi(window, 204);
-                const LONG x = std::clamp<LONG>(point.x, 4, std::max<LONG>(4, client.right - popupWidth - 4));
-                const LONG y = std::clamp<LONG>(point.y, 4, std::max<LONG>(4, client.bottom - popupHeight - 4));
+                const LONG x = std::clamp<LONG>(point.x, desktop3DViewportRect.left + 4,
+                    std::max<LONG>(desktop3DViewportRect.left + 4,
+                        desktop3DViewportRect.right - popupWidth - 4));
+                const LONG y = std::clamp<LONG>(point.y, desktop3DViewportRect.top + 4,
+                    std::max<LONG>(desktop3DViewportRect.top + 4,
+                        desktop3DViewportRect.bottom - popupHeight - 4));
                 desktop3DContextRect = {x, y, x + popupWidth, y + popupHeight};
                 desktop3DContextPoint = point;
                 desktop3DContextOpen = true;
@@ -6605,7 +6622,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         }
         if (desktop3DAssetCandidate < 0 && point.x < desktop3DViewportRect.left) {
             const double rowY = py;
-            const int row = static_cast<int>((rowY - 25.0) / 4.2);
+            const int row = static_cast<int>((rowY - 25.0) / 4.2) + desktop3DHierarchyScroll;
             if (row >= 0 && static_cast<std::size_t>(row) < ui3DObjects.size()) {
                 desktop3DSelectedName = ui3DObjects[static_cast<std::size_t>(row)].name;
                 syncDesktop3DEditorState();
@@ -7192,10 +7209,13 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                     rowRight, rowTop + rowHeight};
                 DrawTextW(dc, L"No objects yet", -1, &emptyRow, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
             }
-            for (std::size_t index = 0; index < ui3DObjects.size() && index < 11; ++index) {
+            for (std::size_t visibleIndex = 0; visibleIndex < 11 &&
+                 static_cast<std::size_t>(desktop3DHierarchyScroll) + visibleIndex < ui3DObjects.size();
+                 ++visibleIndex) {
+                const std::size_t index = static_cast<std::size_t>(desktop3DHierarchyScroll) + visibleIndex;
                 const Ui3DObject& model = ui3DObjects[index];
-                RECT row = {rowLeft, rowTop + static_cast<LONG>(index) * rowHeight,
-                    rowRight, rowTop + static_cast<LONG>(index + 1) * rowHeight};
+                RECT row = {rowLeft, rowTop + static_cast<LONG>(visibleIndex) * rowHeight,
+                    rowRight, rowTop + static_cast<LONG>(visibleIndex + 1) * rowHeight};
                 if (model.name == desktop3DSelectedName) {
                     HBRUSH selectedBrush = CreateSolidBrush(RGB(57, 42, 80));
                     FillRect(dc, &row, selectedBrush);
