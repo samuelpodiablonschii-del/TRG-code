@@ -8497,7 +8497,7 @@ bool launchDesktopVisualEditor(const std::string& fileName) {
     if (fileName == "2DEditor.trg" || fileName == "2D Editor")
         embeddedSource = trg_builtin::editor2D;
     else if (fileName == "3DEditor.trg" || fileName == "3D Editor")
-        embeddedSource = trg_builtin::editor3D;
+        embeddedSource = trg_builtin::desktopEditor3D;
 
     if (!embeddedSource) {
         appendOutput("ERROR Unknown built-in visual editor.\r\n");
@@ -8523,6 +8523,9 @@ bool launchDesktopVisualEditor(const std::string& fileName) {
         desktop3DCameraYaw = 0.0;
         desktop3DCameraPitch = 0.18;
         desktop3DZoom = 1.0;
+        desktop3DToolMode = 1;
+        desktop3DGridVisible = true;
+        desktop3DHierarchyScroll = 0;
     }
     currentSourcePath.clear();
     projectRoot = std::filesystem::current_path();
@@ -8535,6 +8538,7 @@ bool launchDesktopVisualEditor(const std::string& fileName) {
     currentSourcePath = desktopPreviousPath;
     projectRoot = currentSourcePath.empty() ? std::filesystem::current_path() : currentSourcePath.parent_path();
     previewMode = true;
+    if (desktop3DEngineActive && mainWindow) SetTimer(mainWindow, 3, 16, nullptr);
     if (previewButton) SetWindowTextW(previewButton, L"Code");
     layoutOutputControls(mainWindow);
     if (mainWindow) SetFocus(mainWindow);
@@ -8549,6 +8553,7 @@ bool returnFromDesktopVisualEditor() {
     editorDirty = desktopPreviousDirty;
     desktopVisualEditorActive = false;
     desktop3DEngineActive = false;
+    KillTimer(mainWindow, 3);
     desktop3DContextOpen = false;
     desktop3DDraggingObject = false;
     desktop3DDraggingCamera = false;
