@@ -7445,6 +7445,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         FillRect(dc, &client, background);
         DeleteObject(background);
         const DesktopLayout layout = desktopLayout(window, client);
+        if (desktop3DEngineActive && previewMode) updateDesktop3DLayout(window, layout);
         RECT header = {0, 0, layout.width, layout.headerHeight};
         HBRUSH headerBrush = CreateSolidBrush(RGB(24, 17, 38));
         FillRect(dc, &header, headerBrush);
@@ -7628,16 +7629,18 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             }
         }
         const int sceneClipSave = SaveDC(dc);
-        const LONG viewportLeft = static_cast<LONG>(canvasWidth * 0.19);
-        const LONG viewportRight = static_cast<LONG>(canvasWidth * 0.80);
-        const LONG viewportTop = layout.headerHeight + static_cast<LONG>(canvasHeight * 0.13);
-        const LONG viewportBottom = layout.headerHeight + static_cast<LONG>(canvasHeight * 0.78);
-        desktop3DViewportRect = {viewportLeft, viewportTop, viewportRight, viewportBottom};
+        const LONG viewportLeft = desktop3DEngineActive && previewMode
+            ? desktop3DViewportRect.left : static_cast<LONG>(canvasWidth * 0.19);
+        const LONG viewportRight = desktop3DEngineActive && previewMode
+            ? desktop3DViewportRect.right : static_cast<LONG>(canvasWidth * 0.80);
+        const LONG viewportTop = desktop3DEngineActive && previewMode
+            ? desktop3DViewportRect.top : layout.headerHeight + static_cast<LONG>(canvasHeight * 0.13);
+        const LONG viewportBottom = desktop3DEngineActive && previewMode
+            ? desktop3DViewportRect.bottom : layout.headerHeight + static_cast<LONG>(canvasHeight * 0.78);
         if (desktop3DEngineActive && previewMode) {
-            desktop3DWorldScale = std::min<LONG>(viewportRight - viewportLeft,
-                viewportBottom - viewportTop) * 0.19 * desktop3DZoom;
-            IntersectClipRect(dc, viewportLeft, viewportTop, viewportRight, viewportBottom);
             desktop3DProjectedHits.clear();
+            IntersectClipRect(dc, viewportLeft, viewportTop, viewportRight, viewportBottom);
+            drawDesktop3DGrid(dc);
         }
         const std::array<std::array<int, 4>, 6> modelFaces = {{
             {{0, 1, 2, 3}}, {{4, 5, 6, 7}}, {{0, 3, 7, 4}},
@@ -7665,8 +7668,8 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             std::array<POINT, 8> projected{};
             const double viewWidth = std::max<LONG>(1, viewportRight - viewportLeft);
             const double viewHeight = std::max<LONG>(1, viewportBottom - viewportTop);
-            const double modelScale = std::min(viewWidth, viewHeight) * 0.19;
-            desktop3DWorldScale = modelScale * desktop3DZoom;
+            const double modelScale = std::min(viewWidth, viewHeight) * 0.19 * desktop3DZoom;
+            desktop3DWorldScale = modelScale;
             const double centerX = (viewportLeft + viewportRight) * 0.5;
             const double centerY = (viewportTop + viewportBottom) * 0.5;
             for (std::size_t vertex = 0; vertex < local.size(); ++vertex) {
@@ -7886,113 +7889,8 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             SelectObject(dc, previousFont);
             DeleteObject(font);
         }
-        if (desktop3DEngineActive && previewMode) {
-            const int hierarchyFontHeight = scaleForDpi(window, 12);
-            HFONT hierarchyFont = CreateFontW(-hierarchyFontHeight, 0, 0, 0, FW_NORMAL,
-                FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
-            HGDIOBJ oldHierarchyFont = SelectObject(dc, hierarchyFont);
-            SetBkMode(dc, TRANSPARENT);
-            const LONG rowTop = layout.headerHeight + static_cast<LONG>(canvasHeight * 0.265);
-            const LONG rowHeight = std::max<LONG>(scaleForDpi(window, 23),
-                static_cast<LONG>(canvasHeight * 0.043));
-            const LONG rowLeft = scaleForDpi(window, 8);
-            const LONG rowRight = static_cast<LONG>(canvasWidth * 0.185);
-            if (ui3DObjects.empty()) {
-                SetTextColor(dc, RGB(138, 123, 158));
-                RECT emptyRow = {rowLeft + scaleForDpi(window, 8), rowTop,
-                    rowRight, rowTop + rowHeight};
-                DrawTextW(dc, L"No objects yet", -1, &emptyRow, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-            }
-            for (std::size_t visibleIndex = 0; visibleIndex < 11 &&
-                 static_cast<std::size_t>(desktop3DHierarchyScroll) + visibleIndex < ui3DObjects.size();
-                 ++visibleIndex) {
-                const std::size_t index = static_cast<std::size_t>(desktop3DHierarchyScroll) + visibleIndex;
-                const Ui3DObject& model = ui3DObjects[index];
-                RECT row = {rowLeft, rowTop + static_cast<LONG>(visibleIndex) * rowHeight,
-                    rowRight, rowTop + static_cast<LONG>(visibleIndex + 1) * rowHeight};
-                if (model.name == desktop3DSelectedName) {
-                    HBRUSH selectedBrush = CreateSolidBrush(RGB(57, 42, 80));
-                    FillRect(dc, &row, selectedBrush);
-                    DeleteObject(selectedBrush);
-                    RECT edge = {row.left, row.top, row.left + scaleForDpi(window, 3), row.bottom};
-                    HBRUSH edgeBrush = CreateSolidBrush(RGB(171, 129, 255));
-                    FillRect(dc, &edge, edgeBrush);
-                    DeleteObject(edgeBrush);
-                }
-                SetTextColor(dc, model.name == desktop3DSelectedName
-                    ? RGB(247, 239, 255) : RGB(184, 169, 205));
-                RECT label = row;
-                InflateRect(&label, -scaleForDpi(window, 7), 0);
-                DrawTextW(dc, wideFromUtf8(model.name).c_str(), -1, &label,
-                    DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-            }
-            SelectObject(dc, oldHierarchyFont);
-            DeleteObject(hierarchyFont);
-        }
-        if (desktop3DEngineActive && desktop3DAssetDragging &&
-            desktop3DAssetCandidate >= 0) {
-            const wchar_t* assetNames[] = {L"BOX", L"SPHERE", L"CAMERA", L"SPAWN", L"PLANE"};
-            const int index = std::clamp(desktop3DAssetCandidate, 0, 4);
-            HPEN ghostPen = CreatePen(PS_DASH, 2, RGB(190, 150, 255));
-            HGDIOBJ oldGhostPen = SelectObject(dc, ghostPen);
-            HGDIOBJ oldGhostBrush = SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
-            Rectangle(dc, desktop3DMouseCurrent.x - scaleForDpi(window, 27),
-                desktop3DMouseCurrent.y - scaleForDpi(window, 18),
-                desktop3DMouseCurrent.x + scaleForDpi(window, 27),
-                desktop3DMouseCurrent.y + scaleForDpi(window, 18));
-            SetBkMode(dc, TRANSPARENT);
-            SetTextColor(dc, RGB(221, 202, 255));
-            RECT ghostLabel = {desktop3DMouseCurrent.x - scaleForDpi(window, 55),
-                desktop3DMouseCurrent.y + scaleForDpi(window, 21),
-                desktop3DMouseCurrent.x + scaleForDpi(window, 55),
-                desktop3DMouseCurrent.y + scaleForDpi(window, 42)};
-            DrawTextW(dc, assetNames[index], -1, &ghostLabel, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
-            SelectObject(dc, oldGhostBrush);
-            SelectObject(dc, oldGhostPen);
-            DeleteObject(ghostPen);
-        }
-        if (desktop3DEngineActive && desktop3DContextOpen) {
-            RECT popup = desktop3DContextRect;
-            HBRUSH popupBrush = CreateSolidBrush(RGB(28, 22, 39));
-            HPEN popupPen = CreatePen(PS_SOLID, 1, RGB(108, 80, 151));
-            HGDIOBJ oldPopupBrush = SelectObject(dc, popupBrush);
-            HGDIOBJ oldPopupPen = SelectObject(dc, popupPen);
-            RoundRect(dc, popup.left, popup.top, popup.right, popup.bottom,
-                scaleForDpi(window, 9), scaleForDpi(window, 9));
-            SelectObject(dc, oldPopupBrush);
-            SelectObject(dc, oldPopupPen);
-            DeleteObject(popupBrush);
-            DeleteObject(popupPen);
-            SetBkMode(dc, TRANSPARENT);
-            SetTextColor(dc, RGB(229, 216, 248));
-            HFONT popupFont = CreateFontW(-scaleForDpi(window, 13), 0, 0, 0, FW_BOLD,
-                FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
-            HGDIOBJ oldPopupFont = SelectObject(dc, popupFont);
-            RECT popupTitle = {popup.left + scaleForDpi(window, 12),
-                popup.top + scaleForDpi(window, 8), popup.right - scaleForDpi(window, 10),
-                popup.top + scaleForDpi(window, 37)};
-            const auto selected = std::find_if(ui3DObjects.begin(), ui3DObjects.end(),
-                [](const Ui3DObject& model) { return model.name == desktop3DSelectedName; });
-            std::wstring title = selected == ui3DObjects.end()
-                ? L"OBJECT PROPERTIES" : wideFromUtf8(selected->name);
-            DrawTextW(dc, title.c_str(), -1, &popupTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-            const wchar_t* actions[] = {L"Rename object", L"Duplicate", L"Delete", L"Change texture", L"Set position..."};
-            for (int row = 0; row < 5; ++row) {
-                RECT actionRect = {popup.left + scaleForDpi(window, 7),
-                    popup.top + scaleForDpi(window, 48 + row * 28),
-                    popup.right - scaleForDpi(window, 7),
-                    popup.top + scaleForDpi(window, 48 + (row + 1) * 28)};
-                if (row == 2) SetTextColor(dc, RGB(235, 147, 173));
-                else SetTextColor(dc, RGB(216, 204, 233));
-                DrawTextW(dc, actions[row], -1, &actionRect,
-                    DT_LEFT | DT_VCENTER | DT_SINGLELINE);
-                if (row == 2) SetTextColor(dc, RGB(216, 204, 233));
-            }
-            SelectObject(dc, oldPopupFont);
-            DeleteObject(popupFont);
-        }
+        if (desktop3DEngineActive && previewMode)
+            drawDesktop3DWorkspaceChrome(dc, window, layout);
 
         RECT outputHeader = {layout.margin, layout.panelTop,
             std::max<LONG>(layout.margin, layout.width - layout.margin),
