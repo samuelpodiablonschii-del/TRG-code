@@ -6754,6 +6754,14 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 executeBlock(button->body, 0, button->body.size(), uiVariables, uiTypes,
                              uiDefaults, flow, false, true);
                 if (desktop3DEngineActive) {
+                    if (button->name == "reset_view") {
+                        desktop3DCameraX = 0.0;
+                        desktop3DCameraY = 0.0;
+                        desktop3DCameraZ = -12.0;
+                        desktop3DCameraYaw = 0.0;
+                        desktop3DCameraPitch = 0.18;
+                        desktop3DZoom = 1.0;
+                    }
                     desktop3DSelectedName = static_cast<std::string>(uiVariables["selectedName"]);
                     syncDesktop3DEditorState();
                 }
