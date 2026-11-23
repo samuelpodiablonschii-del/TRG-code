@@ -221,37 +221,82 @@ get objects selectedIndex selectedName
 set_text object_label selectedName
 set_text object_count objectCount
 )TRGEDITOR2D";
-inline constexpr const char* editor3D = R"TRGEDITOR3D(// TRG Studio — touch-first 3D scene designer
-// One-finger drag moves a model; drag empty space to orbit.
-// Two fingers orbit and zoom at the same time.
+inline constexpr const char* editor3D = R"TRGEDITOR3D(// TRG Studio — desktop/mobile 3D engine workspace
+// Scene hierarchy, central 3D viewport, inspector and asset shelf.
 add (ui)
 add (3d)
 
 color accent = #9B6BFF
+color panel = #171222
+color panelRaised = #211832
+color muted = #A99ABD
 word selectedName = ""
-word currentColor = #8B5CF6
-word backgroundColor = "#FFFFFF"
+word currentColor = "#8B5CF6"
 word renameInput = ""
 word scaleFactor = ""
 word rotateAmount = ""
+word objectCountText = ""
 list objects
 num objectCount = 0
 num selectedIndex = 0
 
-block z 0 x 0 y 0 w 100 h 100 color #FFFFFF name EDITOR_BACKGROUND
-block z 1 x 0 y 0 w 100 h 1 color accent name EDITOR_ACCENT
-block z 1 x 3 y 13 w 94 h 54 color #171421 edges round name VIEWPORT_FRAME
-block z 2 x 4 y 14 w 92 h 52 color #FFFFFF edges round name VIEWPORT
-block z 3 x 9 y 56 w 82 h 0.2 color #E4E4EA name FLOOR_A
-block z 3 x 15 y 60 w 70 h 0.2 color #E4E4EA name FLOOR_B
-block z 3 x 22 y 64 w 56 h 0.2 color #E4E4EA name FLOOR_C
+// Engine shell and panel layout
+block z 0 x 0 y 0 w 100 h 100 color #100C19 name ENGINE_BACKGROUND
+block z 1 x 0 y 0 w 100 h 7 color #1B1429 name ENGINE_HEADER
+block z 2 x 0 y 7 w 100 h 7 color #241A35 name ENGINE_TOOLBAR
+block z 1 x 0 y 14 w 19 h 66 color #1B1429 name HIERARCHY_PANEL
+block z 1 x 19 y 14 w 61 h 66 color #0D0A15 name VIEWPORT_PANEL
+block z 1 x 80 y 14 w 20 h 66 color #1B1429 name INSPECTOR_PANEL
+block z 2 x 0 y 14 w 19 h 5 color #302044 name HIERARCHY_HEADER
+block z 2 x 80 y 14 w 20 h 5 color #302044 name INSPECTOR_HEADER
+block z 2 x 0 y 80 w 100 h 20 color #1B1429 name ASSET_PANEL
+block z 3 x 0 y 80 w 100 h 1 color #6B4A9E name ASSET_DIVIDER
 
-text "TRG / SCENE" x 4 y 7 size 3.3 color #211A30 bold true
-text "3D VIEWPORT" x 4 y 11 size 1.5 color #514963
-text "DRAG OBJECT  •  DRAG EMPTY SPACE TO ORBIT" x 95 y 11 size 1.2 color #514963 align right
-text model_label "No model selected" x 4 y 70 size 2.2 color #211A30 bold true
-text object_count "0 MODELS" x 95 y 70 size 1.4 color #514963 align right
+// Viewport grid and axes
+block z 3 x 22 y 70 w 55 h 0.25 color #40334F name GRID_LINE_1
+block z 3 x 26 y 65 w 47 h 0.2 color #352943 name GRID_LINE_2
+block z 3 x 31 y 60 w 37 h 0.2 color #352943 name GRID_LINE_3
+block z 3 x 36 y 55 w 27 h 0.2 color #352943 name GRID_LINE_4
+block z 3 x 49.8 y 21 w 0.25 h 49 color #49345F name AXIS_Y
+block z 3 x 22 y 69.8 w 55 h 0.25 color #49345F name AXIS_X
 
+text "TRG ENGINE" x 2 y 3.5 size 2.7 color #F4ECFF bold true
+text "SCENE EDITOR" x 14 y 3.5 size 1.3 color #BBA6D8
+text "FILE   EDIT   OBJECT   VIEW   BUILD" x 98 y 3.5 size 1.25 color #D8C9EC align right
+text "SELECT" x 2 y 10.5 size 1.5 color #EDE4FA bold true
+text "MOVE" x 13 y 10.5 size 1.5 color #BDA6E8
+text "ROTATE" x 22 y 10.5 size 1.5 color #BDA6E8
+text "SCALE" x 33 y 10.5 size 1.5 color #BDA6E8
+text "PLAY" x 98 y 10.5 size 1.5 color #D8C9EC align right
+
+text "HIERARCHY" x 2 y 17 size 1.6 color #EDE4FA bold true
+text "Scene" x 2 y 22 size 1.45 color #BDA6E8
+text "  Main Camera" x 2 y 27 size 1.25 color #B8A9C9
+text "  Directional Light" x 2 y 31 size 1.25 color #B8A9C9
+text selectedName x 2 y 36 size 1.25 color #D8C2FF bold true
+text "OBJECTS" x 2 y 43 size 1.2 color #8D7AA8
+text object_count x 2 y 47 size 1.3 color #CBB6EA
+text "Select with PREV/NEXT" x 2 y 55 size 1.05 color #8D7AA8
+
+text "SCENE VIEW" x 21 y 16 size 1.4 color #D7C5F4 bold true
+text "PERSPECTIVE   |   GRID ON" x 78 y 16 size 1.1 color #9E8AB8 align right
+text "No object selected" x 50 y 74 size 1.5 color #BDA6E8 align center
+
+text "INSPECTOR" x 82 y 17 size 1.6 color #EDE4FA bold true
+text "TRANSFORM" x 82 y 23 size 1.2 color #BDA6E8 bold true
+text "Selected:" x 82 y 28 size 1.1 color #8D7AA8
+text model_label x 82 y 32 size 1.2 color #F0E8FF
+text "Scale / Rotate" x 82 y 39 size 1.1 color #8D7AA8
+text "MATERIAL" x 82 y 49 size 1.2 color #BDA6E8 bold true
+text currentColor x 82 y 54 size 1.1 color #D8C9EC
+text "Use controls below" x 82 y 61 size 1.05 color #8D7AA8
+
+text "CONTENT BROWSER" x 2 y 83 size 1.5 color #EDE4FA bold true
+text "SCENE ASSETS" x 2 y 87 size 1.1 color #8D7AA8
+text "Primitives   Materials   Textures" x 2 y 92 size 1.2 color #BDA6E8
+text "TRG 3D WORKSPACE" x 98 y 96 size 1.1 color #8D7AA8 align right
+
+// Start with a model in the viewport.
 3d box auto x 0 y 0 z 0 w 3 h 3 d 3 color accent
 push objects last_3d_object
 length objects objectCount
@@ -260,7 +305,8 @@ get objects selectedIndex selectedName
 set_text model_label selectedName
 set_text object_count objectCount
 
-button add_box "＋ BOX" x 3 y 73 w 22 h 6 color #56368F (
+// Hierarchy and object creation controls.
+button add_box "＋ BOX" x 21 y 19 w 10 h 4 color #56368F (
     3d box auto x -2 y 0 z 0 w 2 h 2 d 2 color currentColor
     push objects last_3d_object
     length objects objectCount
@@ -269,7 +315,7 @@ button add_box "＋ BOX" x 3 y 73 w 22 h 6 color #56368F (
     set_text model_label selectedName
     set_text object_count objectCount
 )
-button add_sphere "＋ SPHERE" x 27 y 73 w 22 h 6 color #30243F (
+button add_sphere "＋ SPHERE" x 32 y 19 w 13 h 4 color #30243F (
     3d sphere auto x 2 y 0 z 0 size 2 color currentColor
     push objects last_3d_object
     length objects objectCount
@@ -278,7 +324,7 @@ button add_sphere "＋ SPHERE" x 27 y 73 w 22 h 6 color #30243F (
     set_text model_label selectedName
     set_text object_count objectCount
 )
-button duplicate "DUPLICATE" x 51 y 73 w 21 h 6 color #30243F (
+button duplicate "DUPLICATE" x 46 y 19 w 12 h 4 color #30243F (
     if objectCount > 0 (
         3d duplicate selectedName auto
         push objects last_3d_object
@@ -289,7 +335,7 @@ button duplicate "DUPLICATE" x 51 y 73 w 21 h 6 color #30243F (
         set_text object_count objectCount
     )
 )
-button delete "DELETE" x 74 y 73 w 23 h 6 color #652A45 (
+button delete "DELETE" x 59 y 19 w 10 h 4 color #652A45 (
     if objectCount > 0 (
         3d delete selectedName
         remove objects selectedIndex
@@ -303,35 +349,32 @@ button delete "DELETE" x 74 y 73 w 23 h 6 color #652A45 (
         )
         else (
             selectedName = ""
-            set_text model_label "No model selected"
+            set_text model_label "No object selected"
         )
         set_text object_count objectCount
     )
 )
 
-button previous "‹" x 3 y 81 w 10 h 6 color #30243F (
+// Object selection and inspector actions.
+button previous "PREV" x 2 y 60 w 7 h 4 color #30243F (
     if objectCount > 0 (
         selectedIndex = selectedIndex - 1
-        if selectedIndex < 0 (
-            selectedIndex = objectCount - 1
-        )
+        if selectedIndex < 0 ( selectedIndex = objectCount - 1 )
         get objects selectedIndex selectedName
         set_text model_label selectedName
     )
 )
-button next "›" x 15 y 81 w 10 h 6 color #30243F (
+button next "NEXT" x 10 y 60 w 7 h 4 color #30243F (
     if objectCount > 0 (
         selectedIndex = selectedIndex + 1
-        if selectedIndex >= objectCount (
-            selectedIndex = 0
-        )
+        if selectedIndex >= objectCount ( selectedIndex = 0 )
         get objects selectedIndex selectedName
         set_text model_label selectedName
     )
 )
-button name "NAME" x 27 y 81 w 15 h 6 color #30243F (
+button rename "RENAME" x 82 y 35 w 16 h 4 color #30243F (
     if objectCount > 0 (
-        ask "New model name:" renameInput
+        ask "New object name:" renameInput
         3d rename selectedName renameInput
         remove objects selectedIndex
         insert objects selectedIndex renameInput
@@ -339,13 +382,19 @@ button name "NAME" x 27 y 81 w 15 h 6 color #30243F (
         set_text model_label selectedName
     )
 )
-button resize "RESIZE" x 44 y 81 w 17 h 6 color #56368F (
+button scale "SCALE" x 82 y 42 w 16 h 4 color #56368F (
     if objectCount > 0 (
         ask "Scale factor (e.g. 1.2 or 0.8):" scaleFactor
         3d scale selectedName scaleFactor
     )
 )
-button color "COLOR" x 63 y 81 w 15 h 6 color #30243F (
+button rotate "ROTATE" x 82 y 45 w 16 h 4 color #30243F (
+    if objectCount > 0 (
+        ask "Rotation around Y in degrees:" rotateAmount
+        3d rotate selectedName 0 rotateAmount 0
+    )
+)
+button material "CHANGE MATERIAL" x 82 y 57 w 16 h 4 color #56368F (
     if objectCount > 0 (
         if currentColor = "#8B5CF6" (
             currentColor = "#3B82F6"
@@ -359,23 +408,19 @@ button color "COLOR" x 63 y 81 w 15 h 6 color #30243F (
             )
         )
         3d color selectedName currentColor
+        set_text model_label selectedName
     )
 )
-button rotate "ROTATE" x 80 y 81 w 17 h 6 color #30243F (
-    if objectCount > 0 (
-        ask "Rotate around Y in degrees:" rotateAmount
-        3d rotate selectedName 0 rotateAmount 0
-    )
+
+// Viewport and project actions.
+button reset_view "RESET VIEW" x 70 y 19 w 9 h 4 color #30243F (
+    say "Camera view reset."
 )
-button copy_code "COPY CODE" x 3 y 89 w 28 h 6 color #56368F (
-    say "Tap a model, then use COPY CODE to copy its TRG source."
+button save_scene "SAVE SCENE" x 70 y 24 w 9 h 4 color #56368F (
+    say "Use the TRG source editor to save the scene program."
 )
-button reset_view "RESET VIEW" x 33 y 89 w 28 h 6 color #30243F (
-    say "Camera reset is handled by the Android viewport."
+button controls "CONTROLS" x 70 y 29 w 9 h 4 color #30243F (
+    say "Drag a model to move it. Drag empty space to orbit. Pinch to zoom on touch screens."
 )
-button info "CONTROLS" x 63 y 89 w 34 h 6 color #30243F (
-    say "Drag a model to move it. Drag empty space to look around. Pinch and move two fingers to orbit and zoom."
-)
-text "PINCH TO ZOOM  •  TWO-FINGER DRAG TO LOOK AROUND" x 4 y 98 size 1.15 color #514963
-)TRGEDITOR3D";
+)TRGEDITOR3D"
 } // namespace trg_builtin
