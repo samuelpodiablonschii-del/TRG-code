@@ -111,7 +111,9 @@ text "OBJECT INSPECTOR" x 4 y 80 size 1.5 color #BDA7F5 bold true
 button previous "‹" x 4 y 83 w 8 h 5 color #30243F (
     if objectCount > 0 (
         selectedIndex = selectedIndex - 1
-        if selectedIndex < 0 ( selectedIndex = objectCount - 1 )
+            if selectedIndex < 0 (
+            selectedIndex = objectCount - 1
+        )
         get objects selectedIndex selectedName
         set_text object_label selectedName
     )
@@ -119,7 +121,9 @@ button previous "‹" x 4 y 83 w 8 h 5 color #30243F (
 button next "›" x 13 y 83 w 8 h 5 color #30243F (
     if objectCount > 0 (
         selectedIndex = selectedIndex + 1
-        if selectedIndex >= objectCount ( selectedIndex = 0 )
+        if selectedIndex >= objectCount (
+            selectedIndex = 0
+        )
         get objects selectedIndex selectedName
         set_text object_label selectedName
     )
@@ -273,9 +277,9 @@ text "HIERARCHY" x 2 y 17 size 1.6 color #EDE4FA bold true
 text "Scene" x 2 y 22 size 1.45 color #BDA6E8
 text "  Main Camera" x 2 y 27 size 1.25 color #B8A9C9
 text "  Directional Light" x 2 y 31 size 1.25 color #B8A9C9
-text selectedName x 2 y 36 size 1.25 color #D8C2FF bold true
+text hierarchy_selected "No object selected" x 2 y 36 size 1.25 color #D8C2FF bold true
 text "OBJECTS" x 2 y 43 size 1.2 color #8D7AA8
-text object_count x 2 y 47 size 1.3 color #CBB6EA
+text object_count "0 OBJECTS" x 2 y 47 size 1.3 color #CBB6EA
 text "Select with PREV/NEXT" x 2 y 55 size 1.05 color #8D7AA8
 
 text "SCENE VIEW" x 21 y 16 size 1.4 color #D7C5F4 bold true
@@ -285,10 +289,10 @@ text "No object selected" x 50 y 74 size 1.5 color #BDA6E8 align center
 text "INSPECTOR" x 82 y 17 size 1.6 color #EDE4FA bold true
 text "TRANSFORM" x 82 y 23 size 1.2 color #BDA6E8 bold true
 text "Selected:" x 82 y 28 size 1.1 color #8D7AA8
-text model_label x 82 y 32 size 1.2 color #F0E8FF
+text model_label "No selection" x 82 y 32 size 1.2 color #F0E8FF
 text "Scale / Rotate" x 82 y 39 size 1.1 color #8D7AA8
 text "MATERIAL" x 82 y 49 size 1.2 color #BDA6E8 bold true
-text currentColor x 82 y 54 size 1.1 color #D8C9EC
+text current_color_label "Material: purple" x 82 y 54 size 1.1 color #D8C9EC
 text "Use controls below" x 82 y 61 size 1.05 color #8D7AA8
 
 text "CONTENT BROWSER" x 2 y 83 size 1.5 color #EDE4FA bold true
@@ -303,7 +307,9 @@ length objects objectCount
 selectedIndex = 0
 get objects selectedIndex selectedName
 set_text model_label selectedName
+set_text hierarchy_selected selectedName
 set_text object_count objectCount
+set_text current_color_label currentColor
 
 // Hierarchy and object creation controls.
 button add_box "＋ BOX" x 21 y 19 w 10 h 4 color #56368F (
