@@ -1062,10 +1062,25 @@ void appendOutput(const std::string& text) {
 #ifdef TRG_TEST_CONSOLE
     std::cout << text;
 #else
-    outputBuffer += wideFromUtf8(text);
-    if (outputBuffer.size() > 20000) {
-        const std::size_t cutoff = outputBuffer.find(L'\n', outputBuffer.size() - 15000);
-        if (cutoff != std::wstring::npos) outputBuffer.erase(0, cutoff + 1);
+    const std::wstring addition = wideFromUtf8(text);
+    outputBuffer += addition;
+    bool trimmed = false;
+    if (outputBuffer.size() > 30000) {
+        const std::size_t cutoff = outputBuffer.find(L'\n', outputBuffer.size() - 22000);
+        if (cutoff != std::wstring::npos) {
+            outputBuffer.erase(0, cutoff + 1);
+            trimmed = true;
+        }
+    }
+    if (outputControl) {
+        if (trimmed) {
+            SetWindowTextW(outputControl, outputBuffer.c_str());
+        } else {
+            SendMessageW(outputControl, EM_SETSEL, static_cast<WPARAM>(-1), static_cast<LPARAM>(-1));
+            SendMessageW(outputControl, EM_REPLACESEL, FALSE, reinterpret_cast<LPARAM>(addition.c_str()));
+        }
+        SendMessageW(outputControl, EM_SETSEL, static_cast<WPARAM>(-1), static_cast<LPARAM>(-1));
+        SendMessageW(outputControl, EM_SCROLLCARET, 0, 0);
     }
     if (mainWindow) InvalidateRect(mainWindow, nullptr, FALSE);
 #endif
@@ -6136,6 +6151,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 case dictionaryButtonId: fill = RGB(48, 35, 68); break;
                 case editor2DButtonId:
                 case editor3DButtonId: fill = RGB(82, 55, 133); break;
+                case exportButtonId: fill = RGB(73, 55, 104); break;
                 default: break;
             }
             if (item->itemState & ODS_SELECTED) {
@@ -6226,24 +6242,43 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         return 0;
     }
     if (message == WM_COMMAND && LOWORD(wParam) == dictionaryButtonId) {
-        const wchar_t* dictionary =
-            L"TRG COMMAND DICTIONARY\n\n"
-            L"OUTPUT: print / show / say\n"
-            L"INPUT: ask \"Question?\" variable\n"
-            L"VARIABLES: let name = value; num, word, toggle, color\n"
-            L"FLOW: if, else, loop, break, stop, every, wait\n"
-            L"FUNCTIONS: function, return, call\n"
-            L"DATA: list, push, insert, get, set, remove, pop, join, split\n"
-            L"TEXT: upper, lower, trim, length, contains, replace, substring\n"
-            L"MATH: random; add (math) for sin, cos, tan, sqrt, abs, min, max, clamp, distance\n"
-            L"AI: add (ai); ai create, teach, train, predict, classify\n"
-            L"FILES: add (files); read_file, write_file, append_file, file_exists\n"
-            L"JSON: add (json); json GROUP clean RESULT / compressed RESULT\n"
-            L"DATABASE: add (database); database open/save; table create; record add/get/update/delete; query\n"
-            L"UI: add (ui); text, button, rectangle, circle, image, animate\n\n"
-            L"Blocks use parentheses: if score > 0 ( ... )\n"
-            L"Libraries are file-wide: add (math), add (ai), add (json), add (database), add (all).";
-        MessageBoxW(window, dictionary, L"TRG - Command Dictionary", MB_OK | MB_ICONINFORMATION);
+        showDesktopDictionary(window);
+        return 0;
+    }
+    if (message == WM_COMMAND && LOWORD(wParam) == exportButtonId) {
+        std::filesystem::path destination = currentSourcePath.empty()
+            ? std::filesystem::path(L"program.trg") : currentSourcePath.filename();
+        if (saveSourceDialog(destination, window)) {
+            if (lower(destination.extension().u8string()) != ".trg")
+                destination.replace_extension(".trg");
+            const int length = GetWindowTextLengthW(codeEditor);
+            std::wstring wideSource(static_cast<std::size_t>(length) + 1, L'\\0');
+            GetWindowTextW(codeEditor, wideSource.data(), length + 1);
+            wideSource.resize(static_cast<std::size_t>(length));
+            const std::string source = utf8FromWide(wideSource);
+            std::ofstream exported(destination, std::ios::binary | std::ios::trunc);
+            if (!exported) appendOutput("ERROR Could not export TRG source.\\r\\n");
+            else {
+                exported.write(source.data(), static_cast<std::streamsize>(source.size()));
+                if (exported) appendOutput("Exported TRG source: " + destination.u8string() + "\\r\\n");
+                else appendOutput("ERROR Failed while exporting TRG source.\\r\\n");
+            }
+        }
+        return 0;
+    }
+    if (message == WM_COMMAND && LOWORD(wParam) == terminalSendButtonId && terminalInputActive) {
+        const int length = GetWindowTextLengthW(terminalInputControl);
+        std::wstring answer(static_cast<std::size_t>(length) + 1, L'\\0');
+        GetWindowTextW(terminalInputControl, answer.data(), length + 1);
+        answer.resize(static_cast<std::size_t>(length));
+        inputResult = utf8FromWide(answer);
+        inputAccepted = true;
+        inputFinished = true;
+        terminalInputActive = false;
+        appendOutput("> " + inputResult + "\\r\\n");
+        SetWindowTextW(terminalInputControl, L"");
+        layoutOutputControls(window);
+        SetFocus(window);
         return 0;
     }
     if (message == WM_COMMAND && LOWORD(wParam) == buildButtonId) {
@@ -6683,14 +6718,24 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             SelectObject(dc, previousFont);
             DeleteObject(font);
         }
-        RECT outputArea = {
-            layout.margin, layout.outputTop,
-            std::max<LONG>(layout.margin, layout.width - layout.margin), layout.outputBottom
-        };
+        RECT outputHeader = {layout.margin, layout.panelTop,
+            std::max<LONG>(layout.margin, layout.width - layout.margin),
+            layout.panelTop + scaleForDpi(window, 25)};
+        HBRUSH outputHeaderBrush = CreateSolidBrush(RGB(34, 25, 48));
+        FillRect(dc, &outputHeader, outputHeaderBrush);
+        DeleteObject(outputHeaderBrush);
         SetBkMode(dc, TRANSPARENT);
-        SetTextColor(dc, RGB(245, 242, 255));
-        DrawTextW(dc, outputBuffer.c_str(), static_cast<int>(outputBuffer.size()), &outputArea,
-                  DT_LEFT | DT_TOP | DT_WORDBREAK | DT_NOPREFIX);
+        SetTextColor(dc, RGB(190, 160, 255));
+        HFONT terminalHeaderFont = CreateFontW(-scaleForDpi(window, 11), 0, 0, 0, FW_BOLD,
+            FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+        HGDIOBJ previousTerminalFont = SelectObject(dc, terminalHeaderFont);
+        RECT terminalCaption = outputHeader;
+        InflateRect(&terminalCaption, -scaleForDpi(window, 9), 0);
+        DrawTextW(dc, L"OUTPUT  /  TERMINAL", -1, &terminalCaption,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+        SelectObject(dc, previousTerminalFont);
+        DeleteObject(terminalHeaderFont);
         if (bodyFont) {
             SelectObject(dc, previousBodyFont);
             DeleteObject(bodyFont);
@@ -6709,6 +6754,8 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         codeEditor = nullptr;
         openButton = saveButton = runButton = previewButton = newButton = buildButton = dictionaryButton = nullptr;
         editor2DButton = editor3DButton = nullptr;
+        exportButton = outputControl = terminalInputControl = terminalSendButton = nullptr;
+        dictionaryWindow = dictionaryEdit = nullptr;
         desktopSpriteCache.clear();
         if (gdiplusToken != 0) {
             Gdiplus::GdiplusShutdown(gdiplusToken);
@@ -6772,41 +6819,34 @@ bool askForInput(const std::string& prompt, std::string& answer) {
     appendOutput(prompt + " ");
     return static_cast<bool>(std::getline(std::cin, answer));
 #else
-    inputPrompt = wideFromUtf8(prompt);
+    if (!mainWindow || !terminalInputControl || !terminalSendButton) {
+        appendOutput(prompt + "\\r\\n[Input unavailable: desktop terminal is not active.]\\r\\n");
+        return false;
+    }
     inputFinished = false;
     inputAccepted = false;
     inputResult.clear();
-    const wchar_t* className = L"TRGInputWindow";
-    WNDCLASSW windowClass = {};
-    windowClass.lpfnWndProc = inputWindowProc;
-    windowClass.hInstance = GetModuleHandleW(nullptr);
-    windowClass.lpszClassName = className;
-    windowClass.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
-    if (!RegisterClassW(&windowClass) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) return false;
-    if (mainWindow) EnableWindow(mainWindow, FALSE);
-    const auto scale = [](int value) {
-        return mainWindow ? scaleForDpi(mainWindow, value) : value;
-    };
-    HWND dialog = CreateWindowExW(WS_EX_DLGMODALFRAME, className, L"TRG input",
-        WS_CAPTION | WS_SYSMENU, CW_USEDEFAULT, CW_USEDEFAULT, scale(450), scale(180),
-        mainWindow, nullptr, windowClass.hInstance, nullptr);
-    if (!dialog) {
-        if (mainWindow) EnableWindow(mainWindow, TRUE);
-        return false;
-    }
-    ShowWindow(dialog, SW_SHOW);
-    UpdateWindow(dialog);
+    terminalInputActive = true;
+    appendOutput(prompt + "\\r\\n");
+    SetWindowTextW(terminalInputControl, L"");
+    layoutOutputControls(mainWindow);
+    ShowWindow(terminalInputControl, SW_SHOW);
+    ShowWindow(terminalSendButton, SW_SHOW);
+    SetFocus(terminalInputControl);
     MSG message;
-    while (!inputFinished && GetMessageW(&message, nullptr, 0, 0) > 0) {
-        if (!IsDialogMessageW(dialog, &message)) {
-            TranslateMessage(&message);
-            DispatchMessageW(&message);
+    while (!inputFinished) {
+        const BOOL result = GetMessageW(&message, nullptr, 0, 0);
+        if (result <= 0) {
+            inputFinished = true;
+            inputAccepted = false;
+            break;
         }
+        TranslateMessage(&message);
+        DispatchMessageW(&message);
     }
-    if (mainWindow) {
-        EnableWindow(mainWindow, TRUE);
-        SetForegroundWindow(mainWindow);
-    }
+    terminalInputActive = false;
+    layoutOutputControls(mainWindow);
+    if (mainWindow) SetFocus(mainWindow);
     if (inputAccepted) answer = inputResult;
     return inputAccepted;
 #endif
