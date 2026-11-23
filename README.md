@@ -73,19 +73,19 @@ You can start coding without learning variable types first. TRG figures out the 
 Your first program:
 
 ```text
-let name = "Sam"
-let score = 10
+word name = "Sam"
+num score = 10
 
-print "Hello" name
-print "Your score is" score
+say "Hello" name
+say "Your score is" score
 
 score = score + 5
-print "New score:" score
+say "New score:" score
 ```
 
 That's the basics:
 - `let` creates a variable. Numbers, text, and true/false values are detected automatically.
-- `print` displays something. It is the easy-to-remember version of `say`.
+- `say` displays something. It is the easy-to-remember version of `say`.
 - `ask` asks the user a question and stores their answer.
 - `if` checks something; `else` runs when it is not true.
 - `loop` repeats code while a condition is true.
@@ -98,10 +98,10 @@ let name = "there"
 ask "What is your name?" name
 
 if name = "Sam" (
-    print "Welcome back!"
+    say "Welcome back!"
 )
 else (
-    print "Nice to meet you," name
+    say "Nice to meet you," name
 )
 ```
 
