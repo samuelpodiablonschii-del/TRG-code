@@ -913,116 +913,116 @@ LRESULT CALLBACK dictionaryWindowProc(HWND window, UINT message, WPARAM wParam, 
 
 void showDesktopDictionary(HWND owner) {
     desktopDictionaryText =
-        L"TRG LANGUAGE REFERENCE\\r\\n"
-        L"=====================\\r\\n\\r\\n"
-        L"PROGRAM STRUCTURE\\r\\n"
-        L"  TRG executes source from top to bottom. Commands are case-insensitive.\\r\\n"
-        L"  // comment\\r\\n"
-        L"  Blocks use parentheses: if score > 0 ( ... )\\r\\n"
-        L"  Libraries are declared at file scope: add (math), add (ui), add (3d)\\r\\n\\r\\n"
-        L"OUTPUT AND INPUT\\r\\n"
-        L"  say VALUE...              Print text, variables, and expression results\\r\\n"
-        L"  print VALUE...            Alias for say\\r\\n"
-        L"  show VALUE...             Alias for say\\r\\n"
-        L"  ask PROMPT VARIABLE       Read a value from the terminal input line\\r\\n\\r\\n"
-        L"VARIABLES AND TYPES\\r\\n"
-        L"  let NAME = VALUE          Declare a value\\r\\n"
-        L"  num NAME = EXPRESSION     Number\\r\\n"
-        L"  word NAME = TEXT          String\\r\\n"
-        L"  toggle NAME = true|false  Boolean\\r\\n"
-        L"  color NAME = #RRGGBB      Color value\\r\\n"
-        L"  list NAME                 Create a list\\r\\n"
-        L"  set NAME VALUE            Update a variable\\r\\n"
-        L"  increase NAME [AMOUNT]    Add to a number\\r\\n"
-        L"  decrease NAME [AMOUNT]    Subtract from a number\\r\\n"
-        L"  NAME.field                Read or update a record field\\r\\n\\r\\n"
-        L"EXPRESSIONS AND MATH\\r\\n"
-        L"  Operators: +  -  *  /  %  ^  ( )  <  >  <=  >=  ==  !=  &&  ||\\r\\n"
-        L"  random MIN MAX RESULT     Generate a random value\\r\\n"
-        L"  sqrt(VALUE)               Square root\\r\\n"
-        L"  add (math)                Enables sin, cos, tan, asin, acos, atan,\\r\\n"
-        L"                            sqrt, abs, floor, ceil, round, min, max,\\r\\n"
-        L"                            clamp, distance, and related math helpers\\r\\n\\r\\n"
-        L"FLOW CONTROL\\r\\n"
-        L"  if CONDITION ( ... )\\r\\n"
-        L"  else ( ... )\\r\\n"
-        L"  loop CONDITION ( ... )\\r\\n"
-        L"  break | continue | stop\\r\\n"
-        L"  wait 250ms | wait 2s\\r\\n"
-        L"  every 100ms ( ... )      Repeating timer block\\r\\n"
-        L"  group NAME ( ... )       Group variables and UI objects\\r\\n"
-        L"  define NAME PARAMS ( ... )   Define a function\\r\\n"
-        L"  call NAME ARGUMENTS      Call a function\\r\\n"
-        L"  return [VALUE]            Return from a function\\r\\n\\r\\n"
-        L"LISTS AND COLLECTIONS\\r\\n"
-        L"  push LIST VALUE          Append an item\\r\\n"
-        L"  insert LIST INDEX VALUE  Insert an item (zero-based index)\\r\\n"
-        L"  get LIST INDEX RESULT    Read an item\\r\\n"
-        L"  set LIST INDEX VALUE     Replace an item\\r\\n"
-        L"  remove LIST INDEX        Remove an item\\r\\n"
-        L"  pop LIST RESULT          Remove the final item\\r\\n"
-        L"  join LIST SEPARATOR RESULT\\r\\n"
-        L"  split TEXT SEPARATOR RESULT\\r\\n"
-        L"  record TYPE ( ... )      Declare a record type\\r\\n"
-        L"  struct TYPE ( ... )      Alias for record\\r\\n"
-        L"  class TYPE ( ... )       Alias for record\\r\\n"
-        L"  new TYPE VARIABLE        Create a record instance\\r\\n\\r\\n"
-        L"TEXT HELPERS\\r\\n"
-        L"  upper TEXT RESULT | lower TEXT RESULT | trim TEXT RESULT\\r\\n"
-        L"  length TEXT RESULT | contains TEXT SEARCH RESULT\\r\\n"
-        L"  index_of TEXT SEARCH RESULT\\r\\n"
-        L"  replace TEXT SEARCH WITH RESULT\\r\\n"
-        L"  substring TEXT START COUNT RESULT\\r\\n"
-        L"  starts_with TEXT PREFIX RESULT | ends_with TEXT SUFFIX RESULT\\r\\n\\r\\n"
-        L"FILES AND PROJECTS  (add (files))\\r\\n"
-        L"  read_file PATH VARIABLE\\r\\n"
-        L"  write_file PATH TEXT... | append_file PATH TEXT...\\r\\n"
-        L"  file_exists PATH VARIABLE | delete_file PATH\\r\\n"
-        L"  add (plugin.trg) | run (file.trg)\\r\\n"
-        L"  add global ( ... ) | add connect (file.trg)\\r\\n\\r\\n"
-        L"JSON  (add (json))\\r\\n"
-        L"  json GROUP clean RESULT\\r\\n"
-        L"  json GROUP compressed RESULT\\r\\n"
-        L"  json read (PATH)\\r\\n"
-        L"  create FILE (LOCATION) RESULT\\r\\n\\r\\n"
-        L"DATABASE  (add (database))\\r\\n"
-        L"  database open PATH | database save\\r\\n"
-        L"  table create NAME COLUMNS...\\r\\n"
-        L"  record add/get/update/delete ...\\r\\n"
-        L"  query ...\\r\\n\\r\\n"
-        L"UI AND 2D  (add (ui))\\r\\n"
-        L"  text NAME VALUE x X y Y size SIZE color COLOR\\r\\n"
-        L"  button NAME LABEL x X y Y w W h H color COLOR ( ... )\\r\\n"
-        L"  block z Z x X y Y w W h H color COLOR name NAME\\r\\n"
-        L"  sprite NAME FILE x X y Y w W h H\\r\\n"
-        L"  ui create block NAME x X y Y w W h H color COLOR shape SHAPE\\r\\n"
-        L"  ui duplicate SOURCE NAME | ui rename OLD NEW | ui delete NAME\\r\\n"
-        L"  ui move NAME DX DY | ui resize NAME DW DH\\r\\n"
-        L"  ui color NAME COLOR | ui shape NAME SHAPE\\r\\n"
-        L"  animate NAME x DX y DY fps FPS time SECONDS\\r\\n\\r\\n"
-        L"3D SCENES  (add (3d))\\r\\n"
-        L"  3d box NAME x X y Y z Z w W h H d D color COLOR\\r\\n"
-        L"  3d sphere NAME x X y Y z Z size SIZE color COLOR\\r\\n"
-        L"  3d camera NAME x X y Y z Z w W h H d D color COLOR\\r\\n"
-        L"  3d spawn NAME x X y Y z Z size SIZE color COLOR\\r\\n"
-        L"  3d plane NAME x X y Y z Z w W h H d D color COLOR\\r\\n"
-        L"  3d duplicate SOURCE NAME | 3d rename OLD NEW | 3d delete NAME\\r\\n"
-        L"  3d move NAME DX DY DZ | 3d rotate NAME RX RY RZ\\r\\n"
-        L"  3d scale NAME FACTOR | 3d color NAME COLOR\\r\\n"
-        L"  3d texture NAME smooth|grid|metal|wood|stone\\r\\n"
-        L"  3d save FILE.trgscene | 3d load FILE.trgscene\\r\\n"
-        L"  Desktop engine: WASD move, Q/E rise/drop, arrow keys look,\\r\\n"
-        L"  drag empty viewport to orbit, drag assets to add scene objects,\\r\\n"
-        L"  drag models to move, right-click a model for its properties.\\r\\n\\r\\n"
-        L"COLLISION AND CONTROLS\\r\\n"
-        L"  add (collision) | collides A B RESULT | watch_collision A B RESULT\\r\\n"
-        L"  add (controls) | add (animation)\\r\\n"
-        L"  move_ui OBJECT x DX y DY\\r\\n\\r\\n"
-        L"WEB, MEDIA, AND AI\\r\\n"
-        L"  add (web): web_page, web_heading, web_text, web_button, web_image, web_show\\r\\n"
-        L"  play_audio FILE | show_image FILE | play_video FILE\\r\\n"
-        L"  add (ai): ai create, teach, train, predict, classify\\r\\n"
-        L"  add (all) enables the built-in libraries.\\r\\n\\r\\n"
+        L"TRG LANGUAGE REFERENCE\r\n"
+        L"=====================\r\n\r\n"
+        L"PROGRAM STRUCTURE\r\n"
+        L"  TRG executes source from top to bottom. Commands are case-insensitive.\r\n"
+        L"  // comment\r\n"
+        L"  Blocks use parentheses: if score > 0 ( ... )\r\n"
+        L"  Libraries are declared at file scope: add (math), add (ui), add (3d)\r\n\r\n"
+        L"OUTPUT AND INPUT\r\n"
+        L"  say VALUE...              Print text, variables, and expression results\r\n"
+        L"  print VALUE...            Alias for say\r\n"
+        L"  show VALUE...             Alias for say\r\n"
+        L"  ask PROMPT VARIABLE       Read a value from the terminal input line\r\n\r\n"
+        L"VARIABLES AND TYPES\r\n"
+        L"  let NAME = VALUE          Declare a value\r\n"
+        L"  num NAME = EXPRESSION     Number\r\n"
+        L"  word NAME = TEXT          String\r\n"
+        L"  toggle NAME = true|false  Boolean\r\n"
+        L"  color NAME = #RRGGBB      Color value\r\n"
+        L"  list NAME                 Create a list\r\n"
+        L"  set NAME VALUE            Update a variable\r\n"
+        L"  increase NAME [AMOUNT]    Add to a number\r\n"
+        L"  decrease NAME [AMOUNT]    Subtract from a number\r\n"
+        L"  NAME.field                Read or update a record field\r\n\r\n"
+        L"EXPRESSIONS AND MATH\r\n"
+        L"  Operators: +  -  *  /  %  ^  ( )  <  >  <=  >=  ==  !=  &&  ||\r\n"
+        L"  random MIN MAX RESULT     Generate a random value\r\n"
+        L"  sqrt(VALUE)               Square root\r\n"
+        L"  add (math)                Enables sin, cos, tan, asin, acos, atan,\r\n"
+        L"                            sqrt, abs, floor, ceil, round, min, max,\r\n"
+        L"                            clamp, distance, and related math helpers\r\n\r\n"
+        L"FLOW CONTROL\r\n"
+        L"  if CONDITION ( ... )\r\n"
+        L"  else ( ... )\r\n"
+        L"  loop CONDITION ( ... )\r\n"
+        L"  break | continue | stop\r\n"
+        L"  wait 250ms | wait 2s\r\n"
+        L"  every 100ms ( ... )      Repeating timer block\r\n"
+        L"  group NAME ( ... )       Group variables and UI objects\r\n"
+        L"  define NAME PARAMS ( ... )   Define a function\r\n"
+        L"  call NAME ARGUMENTS      Call a function\r\n"
+        L"  return [VALUE]            Return from a function\r\n\r\n"
+        L"LISTS AND COLLECTIONS\r\n"
+        L"  push LIST VALUE          Append an item\r\n"
+        L"  insert LIST INDEX VALUE  Insert an item (zero-based index)\r\n"
+        L"  get LIST INDEX RESULT    Read an item\r\n"
+        L"  set LIST INDEX VALUE     Replace an item\r\n"
+        L"  remove LIST INDEX        Remove an item\r\n"
+        L"  pop LIST RESULT          Remove the final item\r\n"
+        L"  join LIST SEPARATOR RESULT\r\n"
+        L"  split TEXT SEPARATOR RESULT\r\n"
+        L"  record TYPE ( ... )      Declare a record type\r\n"
+        L"  struct TYPE ( ... )      Alias for record\r\n"
+        L"  class TYPE ( ... )       Alias for record\r\n"
+        L"  new TYPE VARIABLE        Create a record instance\r\n\r\n"
+        L"TEXT HELPERS\r\n"
+        L"  upper TEXT RESULT | lower TEXT RESULT | trim TEXT RESULT\r\n"
+        L"  length TEXT RESULT | contains TEXT SEARCH RESULT\r\n"
+        L"  index_of TEXT SEARCH RESULT\r\n"
+        L"  replace TEXT SEARCH WITH RESULT\r\n"
+        L"  substring TEXT START COUNT RESULT\r\n"
+        L"  starts_with TEXT PREFIX RESULT | ends_with TEXT SUFFIX RESULT\r\n\r\n"
+        L"FILES AND PROJECTS  (add (files))\r\n"
+        L"  read_file PATH VARIABLE\r\n"
+        L"  write_file PATH TEXT... | append_file PATH TEXT...\r\n"
+        L"  file_exists PATH VARIABLE | delete_file PATH\r\n"
+        L"  add (plugin.trg) | run (file.trg)\r\n"
+        L"  add global ( ... ) | add connect (file.trg)\r\n\r\n"
+        L"JSON  (add (json))\r\n"
+        L"  json GROUP clean RESULT\r\n"
+        L"  json GROUP compressed RESULT\r\n"
+        L"  json read (PATH)\r\n"
+        L"  create FILE (LOCATION) RESULT\r\n\r\n"
+        L"DATABASE  (add (database))\r\n"
+        L"  database open PATH | database save\r\n"
+        L"  table create NAME COLUMNS...\r\n"
+        L"  record add/get/update/delete ...\r\n"
+        L"  query ...\r\n\r\n"
+        L"UI AND 2D  (add (ui))\r\n"
+        L"  text NAME VALUE x X y Y size SIZE color COLOR\r\n"
+        L"  button NAME LABEL x X y Y w W h H color COLOR ( ... )\r\n"
+        L"  block z Z x X y Y w W h H color COLOR name NAME\r\n"
+        L"  sprite NAME FILE x X y Y w W h H\r\n"
+        L"  ui create block NAME x X y Y w W h H color COLOR shape SHAPE\r\n"
+        L"  ui duplicate SOURCE NAME | ui rename OLD NEW | ui delete NAME\r\n"
+        L"  ui move NAME DX DY | ui resize NAME DW DH\r\n"
+        L"  ui color NAME COLOR | ui shape NAME SHAPE\r\n"
+        L"  animate NAME x DX y DY fps FPS time SECONDS\r\n\r\n"
+        L"3D SCENES  (add (3d))\r\n"
+        L"  3d box NAME x X y Y z Z w W h H d D color COLOR\r\n"
+        L"  3d sphere NAME x X y Y z Z size SIZE color COLOR\r\n"
+        L"  3d camera NAME x X y Y z Z w W h H d D color COLOR\r\n"
+        L"  3d spawn NAME x X y Y z Z size SIZE color COLOR\r\n"
+        L"  3d plane NAME x X y Y z Z w W h H d D color COLOR\r\n"
+        L"  3d duplicate SOURCE NAME | 3d rename OLD NEW | 3d delete NAME\r\n"
+        L"  3d move NAME DX DY DZ | 3d rotate NAME RX RY RZ\r\n"
+        L"  3d scale NAME FACTOR | 3d color NAME COLOR\r\n"
+        L"  3d texture NAME smooth|grid|metal|wood|stone\r\n"
+        L"  3d save FILE.trgscene | 3d load FILE.trgscene\r\n"
+        L"  Desktop engine: WASD move, Q/E rise/drop, arrow keys look,\r\n"
+        L"  drag empty viewport to orbit, drag assets to add scene objects,\r\n"
+        L"  drag models to move, right-click a model for its properties.\r\n\r\n"
+        L"COLLISION AND CONTROLS\r\n"
+        L"  add (collision) | collides A B RESULT | watch_collision A B RESULT\r\n"
+        L"  add (controls) | add (animation)\r\n"
+        L"  move_ui OBJECT x DX y DY\r\n\r\n"
+        L"WEB, MEDIA, AND AI\r\n"
+        L"  add (web): web_page, web_heading, web_text, web_button, web_image, web_show\r\n"
+        L"  play_audio FILE | show_image FILE | play_video FILE\r\n"
+        L"  add (ai): ai create, teach, train, predict, classify\r\n"
+        L"  add (all) enables the built-in libraries.\r\n\r\n"
         L"COLORS accept #RRGGBB or 0xRRGGBB.";
     const wchar_t* className = L"TRGDictionaryWindow";
     WNDCLASSW wc = {};
@@ -5237,12 +5237,16 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 while (std::any_of(ui3DObjects.begin(), ui3DObjects.end(), [&](const Ui3DObject& item) { return item.name == candidate; }));
                 return candidate;
             };
-            if (action == "box" || action == "sphere") {
+            if (action == "box" || action == "sphere" || action == "camera" ||
+                action == "spawn" || action == "plane") {
                 Ui3DObject object;
                 object.group = currentUiGroup;
                 object.shape = action;
                 object.name = tokens.size() > 2 ? valueFor(tokens[2], variables) : "";
                 if (lower(object.name) == "auto") object.name = unique3DName();
+                if (action == "camera") object.width = 1.1, object.height = 0.8, object.depth = 1.4;
+                else if (action == "spawn") object.width = object.height = object.depth = 1.0;
+                else if (action == "plane") object.width = object.depth = 6.0, object.height = 0.15;
                 bool valid = validName(object.name);
                 bool hasColor = false;
                 for (std::size_t part = 3; valid && part + 1 < tokens.size(); part += 2) {
@@ -5266,9 +5270,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 }
                 const bool exists = std::any_of(ui3DObjects.begin(), ui3DObjects.end(), [&](const Ui3DObject& item) { return item.name == object.name; });
                 if (!valid || !hasColor || exists) {
-                    reportError(i + 1, action == "box" ?
-                        "use 3d box NAME x X y Y z Z w WIDTH h HEIGHT d DEPTH color COLOR" :
-                        "use 3d sphere NAME x X y Y z Z size SIZE color COLOR", object.name);
+                    reportError(i + 1, "use 3d box|sphere|camera|spawn|plane NAME x X y Y z Z ... color COLOR", object.name);
                     continue;
                 }
                 ui3DObjects.push_back(object);
@@ -5315,11 +5317,11 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 if (directoryError) { reportError(i + 1, "could not create the scene directory", directoryError.message()); continue; }
                 std::ofstream sceneFile(scenePath, std::ios::binary | std::ios::trunc);
                 if (!sceneFile) { reportError(i + 1, "could not write the 3D scene", scenePath.string()); continue; }
-                sceneFile << "TRGSCENE 1\n" << ui3DObjects.size() << "\n";
+                sceneFile << "TRGSCENE 2\n" << ui3DObjects.size() << "\n";
                 for (const Ui3DObject& item : ui3DObjects) {
                     sceneFile << std::quoted(item.name) << ' ' << std::quoted(item.group) << ' '
                               << std::quoted(item.shape) << ' ' << std::quoted(item.color) << ' '
-                              << std::setprecision(17)
+                              << std::quoted(item.texture) << ' ' << std::setprecision(17)
                               << item.x << ' ' << item.y << ' ' << item.z << ' '
                               << item.width << ' ' << item.height << ' ' << item.depth << ' '
                               << item.rotateX << ' ' << item.rotateY << ' ' << item.rotateZ << ' '
@@ -5340,7 +5342,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 unsigned version = 0;
                 std::size_t objectCount = 0;
                 if (!sceneFile || !(sceneFile >> magic >> version >> objectCount) ||
-                    magic != "TRGSCENE" || version != 1 || objectCount > 100000) {
+                    magic != "TRGSCENE" || (version != 1 && version != 2) || objectCount > 100000) {
                     reportError(i + 1, "invalid or unsupported 3D scene file", scenePath.string()); continue;
                 }
                 std::vector<Ui3DObject> loadedObjects;
@@ -5351,13 +5353,17 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     Ui3DObject item;
                     int visible = 0;
                     if (!(sceneFile >> std::quoted(item.name) >> std::quoted(item.group)
-                          >> std::quoted(item.shape) >> std::quoted(item.color)
-                          >> item.x >> item.y >> item.z
+                          >> std::quoted(item.shape) >> std::quoted(item.color)) ||
+                        (version >= 2 && !(sceneFile >> std::quoted(item.texture))) ||
+                        !(sceneFile >> item.x >> item.y >> item.z
                           >> item.width >> item.height >> item.depth
                           >> item.rotateX >> item.rotateY >> item.rotateZ
                           >> item.opacity >> visible) ||
                         !validName(item.name) ||
-                        (item.shape != "box" && item.shape != "sphere") ||
+                        (item.shape != "box" && item.shape != "sphere" && item.shape != "camera" &&
+                         item.shape != "spawn" && item.shape != "plane") ||
+                        (item.texture != "smooth" && item.texture != "grid" && item.texture != "metal" &&
+                         item.texture != "wood" && item.texture != "stone") ||
                         item.width <= 0 || item.height <= 0 || item.depth <= 0 ||
                         item.opacity < 0 || item.opacity > 1 ||
                         (visible != 0 && visible != 1) ||
@@ -5446,6 +5452,16 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 unsigned red = 0, green = 0, blue = 0;
                 if (!parseColor(color, red, green, blue)) { reportError(i + 1, "3d color needs a valid color", color); continue; }
                 object->color = color;
+                continue;
+            }
+            if (action == "texture" && tokens.size() == 4) {
+                const std::string texture = lower(valueFor(tokens[3], variables));
+                static const std::unordered_set<std::string> textures = {"smooth","grid","metal","wood","stone"};
+                if (!textures.count(texture)) {
+                    reportError(i + 1, "3d texture must be smooth, grid, metal, wood, or stone", texture);
+                    continue;
+                }
+                object->texture = texture;
                 continue;
             }
             reportError(i + 1, "unknown or invalid 3D operation", action);
@@ -6252,30 +6268,30 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             if (lower(destination.extension().u8string()) != ".trg")
                 destination.replace_extension(".trg");
             const int length = GetWindowTextLengthW(codeEditor);
-            std::wstring wideSource(static_cast<std::size_t>(length) + 1, L'\\0');
+            std::wstring wideSource(static_cast<std::size_t>(length) + 1, L'\0');
             GetWindowTextW(codeEditor, wideSource.data(), length + 1);
             wideSource.resize(static_cast<std::size_t>(length));
             const std::string source = utf8FromWide(wideSource);
             std::ofstream exported(destination, std::ios::binary | std::ios::trunc);
-            if (!exported) appendOutput("ERROR Could not export TRG source.\\r\\n");
+            if (!exported) appendOutput("ERROR Could not export TRG source.\r\n");
             else {
                 exported.write(source.data(), static_cast<std::streamsize>(source.size()));
-                if (exported) appendOutput("Exported TRG source: " + destination.u8string() + "\\r\\n");
-                else appendOutput("ERROR Failed while exporting TRG source.\\r\\n");
+                if (exported) appendOutput("Exported TRG source: " + destination.u8string() + "\r\n");
+                else appendOutput("ERROR Failed while exporting TRG source.\r\n");
             }
         }
         return 0;
     }
     if (message == WM_COMMAND && LOWORD(wParam) == terminalSendButtonId && terminalInputActive) {
         const int length = GetWindowTextLengthW(terminalInputControl);
-        std::wstring answer(static_cast<std::size_t>(length) + 1, L'\\0');
+        std::wstring answer(static_cast<std::size_t>(length) + 1, L'\0');
         GetWindowTextW(terminalInputControl, answer.data(), length + 1);
         answer.resize(static_cast<std::size_t>(length));
         inputResult = utf8FromWide(answer);
         inputAccepted = true;
         inputFinished = true;
         terminalInputActive = false;
-        appendOutput("> " + inputResult + "\\r\\n");
+        appendOutput("> " + inputResult + "\r\n");
         SetWindowTextW(terminalInputControl, L"");
         layoutOutputControls(window);
         SetFocus(window);
@@ -6820,14 +6836,14 @@ bool askForInput(const std::string& prompt, std::string& answer) {
     return static_cast<bool>(std::getline(std::cin, answer));
 #else
     if (!mainWindow || !terminalInputControl || !terminalSendButton) {
-        appendOutput(prompt + "\\r\\n[Input unavailable: desktop terminal is not active.]\\r\\n");
+        appendOutput(prompt + "\r\n[Input unavailable: desktop terminal is not active.]\r\n");
         return false;
     }
     inputFinished = false;
     inputAccepted = false;
     inputResult.clear();
     terminalInputActive = true;
-    appendOutput(prompt + "\\r\\n");
+    appendOutput(prompt + "\r\n");
     SetWindowTextW(terminalInputControl, L"");
     layoutOutputControls(mainWindow);
     ShowWindow(terminalInputControl, SW_SHOW);
