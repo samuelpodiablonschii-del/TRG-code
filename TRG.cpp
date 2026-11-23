@@ -863,39 +863,6 @@ std::string lower(std::string s) {
     return s;
 }
 
-std::string suggestedCommand(const std::string& input) {
-    static const std::vector<std::string> commands = {
-        "say", "print", "show", "let", "list", "dictionary", "dict_set", "dict_get", "dict_has", "dict_remove", "dict_keys", "dict_count", "ask", "ai", "math", "word", "num", "toggle", "color", "if", "else", "loop", "every", "for", "each", "query", "random",
-        "group", "define", "stop", "exit", "break", "continue", "add", "text",
-        "button", "block", "animate", "collides", "touching", "move_ui", "register", "move", "subtract", "multiply",
-        "watch_collision",
-        "divide", "write_file", "append_file", "read_file", "delete_file", "file_exists",
-        "upper", "lower", "length", "contains", "replace", "push", "get", "remove", "pop", "insert", "index_of", "split", "join", "trim", "substring", "set", "increase", "decrease",
-        "play_audio", "show_image", "play_video", "run_wasm", "web_page", "web_heading",
-        "web_text", "web_color", "web_button", "web_image", "web_show",
-        "binary", "bit", "checksum", "regex", "compress"
-    };
-    const std::string word = lower(input);
-    std::size_t bestDistance = word.size();
-    std::string best;
-    for (const std::string& candidate : commands) {
-        std::vector<std::size_t> row(candidate.size() + 1);
-        for (std::size_t j = 0; j <= candidate.size(); ++j) row[j] = j;
-        for (std::size_t i = 1; i <= word.size(); ++i) {
-            std::size_t diagonal = row[0];
-            row[0] = i;
-            for (std::size_t j = 1; j <= candidate.size(); ++j) {
-                const std::size_t previous = row[j];
-                row[j] = std::min({row[j] + 1, row[j - 1] + 1,
-                                   diagonal + (word[i - 1] == candidate[j - 1] ? 0u : 1u)});
-                diagonal = previous;
-            }
-        }
-        if (row.back() < bestDistance) { bestDistance = row.back(); best = candidate; }
-    }
-    const std::size_t threshold = std::max<std::size_t>(2, word.size() / 3);
-    return bestDistance <= threshold ? best : std::string();
-}
 
 std::string stripComment(const std::string& line) {
     bool inQuotes = false;
@@ -5467,8 +5434,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
         }
 
         
-        const std::string suggestion = suggestedCommand(cmd);
-        reportError(i + 1, suggestion.empty() ? "unknown command" : "unknown command; did you mean '" + suggestion + "'?", cmd);
+        reportError(i + 1, "unknown command", cmd);
     }
 }
 
