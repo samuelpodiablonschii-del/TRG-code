@@ -569,6 +569,8 @@ HWND terminalInputControl = nullptr;
 HWND terminalSendButton = nullptr;
 HWND dictionaryWindow = nullptr;
 HWND dictionaryEdit = nullptr;
+HBRUSH terminalInputBrush = nullptr;
+HBRUSH dictionaryEditBrush = nullptr;
 WNDPROC previousCodeEditorProc = nullptr;
 WNDPROC previousTerminalInputProc = nullptr;
 bool terminalInputActive = false;
@@ -888,6 +890,7 @@ LRESULT CALLBACK terminalInputWindowProc(HWND control, UINT message, WPARAM wPar
 
 LRESULT CALLBACK dictionaryWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     if (message == WM_CREATE) {
+        dictionaryEditBrush = CreateSolidBrush(RGB(8, 7, 12));
         dictionaryEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", desktopDictionaryText.c_str(),
             WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE |
                 ES_READONLY | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_NOHIDESEL,
@@ -897,6 +900,12 @@ LRESULT CALLBACK dictionaryWindowProc(HWND window, UINT message, WPARAM wParam, 
             FIXED_PITCH | FF_MODERN, L"Consolas");
         if (dictionaryEdit && font) SendMessageW(dictionaryEdit, WM_SETFONT, reinterpret_cast<WPARAM>(font), TRUE);
         return 0;
+    }
+    if (message == WM_CTLCOLOREDIT && reinterpret_cast<HWND>(lParam) == dictionaryEdit) {
+        HDC dc = reinterpret_cast<HDC>(wParam);
+        SetTextColor(dc, RGB(243, 238, 250));
+        SetBkColor(dc, RGB(8, 7, 12));
+        return reinterpret_cast<LRESULT>(dictionaryEditBrush);
     }
     if (message == WM_SIZE) {
         if (dictionaryEdit) MoveWindow(dictionaryEdit, 10, 10,
@@ -910,6 +919,8 @@ LRESULT CALLBACK dictionaryWindowProc(HWND window, UINT message, WPARAM wParam, 
     if (message == WM_DESTROY) {
         dictionaryWindow = nullptr;
         dictionaryEdit = nullptr;
+        if (dictionaryEditBrush) DeleteObject(dictionaryEditBrush);
+        dictionaryEditBrush = nullptr;
         return 0;
     }
     return DefWindowProcW(window, message, wParam, lParam);
@@ -6249,6 +6260,9 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         }
         if (terminalInputControl && codeEditorFont)
             SendMessageW(terminalInputControl, WM_SETFONT, reinterpret_cast<WPARAM>(codeEditorFont), TRUE);
+        if (terminalSendButton && openButtonFont)
+            SendMessageW(terminalSendButton, WM_SETFONT, reinterpret_cast<WPARAM>(openButtonFont), TRUE);
+        terminalInputBrush = CreateSolidBrush(RGB(12, 9, 19));
         restoreDesktopAutosave();
         if (codeEditor && richEditModule) {
             SendMessageW(codeEditor, EM_SETBKGNDCOLOR, 0, RGB(19, 13, 31));
@@ -6317,6 +6331,12 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             }
             return TRUE;
         }
+    }
+    if (message == WM_CTLCOLOREDIT && reinterpret_cast<HWND>(lParam) == terminalInputControl) {
+        HDC dc = reinterpret_cast<HDC>(wParam);
+        SetTextColor(dc, RGB(241, 235, 250));
+        SetBkColor(dc, RGB(12, 9, 19));
+        return reinterpret_cast<LRESULT>(terminalInputBrush);
     }
     if (message == WM_SIZE) {
         layoutOutputControls(window);
@@ -7373,6 +7393,8 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         editor2DButton = editor3DButton = nullptr;
         exportButton = outputControl = terminalInputControl = terminalSendButton = nullptr;
         dictionaryWindow = dictionaryEdit = nullptr;
+        if (terminalInputBrush) DeleteObject(terminalInputBrush);
+        terminalInputBrush = nullptr;
         desktopSpriteCache.clear();
         if (gdiplusToken != 0) {
             Gdiplus::GdiplusShutdown(gdiplusToken);
