@@ -292,6 +292,7 @@ button code "CODE" x 49 y 7.7 w 8 h 4.2 color #30243F (
 // Scene hierarchy.
 text "HIERARCHY" x 1.5 y 16.5 size 1.35 color #EDE4FA bold true
 text "▾ Scene" x 2 y 21.5 size 1.3 color #BDA6E8
+text hierarchy_selected "No objects in scene" x 2 y 27 size 1.05 color #9F8DB8
 text object_count "0 OBJECTS" x 2 y 74 size 1.05 color #9F8DB8
 
 // Viewport overlays; 3D models are clipped to this central panel.
