@@ -712,13 +712,13 @@ sourceText = exampleSource;
     private void showErrorExplanation() {
         if (lastRunError.isEmpty()) {
             new AlertDialog.Builder(this).setTitle("TRG debug helper")
-                    .setMessage("Run a program with an error first. TRG also suggests a command when it spots a likely typo.")
+                    .setMessage("Run a program with an error first. TRG reports unknown commands without rewriting your source.")
                     .setPositiveButton("Close", null).show();
             return;
         }
         String explanation = "Check the command name and its arguments in the TRG command dictionary.";
         String error = lastRunError.toLowerCase(Locale.ROOT);
-        if (error.contains("did you mean")) explanation = "TRG found a command name that is close to a built-in command. Try the suggested spelling shown in the error.";
+        if (error.contains("unknown command")) explanation = "TRG did not recognize that command. Check its spelling in the command dictionary; TRG will not rewrite it.";
         else if (error.contains("invalid number") || error.contains("must be a number")) explanation = "A numeric value needs a valid number or expression. TRG supports +, -, *, /, %, ^, parentheses, and sqrt(...).";
         else if (error.contains("missing block") || error.contains("needs a code block")) explanation = "This command starts a block. Add a matching pair of ( ) around the lines that belong inside it.";
         else if (error.contains("opacity")) explanation = "Button opacity must be between 0 (transparent) and 1 (fully opaque).";
