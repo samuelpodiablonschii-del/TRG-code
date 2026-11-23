@@ -1,3 +1,4 @@
+#include "EditorSources.h"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -336,6 +337,7 @@ struct Ui3DObject {
     double rotateX = 0, rotateY = 0, rotateZ = 0;
     double opacity = 1.0;
     bool visible = true;
+    std::string texture = "smooth";
 };
 
 struct UiSprite {
@@ -560,8 +562,27 @@ HWND buildButton = nullptr;
 HWND dictionaryButton = nullptr;
 HWND editor2DButton = nullptr;
 HWND editor3DButton = nullptr;
+HWND exportButton = nullptr;
 HWND codeEditor = nullptr;
-std::wstring desktopPreviousSource;
+HWND outputControl = nullptr;
+HWND terminalInputControl = nullptr;
+HWND terminalSendButton = nullptr;
+HWND dictionaryWindow = nullptr;
+HWND dictionaryEdit = nullptr;
+HFONT dictionaryFont = nullptr;
+HBRUSH terminalInputBrush = nullptr;
+HBRUSH outputControlBrush = nullptr;
+HBRUSH dictionaryEditBrush = nullptr;
+WNDPROC previousCodeEditorProc = nullptr;
+WNDPROC previousTerminalInputProc = nullptr;
+WNDPROC previousOutputProc = nullptr;
+bool terminalInputActive = false;
+std::wstring desktopDictionaryText;
+constexpr int outputControlId = 302;
+constexpr int terminalInputControlId = 303;
+constexpr int terminalSendButtonId = 304;
+constexpr int exportButtonId = 110;
+constexpr int terminalInputHeight = 32;
 std::filesystem::path desktopPreviousPath;
 bool desktopPreviousDirty = false;
 bool desktopVisualEditorActive = false;
@@ -569,14 +590,53 @@ std::wstring inputPrompt;
 std::wstring outputBuffer;
 ULONG_PTR gdiplusToken = 0;
 std::unordered_map<std::string, std::unique_ptr<Gdiplus::Image>> desktopSpriteCache;
+bool desktop3DEngineActive = false;
+std::string desktop3DSelectedName;
+double desktop3DCameraX = 0.0, desktop3DCameraY = 0.0, desktop3DCameraZ = -12.0;
+double desktop3DCameraYaw = 0.0, desktop3DCameraPitch = 0.18;
+double desktop3DZoom = 1.0;
+double desktop3DWorldScale = 1.0;
+std::vector<std::pair<std::string, RECT>> desktop3DProjectedHits;
+RECT desktop3DViewportRect = {};
+bool desktop3DDraggingObject = false;
+bool desktop3DDraggingCamera = false;
+int desktop3DAssetCandidate = -1;
+bool desktop3DAssetDragging = false;
+POINT desktop3DMouseDown = {};
+double desktop3DDragStartX = 0.0, desktop3DDragStartY = 0.0, desktop3DDragStartZ = 0.0;
+double desktop3DDragStartYaw = 0.0, desktop3DDragStartPitch = 0.0;
+bool desktop3DContextOpen = false;
+bool desktop3DRightClickMoved = false;
+int desktop3DHierarchyScroll = 0;
+POINT desktop3DContextPoint = {};
+POINT desktop3DMouseCurrent = {};
+RECT desktop3DContextRect = {};
+RECT desktop3DToolbarRect = {};
+RECT desktop3DHierarchyRect = {};
+RECT desktop3DInspectorRect = {};
+RECT desktop3DAssetShelfRect = {};
+std::array<RECT, 7> desktop3DToolRects = {};
+std::array<RECT, 5> desktop3DAssetRects = {};
+std::array<RECT, 5> desktop3DTextureRects = {};
+int desktop3DToolMode = 1;
+bool desktop3DGridVisible = true;
+double desktop3DDragStartWidth = 2.0, desktop3DDragStartHeight = 2.0, desktop3DDragStartDepth = 2.0;
+double desktop3DDragStartRotX = 0.0, desktop3DDragStartRotY = 0.0;
+LRESULT CALLBACK codeEditorWindowProc(HWND, UINT, WPARAM, LPARAM);
+LRESULT CALLBACK terminalInputWindowProc(HWND, UINT, WPARAM, LPARAM);
+LRESULT CALLBACK outputWindowProc(HWND, UINT, WPARAM, LPARAM);
+LRESULT CALLBACK dictionaryWindowProc(HWND, UINT, WPARAM, LPARAM);
 
 bool runSourceFile(const std::filesystem::path& path);
 bool loadSourceFile(const std::filesystem::path& path);
 bool saveSourceFile();
+void saveDesktopAutosave();
+void restoreDesktopAutosave();
 bool runEditorSource();
 void applyEditorSyntaxHighlighting();
 bool launchDesktopVisualEditor(const std::string& fileName);
 bool returnFromDesktopVisualEditor();
+void clearDesktopOutput();
 
 int windowDpi(HWND window) {
     using GetDpiForWindowFunction = UINT (WINAPI*)(HWND);
@@ -614,7 +674,7 @@ void setOpenButtonFont(HWND window) {
     openButtonFont = CreateFontW(scaleForDpi(window, 13), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
         DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
-    const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton, buildButton, dictionaryButton, editor2DButton, editor3DButton};
+    const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton, buildButton, dictionaryButton, editor2DButton, editor3DButton, exportButton};
     if (openButtonFont) for (HWND button : buttons) if (button)
         SendMessageW(button, WM_SETFONT, reinterpret_cast<WPARAM>(openButtonFont), TRUE);
     if (codeEditorFont) DeleteObject(codeEditorFont);
@@ -664,14 +724,13 @@ void layoutOutputControls(HWND window) {
     GetClientRect(window, &client);
     const LONG width = std::max<LONG>(0, client.right - client.left);
     const LONG height = std::max<LONG>(0, client.bottom - client.top);
-    const LONG headerHeight = std::min<LONG>(scaleForDpi(window, 76),
-        std::max<LONG>(scaleForDpi(window, 48), height / 5));
+    const LONG headerHeight = scaleForDpi(window, 84);
     const LONG gap = scaleForDpi(window, 5);
     const LONG margin = scaleForDpi(window, 12);
 
     if (previewMode) {
         const HWND controls[] = {openButton, saveButton, runButton, newButton, buildButton,
-            dictionaryButton, editor2DButton, editor3DButton};
+            dictionaryButton, editor2DButton, editor3DButton, exportButton};
         for (HWND control : controls) if (control) ShowWindow(control, SW_HIDE);
         if (previewButton) {
             if (standaloneAppMode) {
@@ -688,36 +747,68 @@ void layoutOutputControls(HWND window) {
             }
         }
     } else {
-        const LONG available = std::max<LONG>(scaleForDpi(window, 9 * 48 + 8 * 5),
-            width - scaleForDpi(window, 170) - margin * 2);
-        const LONG buttonWidth = std::clamp<LONG>((available - gap * 8) / 9,
-            scaleForDpi(window, 48), scaleForDpi(window, 78));
-        const LONG buttonHeight = scaleForDpi(window, 34);
         const HWND buttons[] = {openButton, saveButton, runButton, previewButton, newButton,
-            buildButton, dictionaryButton, editor2DButton, editor3DButton};
-        LONG x = width - margin - (buttonWidth + gap) * 9 + gap;
-        const LONG y = std::max<LONG>(0, (headerHeight - buttonHeight) / 2);
-        for (HWND button : buttons) {
-            if (button) {
-                MoveWindow(button, x, y, buttonWidth, buttonHeight, TRUE);
-                ShowWindow(button, SW_SHOW);
+            buildButton, dictionaryButton, editor2DButton, editor3DButton, exportButton};
+        const LONG toolbarLeft = scaleForDpi(window, 170);
+        const LONG usableWidth = std::max<LONG>(scaleForDpi(window, 5 * 58),
+            width - toolbarLeft - margin);
+        const LONG buttonWidth = std::max<LONG>(scaleForDpi(window, 1),
+            (usableWidth - gap * 4) / 5);
+        const LONG buttonHeight = scaleForDpi(window, 30);
+        const LONG rowGap = scaleForDpi(window, 5);
+        for (std::size_t index = 0; index < std::size(buttons); ++index) {
+            const LONG row = static_cast<LONG>(index / 5);
+            const LONG column = static_cast<LONG>(index % 5);
+            const LONG x = toolbarLeft + column * (buttonWidth + gap);
+            const LONG y = scaleForDpi(window, 8) + row * (buttonHeight + rowGap);
+            if (buttons[index]) {
+                MoveWindow(buttons[index], x, y, buttonWidth, buttonHeight, TRUE);
+                ShowWindow(buttons[index], SW_SHOW);
             }
-            x += buttonWidth + gap;
         }
         if (previewButton) SetWindowTextW(previewButton, L"Preview");
     }
+    if (codeEditor && previewMode) ShowWindow(codeEditor, SW_HIDE);
 
-    if (codeEditor) {
+    LONG panelTop = 0;
+    if (previewMode) {
+        const LONG outputHeight = std::min<LONG>(
+            std::max<LONG>(scaleForDpi(window, 116), height / 5),
+            std::max<LONG>(scaleForDpi(window, 90), height / 3));
+        panelTop = std::max<LONG>(scaleForDpi(window, 120), height - outputHeight);
+    } else {
         const LONG editorMargin = scaleForDpi(window, 10);
         const LONG top = headerHeight + editorMargin;
-        const LONG outputMinimum = scaleForDpi(window, 80);
+        const LONG outputMinimum = scaleForDpi(window, 112);
         const LONG canvasMinimum = scaleForDpi(window, 100);
         const LONG panelMinimum = std::min(height, headerHeight + canvasMinimum);
         const LONG panelMaximum = std::max(panelMinimum, height - outputMinimum);
-        const LONG panelTop = std::clamp<LONG>(height * 65 / 100, panelMinimum, panelMaximum);
-        const LONG bottom = std::max<LONG>(top + 1, panelTop - editorMargin);
-        MoveWindow(codeEditor, editorMargin, top, std::max<LONG>(1, width - editorMargin * 2), bottom - top, TRUE);
-        ShowWindow(codeEditor, previewMode ? SW_HIDE : SW_SHOW);
+        panelTop = std::clamp<LONG>(height * 65 / 100, panelMinimum, panelMaximum);
+        if (codeEditor) {
+            const LONG bottom = std::max<LONG>(top + 1, panelTop - editorMargin);
+            MoveWindow(codeEditor, editorMargin, top,
+                std::max<LONG>(1, width - editorMargin * 2), bottom - top, TRUE);
+            ShowWindow(codeEditor, SW_SHOW);
+        }
+    }
+    const LONG outputHeaderHeight = scaleForDpi(window, 25);
+    const LONG inputHeight = terminalInputActive ? scaleForDpi(window, terminalInputHeight + 5) : 0;
+    const LONG outputTop = panelTop + outputHeaderHeight;
+    const LONG outputBottom = std::max<LONG>(outputTop + 1, height - margin - inputHeight);
+    if (outputControl) {
+        MoveWindow(outputControl, margin, outputTop, std::max<LONG>(1, width - margin * 2),
+            outputBottom - outputTop, TRUE);
+        ShowWindow(outputControl, SW_SHOW);
+    }
+    if (terminalInputControl && terminalSendButton) {
+        const LONG inputWidth = std::min<LONG>(scaleForDpi(window, 430),
+            std::max<LONG>(scaleForDpi(window, 150), width - margin * 2 - scaleForDpi(window, 82)));
+        const LONG inputY = height - margin - scaleForDpi(window, terminalInputHeight);
+        MoveWindow(terminalInputControl, margin, inputY, inputWidth, scaleForDpi(window, 28), TRUE);
+        MoveWindow(terminalSendButton, margin + inputWidth + scaleForDpi(window, 7), inputY,
+            scaleForDpi(window, 72), scaleForDpi(window, 28), TRUE);
+        ShowWindow(terminalInputControl, terminalInputActive ? SW_SHOW : SW_HIDE);
+        ShowWindow(terminalSendButton, terminalInputActive ? SW_SHOW : SW_HIDE);
     }
 }
 
@@ -739,6 +830,391 @@ std::string utf8FromWide(const std::wstring& value) {
     return result;
 }
 
+
+LRESULT CALLBACK codeEditorWindowProc(HWND control, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (message == WM_KEYDOWN && wParam == VK_TAB) {
+        SendMessageW(control, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(L"    "));
+        return 0;
+    }
+    if (message == WM_CHAR) {
+        DWORD selectionStart = 0, selectionEnd = 0;
+        SendMessageW(control, EM_GETSEL, reinterpret_cast<WPARAM>(&selectionStart),
+                     reinterpret_cast<LPARAM>(&selectionEnd));
+        const int textLength = GetWindowTextLengthW(control);
+        std::wstring text(static_cast<std::size_t>(textLength) + 1, L'\0');
+        GetWindowTextW(control, text.data(), textLength + 1);
+        text.resize(static_cast<std::size_t>(textLength));
+        if (selectionStart == selectionEnd &&
+            (wParam == L')' || wParam == L'"' || wParam == L'\'') &&
+            selectionStart < text.size() && text[selectionStart] == static_cast<wchar_t>(wParam)) {
+            SendMessageW(control, EM_SETSEL, selectionStart + 1, selectionStart + 1);
+            return 0;
+        }
+        if (selectionStart != selectionEnd &&
+            (wParam == L'(' || wParam == L'"' || wParam == L'\'')) {
+            const std::wstring selected = text.substr(selectionStart, selectionEnd - selectionStart);
+            const wchar_t closing = wParam == L'(' ? L')' : static_cast<wchar_t>(wParam);
+            std::wstring wrapped;
+            wrapped.reserve(selected.size() + 2);
+            wrapped.push_back(static_cast<wchar_t>(wParam));
+            wrapped += selected;
+            wrapped.push_back(closing);
+            SendMessageW(control, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(wrapped.c_str()));
+            SendMessageW(control, EM_SETSEL, selectionStart + 1,
+                selectionStart + 1 + static_cast<DWORD>(selected.size()));
+            return 0;
+        }
+        if (selectionStart == selectionEnd &&
+            (wParam == L'(' || wParam == L'"' || wParam == L'\'')) {
+            const wchar_t pair[] = {static_cast<wchar_t>(wParam),
+                wParam == L'(' ? L')' : static_cast<wchar_t>(wParam), L'\0'};
+            SendMessageW(control, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(pair));
+            SendMessageW(control, EM_SETSEL, selectionStart + 1, selectionStart + 1);
+            return 0;
+        }
+        if (wParam == L'\r' && selectionStart == selectionEnd) {
+            const std::wstring before = text.substr(0, selectionStart);
+            const std::size_t lineStart = before.find_last_of(L"\r\n") == std::wstring::npos
+                ? 0 : before.find_last_of(L"\r\n") + 1;
+            const std::wstring line = before.substr(lineStart);
+            std::size_t indent = 0;
+            while (indent < line.size() && (line[indent] == L' ' || line[indent] == L'\t'))
+                indent += line[indent] == L'\t' ? 4 : 1;
+            std::size_t first = indent;
+            while (first < line.size() && std::iswspace(line[first])) ++first;
+            const std::wstring trimmed = line.substr(first);
+            const bool betweenPair = selectionStart > 0 && selectionStart < text.size() &&
+                text[selectionStart - 1] == L'(' && text[selectionStart] == L')';
+            std::wstring insertion;
+            std::size_t caretOffset = 0;
+            if (betweenPair) {
+                const std::wstring outer(indent, L' ');
+                const std::wstring inner(indent + 4, L' ');
+                insertion = L"\r\n" + inner + L"\r\n" + outer;
+                caretOffset = 2 + inner.size();
+            } else {
+                std::size_t nextIndent = indent;
+                if (!trimmed.empty() && trimmed.back() == L'(') nextIndent += 4;
+                else if (trimmed.empty() && selectionStart < text.size() &&
+                         text[selectionStart] == L')' && nextIndent >= 4) nextIndent -= 4;
+                insertion = L"\r\n" + std::wstring(nextIndent, L' ');
+                caretOffset = insertion.size();
+            }
+            SendMessageW(control, EM_REPLACESEL, TRUE, reinterpret_cast<LPARAM>(insertion.c_str()));
+            const DWORD caret = selectionStart + static_cast<DWORD>(caretOffset);
+            SendMessageW(control, EM_SETSEL, caret, caret);
+            return 0;
+        }
+    }
+    return previousCodeEditorProc
+        ? CallWindowProcW(previousCodeEditorProc, control, message, wParam, lParam)
+        : DefWindowProcW(control, message, wParam, lParam);
+}
+
+LRESULT CALLBACK terminalInputWindowProc(HWND control, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (message == WM_KEYDOWN && wParam == VK_RETURN) {
+        if (mainWindow) SendMessageW(mainWindow, WM_COMMAND,
+            MAKEWPARAM(terminalSendButtonId, BN_CLICKED), reinterpret_cast<LPARAM>(terminalSendButton));
+        return 0;
+    }
+    return previousTerminalInputProc
+        ? CallWindowProcW(previousTerminalInputProc, control, message, wParam, lParam)
+        : DefWindowProcW(control, message, wParam, lParam);
+}
+
+LRESULT CALLBACK dictionaryWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (message == WM_CREATE) {
+        dictionaryEditBrush = CreateSolidBrush(RGB(8, 7, 12));
+        dictionaryEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", desktopDictionaryText.c_str(),
+            WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE |
+                ES_READONLY | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_NOHIDESEL,
+            0, 0, 100, 100, window, nullptr, GetModuleHandleW(nullptr), nullptr);
+        dictionaryFont = CreateFontW(-15, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+            FIXED_PITCH | FF_MODERN, L"Consolas");
+        if (dictionaryEdit && dictionaryFont)
+            SendMessageW(dictionaryEdit, WM_SETFONT, reinterpret_cast<WPARAM>(dictionaryFont), TRUE);
+        return 0;
+    }
+    if (message == WM_CTLCOLOREDIT && reinterpret_cast<HWND>(lParam) == dictionaryEdit) {
+        HDC dc = reinterpret_cast<HDC>(wParam);
+        SetTextColor(dc, RGB(243, 238, 250));
+        SetBkColor(dc, RGB(8, 7, 12));
+        return reinterpret_cast<LRESULT>(dictionaryEditBrush);
+    }
+    if (message == WM_SIZE) {
+        if (dictionaryEdit) MoveWindow(dictionaryEdit, 10, 10,
+            std::max(1, LOWORD(lParam) - 20), std::max(1, HIWORD(lParam) - 20), TRUE);
+        return 0;
+    }
+    if (message == WM_CLOSE) {
+        DestroyWindow(window);
+        return 0;
+    }
+    if (message == WM_DESTROY) {
+        dictionaryWindow = nullptr;
+        dictionaryEdit = nullptr;
+        if (dictionaryEditBrush) DeleteObject(dictionaryEditBrush);
+        if (dictionaryFont) DeleteObject(dictionaryFont);
+        dictionaryEditBrush = nullptr;
+        dictionaryFont = nullptr;
+        return 0;
+    }
+    return DefWindowProcW(window, message, wParam, lParam);
+}
+
+void showDesktopDictionary(HWND owner) {
+    desktopDictionaryText =
+        L"TRG LANGUAGE REFERENCE\r\n"
+        L"=====================\r\n\r\n"
+        L"PROGRAM STRUCTURE\r\n"
+        L"  TRG executes source from top to bottom. Commands are case-insensitive.\r\n"
+        L"  // comment\r\n"
+        L"  Blocks use parentheses: if score > 0 ( ... )\r\n"
+        L"  Libraries are declared at file scope: add (math), add (ui), add (3d)\r\n\r\n"
+        L"OUTPUT AND INPUT\r\n"
+        L"  say VALUE...              Print text, variables, and expression results\r\n"
+        L"  print VALUE...            Alias for say\r\n"
+        L"  show VALUE...             Alias for say\r\n"
+        L"  ask PROMPT VARIABLE       Read a value from the terminal input line\r\n\r\n"
+        L"VARIABLES AND TYPES\r\n"
+        L"  let NAME = VALUE          Declare a value\r\n"
+        L"  num NAME = EXPRESSION     Number\r\n"
+        L"  word NAME = TEXT          String\r\n"
+        L"  toggle NAME = true|false  Boolean\r\n"
+        L"  color NAME = #RRGGBB      Color value\r\n"
+        L"  list NAME                 Create a list\r\n"
+        L"  set NAME VALUE            Update a variable\r\n"
+        L"  increase NAME [AMOUNT]    Add to a number\r\n"
+        L"  decrease NAME [AMOUNT]    Subtract from a number\r\n"
+        L"  NAME.field                Read or update a record field\r\n\r\n"
+        L"EXPRESSIONS AND MATH\r\n"
+        L"  Operators: +  -  *  /  %  ^  ( )  <  >  <=  >=  ==  !=  &&  ||\r\n"
+        L"  random MIN MAX RESULT     Generate a random value\r\n"
+        L"  sqrt(VALUE)               Square root\r\n"
+        L"  add (math)                Enables sin, cos, tan, asin, acos, atan,\r\n"
+        L"                            sqrt, abs, floor, ceil, round, min, max,\r\n"
+        L"                            clamp, distance, and related math helpers\r\n\r\n"
+        L"FLOW CONTROL\r\n"
+        L"  if CONDITION ( ... )\r\n"
+        L"  else ( ... )\r\n"
+        L"  loop CONDITION ( ... )\r\n"
+        L"  break | continue | stop\r\n"
+        L"  wait 250ms | wait 2s\r\n"
+        L"  every 100ms ( ... )      Repeating timer block\r\n"
+        L"  group NAME ( ... )       Group variables and UI objects\r\n"
+        L"  define NAME PARAMS ( ... )   Define a function\r\n"
+        L"  call NAME ARGUMENTS      Call a function\r\n"
+        L"  return [VALUE]            Return from a function\r\n\r\n"
+        L"LISTS AND COLLECTIONS\r\n"
+        L"  push LIST VALUE          Append an item\r\n"
+        L"  insert LIST INDEX VALUE  Insert an item (zero-based index)\r\n"
+        L"  get LIST INDEX RESULT    Read an item\r\n"
+        L"  set LIST INDEX VALUE     Replace an item\r\n"
+        L"  remove LIST INDEX        Remove an item\r\n"
+        L"  pop LIST RESULT          Remove the final item\r\n"
+        L"  join LIST SEPARATOR RESULT\r\n"
+        L"  split TEXT SEPARATOR RESULT\r\n"
+        L"  record TYPE ( ... )      Declare a record type\r\n"
+        L"  struct TYPE ( ... )      Alias for record\r\n"
+        L"  class TYPE ( ... )       Alias for record\r\n"
+        L"  new TYPE VARIABLE        Create a record instance\r\n\r\n"
+        L"TEXT HELPERS\r\n"
+        L"  upper TEXT RESULT | lower TEXT RESULT | trim TEXT RESULT\r\n"
+        L"  length TEXT RESULT | contains TEXT SEARCH RESULT\r\n"
+        L"  index_of TEXT SEARCH RESULT\r\n"
+        L"  replace TEXT SEARCH WITH RESULT\r\n"
+        L"  substring TEXT START COUNT RESULT\r\n"
+        L"  starts_with TEXT PREFIX RESULT | ends_with TEXT SUFFIX RESULT\r\n\r\n"
+        L"FILES AND PROJECTS  (add (files))\r\n"
+        L"  read_file PATH VARIABLE\r\n"
+        L"  write_file PATH TEXT... | append_file PATH TEXT...\r\n"
+        L"  file_exists PATH VARIABLE | delete_file PATH\r\n"
+        L"  add (plugin.trg) | run (file.trg)\r\n"
+        L"  add global ( ... ) | add connect (file.trg)\r\n\r\n"
+        L"JSON  (add (json))\r\n"
+        L"  json GROUP clean RESULT\r\n"
+        L"  json GROUP compressed RESULT\r\n"
+        L"  json read (PATH)\r\n"
+        L"  create FILE (LOCATION) RESULT\r\n\r\n"
+        L"DATABASE  (add (database))\r\n"
+        L"  database open PATH | database save\r\n"
+        L"  table create NAME COLUMN... | table delete NAME | table count NAME RESULT\r\n"
+        L"  record add TABLE FIELD VALUE...\r\n"
+        L"  record get TABLE INDEX FIELD RESULT\r\n"
+        L"  record update TABLE INDEX FIELD VALUE | record delete TABLE INDEX\r\n"
+        L"  query TABLE FIELD OP VALUE RESULT\r\n"
+        L"  sql select from TABLE where FIELD OP VALUE into RESULT\r\n\r\n"
+        L"UI AND 2D  (add (ui))\r\n"
+        L"  text NAME VALUE x X y Y size SIZE color COLOR\r\n"
+        L"  button NAME LABEL x X y Y w W h H color COLOR ( ... )\r\n"
+        L"  block z Z x X y Y w W h H color COLOR name NAME\r\n"
+        L"  sprite NAME FILE x X y Y w W h H\r\n"
+        L"  ui create block NAME x X y Y w W h H color COLOR shape SHAPE\r\n"
+        L"  ui duplicate SOURCE NAME | ui rename OLD NEW | ui delete NAME\r\n"
+        L"  ui move NAME DX DY | ui resize NAME DW DH\r\n"
+        L"  ui color NAME COLOR | ui shape NAME SHAPE\r\n"
+        L"  animate NAME x DX y DY fps FPS time SECONDS\r\n\r\n"
+        L"3D SCENES  (add (3d))\r\n"
+        L"  3d box NAME x X y Y z Z w W h H d D color COLOR\r\n"
+        L"  3d sphere NAME x X y Y z Z size SIZE color COLOR\r\n"
+        L"  3d camera NAME x X y Y z Z w W h H d D color COLOR\r\n"
+        L"  3d spawn NAME x X y Y z Z size SIZE color COLOR\r\n"
+        L"  3d plane NAME x X y Y z Z w W h H d D color COLOR\r\n"
+        L"  3d duplicate SOURCE NAME | 3d rename OLD NEW | 3d delete NAME\r\n"
+        L"  3d move NAME DX DY DZ | 3d rotate NAME RX RY RZ\r\n"
+        L"  3d scale NAME FACTOR | 3d color NAME COLOR\r\n"
+        L"  3d texture NAME smooth|grid|metal|wood|stone\r\n"
+        L"  3d save FILE.trgscene | 3d load FILE.trgscene\r\n"
+        L"  Desktop engine: WASD move, Q/E rise/drop, arrow keys look,\r\n"
+        L"  drag empty viewport to orbit, drag assets to add scene objects,\r\n"
+        L"  drag models to move, right-click a model for its properties.\r\n\r\n"
+        L"COLLISION AND CONTROLS\r\n"
+        L"  add (collision) | collides A B RESULT | watch_collision A B RESULT\r\n"
+        L"  add (controls) | add (animation)\r\n"
+        L"  move_ui OBJECT x DX y DY\r\n\r\n"
+        L"WEB, MEDIA, AND AI\r\n"
+        L"  add (web): web_page, web_heading, web_text, web_button, web_image, web_show\r\n"
+        L"  play_audio FILE | show_image FILE | play_video FILE\r\n"
+        L"  add (ai): ai create, teach, train, predict, classify\r\n"
+        L"  add (all) enables the built-in libraries.\r\n\r\n"
+        L"DEFAULTS AND MANUAL REGISTERS\r\n"
+        L"  default num|word|toggle|color VALUE  Change a type's default value\r\n"
+        L"  add (manual): register NAME [num|word|toggle|color]\r\n"
+        L"  registry NAME [TYPE]        Alias for register\r\n"
+        L"  move NAME VALUE             Assign a manual register\r\n"
+        L"  add|subtract|multiply|divide NAME VALUE  Numeric register arithmetic\r\n"
+        L"  Arithmetic register commands require add (manual).\r\n\r\n"
+        L"FUNCTIONS AND ITERATION\r\n"
+        L"  define NAME PARAMS ( ... )  Define a reusable function\r\n"
+        L"  call NAME ARGUMENTS         Call a function\r\n"
+        L"  return [VALUE]               Return from a function\r\n"
+        L"  for each ITEM in LIST ( ... )  Iterate through a list\r\n"
+        L"  group NAME ( ... )           Run code in a named UI group\r\n"
+        L"  hide NAME | show NAME        Hide or show a UI group\r\n\r\n"
+        L"DICTIONARIES\r\n"
+        L"  dictionary NAME              Create a key/value dictionary\r\n"
+        L"  dict_set NAME KEY VALUE      Set a value\r\n"
+        L"  dict_get NAME KEY RESULT     Read a value\r\n"
+        L"  dict_has NAME KEY RESULT     Test whether a key exists\r\n"
+        L"  dict_remove NAME KEY         Remove a key\r\n"
+        L"  dict_keys NAME RESULT        Get all keys\r\n"
+        L"  dict_count NAME RESULT      Count entries\r\n\r\n"
+        L"MATH AND STATISTICS\r\n"
+        L"  add (math): math sin|cos|tan|abs|floor|ceil|round|sqrt VALUE RESULT\r\n"
+        L"  math min|max A B RESULT | math clamp VALUE MIN MAX RESULT\r\n"
+        L"  math distance X1 Y1 X2 Y2 RESULT\r\n"
+        L"  add (stats): stats sum|average|min|max|median|range LIST RESULT\r\n\r\n"
+        L"CONVERSIONS AND UNITS\r\n"
+        L"  add (convert): convert number|text|bool VALUE RESULT\r\n"
+        L"  add (units): units c_to_f|f_to_c|km_to_mi|mi_to_km VALUE RESULT\r\n"
+        L"  units m_to_ft|ft_to_m|kg_to_lb|lb_to_kg VALUE RESULT\r\n"
+        L"  add (time): time unix|milliseconds|year|month|day|hour|minute|second RESULT\r\n\r\n"
+        L"BINARY, BITS AND CHECKSUMS\r\n"
+        L"  add (binary): binary to_bin|from_bin|to_hex|from_hex VALUE RESULT\r\n"
+        L"  binary base64_encode|base64_decode VALUE RESULT\r\n"
+        L"  bit and|or|xor A B RESULT | bit not A RESULT\r\n"
+        L"  bit shift_left|shift_right VALUE AMOUNT RESULT\r\n"
+        L"  checksum crc32|fnv1a TEXT RESULT\r\n\r\n"
+        L"TEXT PATTERNS AND COMPRESSION\r\n"
+        L"  add (regex): regex match|search TEXT PATTERN RESULT\r\n"
+        L"  regex replace TEXT PATTERN REPLACEMENT RESULT\r\n"
+        L"  add (compression): compress encode|decode TEXT RESULT\r\n"
+        L"  add (files): read_file PATH RESULT | write_file PATH TEXT...\r\n"
+        L"  append_file PATH TEXT... | file_exists PATH RESULT | delete_file PATH\r\n\r\n"
+        L"NETWORK AND WEBASSEMBLY\r\n"
+        L"  add (network): http_get URL RESULT | http_post URL BODY RESULT\r\n"
+        L"  add (web): run_wasm FILE.wasm\r\n"
+        L"  web_page TITLE | web_heading TEXT | web_text TEXT | web_color COLOR\r\n"
+        L"  web_button LABEL [MESSAGE] | web_image FILE | web_show\r\n\r\n"
+        L"PHYSICS AND COLLISION\r\n"
+        L"  add (physics) and add (ui) to register UI objects as bodies\r\n"
+        L"  physics body|solid|trigger OBJECT\r\n"
+        L"  physics velocity BODY VX VY | physics position BODY X Y\r\n"
+        L"  physics gravity BODY VALUE | physics drag BODY VALUE | physics bounce BODY VALUE\r\n"
+        L"  physics drag_launch BODY MAX_SPEED | physics step SECONDS\r\n"
+        L"  physics freeze|unfreeze BODY | physics reset BODY | physics remove BODY\r\n"
+        L"  add (collision): collides A B RESULT | watch_collision A B RESULT\r\n\r\n"
+        L"PARTICLES, VIEWPORT AND MEDIA\r\n"
+        L"  particle NAME X Y COLOR SPEED LIFE [SIZE]\r\n"
+        L"  scroll X Y                 Move the UI viewport\r\n"
+        L"  set_text NAME VALUE | set_color NAME #RRGGBB\r\n"
+        L"  play FILE | play_audio FILE | show_image FILE | play_video FILE\r\n"
+        L"  animate NAME x DX y DY fps FPS time SECONDS\r\n"
+        L"  image NAME FILE x X y Y w W h H | sprite NAME FILE x X y Y w W h H\r\n"
+        L"  run (FILE.trg)              Run another file in the current scope\r\n"
+        L"  add global ( ... )          Share declarations across project files\r\n"
+        L"  add connect (FILE.trg)      Connect variables across project files\r\n"
+        L"  add (ai): ai create, teach, train, predict, classify\r\n"
+        L"  add (accessibility): enable accessibility helpers\r\n"
+        L"  add (powershell): PowerShell integration on supported Windows builds\r\n"
+        L"  add (raspberry): Raspberry Pi integration on supported builds\r\n\r\n"
+        L"DESKTOP IDE AND TERMINAL\r\n"
+        L"  Tab inserts four spaces. Parentheses and quotes pair automatically.\r\n"
+        L"  Enter between () creates a blank body line with four-space indentation;\r\n"
+        L"  the matching ) stays on its own line at the parent indentation level.\r\n"
+        L"  Typing a closing bracket or quote skips over its existing pair.\r\n"
+        L"  Select text and type (, \\" or ' to wrap the selected text.\r\n"
+        L"  The code editor highlights comments, strings, numbers and TRG commands.\r\n"
+        L"  Build EXE creates a self-contained Windows TRG runtime package.\r\n"
+        L"  Export TRG saves the current source as a .trg file.\r\n"
+        L"  Program output has vertical/horizontal scrollbars; select text and use\r\n"
+        L"  Ctrl+C or right-click for Copy, Select All and Clear Output.\r\n"
+        L"  ask PROMPT VARIABLE writes its prompt here and accepts the answer in\r\n"
+        L"  the terminal input line at the bottom of the output panel.\r\n\r\n"
+        L"DESKTOP 3D ENGINE CONTROLS\r\n"
+        L"  Drag BOX, SPHERE, CAMERA, SPAWN or PLANE from the Content Browser.\r\n"
+        L"  Click an asset card to create it in front of the editor camera.\r\n"
+        L"  Select, Move, Rotate and Scale choose the active transform tool.\r\n"
+        L"  WASD moves the editor camera; hold Shift to move faster.\r\n"
+        L"  Q/E move vertically; arrow keys look around; right-drag orbits.\r\n"
+        L"  Mouse wheel zooms the viewport; wheel over the hierarchy scrolls it.\r\n"
+        L"  Right-click an object for Rename, Duplicate, Delete, Texture,\r\n"
+        L"  Focus and Position actions. Save Scene and Load Scene use\r\n"
+        L"  scene.trgscene in the current project folder.\r\n"
+        L"  Material cards apply Smooth, Grid, Metal, Wood or Stone textures.\r\n\r\n"
+        L"LIBRARY LIST\r\n"
+        L"  add (files) (json) (database) (web) (collision) (physics) (3d)\r\n"
+        L"  add (manual) (ui) (animation) (controls) (network) (ai) (math)\r\n"
+        L"  add (binary) (regex) (compression) (powershell) (raspberry)\r\n"
+        L"  add (accessibility) (time) (convert) (stats) (units) (all)\r\n"
+        L"  Most library declarations apply to the whole file and belong at the top.\r\n\r\n"
+        L"COMMAND INDEX\r\n"
+        L"  let num word toggle color list default register registry dictionary\r\n"
+        L"  if else loop for each every wait break continue stop define call return\r\n"
+        L"  say print show ask add run create set increase decrease move\r\n"
+        L"  add subtract multiply divide random math stats units convert time\r\n"
+        L"  upper lower trim ttrim length contains index_of find find_position\r\n"
+        L"  replace replace_text count_text starts_with ends_with substring\r\n"
+        L"  push insert get remove pop join split dict_set dict_get dict_has\r\n"
+        L"  dict_remove dict_keys dict_count json database table record query sql\r\n"
+        L"  read_file write_file append_file file_exists delete_file\r\n"
+        L"  binary bit checksum regex compress http_get http_post run_wasm\r\n"
+        L"  text button block sprite image ui animate group show hide scroll\r\n"
+        L"  set_text set_color collides watch_collision physics particle\r\n"
+        L"  3d play play_audio show_image play_video web_page web_heading web_text\r\n"
+        L"  web_color web_button web_image web_show studio\r\n\r\n"
+        L"COLORS accept #RRGGBB or 0xRRGGBB.";
+    const wchar_t* className = L"TRGDictionaryWindow";
+    WNDCLASSW wc = {};
+    wc.lpfnWndProc = dictionaryWindowProc;
+    wc.hInstance = GetModuleHandleW(nullptr);
+    wc.lpszClassName = className;
+    wc.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
+    if (!RegisterClassW(&wc) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) return;
+    if (!dictionaryWindow) {
+        dictionaryWindow = CreateWindowExW(WS_EX_TOOLWINDOW, className,
+            L"TRG Command Dictionary", WS_OVERLAPPEDWINDOW,
+            CW_USEDEFAULT, CW_USEDEFAULT, scaleForDpi(owner, 760), scaleForDpi(owner, 680),
+            owner, nullptr, wc.hInstance, nullptr);
+    }
+    if (dictionaryWindow) {
+        ShowWindow(dictionaryWindow, SW_SHOW);
+        SetForegroundWindow(dictionaryWindow);
+    }
+}
+
+
 void updateEditorWindowTitle() {
     if (!mainWindow) return;
     std::wstring title = L"TRG Editor - ";
@@ -757,13 +1233,33 @@ void appendOutput(const std::string& text) {
 #ifdef TRG_TEST_CONSOLE
     std::cout << text;
 #else
-    outputBuffer += wideFromUtf8(text);
-    if (outputBuffer.size() > 20000) {
-        const std::size_t cutoff = outputBuffer.find(L'\n', outputBuffer.size() - 15000);
-        if (cutoff != std::wstring::npos) outputBuffer.erase(0, cutoff + 1);
+    const std::wstring addition = wideFromUtf8(text);
+    outputBuffer += addition;
+    bool trimmed = false;
+    if (outputBuffer.size() > 30000) {
+        const std::size_t cutoff = outputBuffer.find(L'\n', outputBuffer.size() - 22000);
+        if (cutoff != std::wstring::npos) {
+            outputBuffer.erase(0, cutoff + 1);
+            trimmed = true;
+        }
+    }
+    if (outputControl) {
+        if (trimmed) {
+            SetWindowTextW(outputControl, outputBuffer.c_str());
+        } else {
+            SendMessageW(outputControl, EM_SETSEL, static_cast<WPARAM>(-1), static_cast<LPARAM>(-1));
+            SendMessageW(outputControl, EM_REPLACESEL, FALSE, reinterpret_cast<LPARAM>(addition.c_str()));
+        }
+        SendMessageW(outputControl, EM_SETSEL, static_cast<WPARAM>(-1), static_cast<LPARAM>(-1));
+        SendMessageW(outputControl, EM_SCROLLCARET, 0, 0);
+        SendMessageW(outputControl, WM_VSCROLL, SB_BOTTOM, 0);
     }
     if (mainWindow) InvalidateRect(mainWindow, nullptr, FALSE);
 #endif
+}
+void clearDesktopOutput() {
+    outputBuffer.clear();
+    if (outputControl) SetWindowTextW(outputControl, L"");
 }
 #else
 void appendOutput(const std::string& text) {
@@ -775,7 +1271,42 @@ void appendOutput(const std::string& text) {
 }
 #endif
 
-
+#ifdef _WIN32
+LRESULT CALLBACK outputWindowProc(HWND control, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (message == WM_KEYDOWN && (GetKeyState(VK_CONTROL) & 0x8000)) {
+        if (wParam == 'A') {
+            SendMessageW(control, EM_SETSEL, 0, -1);
+            return 0;
+        }
+        if (wParam == 'C') {
+            SendMessageW(control, WM_COPY, 0, 0);
+            return 0;
+        }
+    }
+    if (message == WM_CONTEXTMENU) {
+        POINT point = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
+        if (point.x == -1 && point.y == -1) GetCursorPos(&point);
+        HMENU menu = CreatePopupMenu();
+        if (menu) {
+            AppendMenuW(menu, MF_STRING, 1, L"Copy");
+            AppendMenuW(menu, MF_STRING, 2, L"Select all");
+            AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+            AppendMenuW(menu, MF_STRING, 3, L"Clear output");
+            const UINT selected = TrackPopupMenu(menu,
+                TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_NONOTIFY,
+                point.x, point.y, 0, GetParent(control), nullptr);
+            DestroyMenu(menu);
+            if (selected == 1) SendMessageW(control, WM_COPY, 0, 0);
+            else if (selected == 2) SendMessageW(control, EM_SETSEL, 0, -1);
+            else if (selected == 3) clearDesktopOutput();
+        }
+        return 0;
+    }
+    return previousOutputProc
+        ? CallWindowProcW(previousOutputProc, control, message, wParam, lParam)
+        : DefWindowProcW(control, message, wParam, lParam);
+}
+#endif
 
 
 std::string trim(const std::string& s) {
@@ -862,39 +1393,6 @@ std::string lower(std::string s) {
     return s;
 }
 
-std::string suggestedCommand(const std::string& input) {
-    static const std::vector<std::string> commands = {
-        "say", "print", "show", "let", "list", "dictionary", "dict_set", "dict_get", "dict_has", "dict_remove", "dict_keys", "dict_count", "ask", "ai", "math", "word", "num", "toggle", "color", "if", "else", "loop", "every", "for", "each", "query", "random",
-        "group", "define", "stop", "exit", "break", "continue", "add", "text",
-        "button", "block", "animate", "collides", "touching", "move_ui", "register", "move", "subtract", "multiply",
-        "watch_collision",
-        "divide", "write_file", "append_file", "read_file", "delete_file", "file_exists",
-        "upper", "lower", "length", "contains", "replace", "push", "get", "remove", "pop", "insert", "index_of", "split", "join", "trim", "substring", "set", "increase", "decrease",
-        "play_audio", "show_image", "play_video", "run_wasm", "web_page", "web_heading",
-        "web_text", "web_color", "web_button", "web_image", "web_show",
-        "binary", "bit", "checksum", "regex", "compress"
-    };
-    const std::string word = lower(input);
-    std::size_t bestDistance = word.size();
-    std::string best;
-    for (const std::string& candidate : commands) {
-        std::vector<std::size_t> row(candidate.size() + 1);
-        for (std::size_t j = 0; j <= candidate.size(); ++j) row[j] = j;
-        for (std::size_t i = 1; i <= word.size(); ++i) {
-            std::size_t diagonal = row[0];
-            row[0] = i;
-            for (std::size_t j = 1; j <= candidate.size(); ++j) {
-                const std::size_t previous = row[j];
-                row[j] = std::min({row[j] + 1, row[j - 1] + 1,
-                                   diagonal + (word[i - 1] == candidate[j - 1] ? 0u : 1u)});
-                diagonal = previous;
-            }
-        }
-        if (row.back() < bestDistance) { bestDistance = row.back(); best = candidate; }
-    }
-    const std::size_t threshold = std::max<std::size_t>(2, word.size() / 3);
-    return bestDistance <= threshold ? best : std::string();
-}
 
 std::string stripComment(const std::string& line) {
     bool inQuotes = false;
@@ -997,7 +1495,9 @@ Defaults standardDefaults() {
 
 std::vector<std::string> tokenize(const std::string& text) {
     std::vector<std::string> result;
+    result.reserve(text.size() / 2 + 1);
     std::string token;
+    token.reserve(text.size());
     bool quoted = false;
     char quote = '\0';
     for (std::size_t i = 0; i < text.size(); ++i) {
@@ -1146,16 +1646,25 @@ bool parseColor(const std::string& color, unsigned& red, unsigned& green, unsign
 bool evaluateExpression(const std::string& expr, Vars& variables, double& result) {
     std::string t = trim(expr);
     if (t.empty()) return false;
+    // Avoid constructing a temporary operator string for every character.
+    const auto isOperator = [](char c) noexcept {
+        switch (c) {
+            case '(' : case ')' : case '+' : case '-' : case '*' :
+            case '/' : case '%' : case '^' : case ',' : return true;
+            default: return false;
+        }
+    };
     std::vector<std::string> tokens;
+    tokens.reserve(t.size() / 2 + 1);
     for (std::size_t i = 0; i < t.size();) {
         if (std::isspace(static_cast<unsigned char>(t[i]))) { ++i; continue; }
-        if (std::string("()+-*/%^,").find(t[i]) != std::string::npos) {
+        if (isOperator(t[i])) {
             tokens.emplace_back(1, t[i++]);
             continue;
         }
         const std::size_t start = i;
         while (i < t.size() && !std::isspace(static_cast<unsigned char>(t[i])) &&
-               std::string("()+-*/%^,").find(t[i]) == std::string::npos) ++i;
+               !isOperator(t[i])) ++i;
         tokens.push_back(t.substr(start, i - start));
     }
     std::size_t position = 0;
@@ -2896,7 +3405,15 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 trgStudioActionAndroid(tokens[1]);
             }
 #else
+#ifdef _WIN32
+            if (tokens.size() == 2 && lower(tokens[1]) == "code" && desktopVisualEditorActive) {
+                returnFromDesktopVisualEditor();
+            } else {
+                reportError(i + 1, "desktop studio supports studio code while a built-in visual editor is open");
+            }
+#else
             reportError(i + 1, "studio actions are only available in TRG Studio");
+#endif
 #endif
             continue;
         }
@@ -4931,7 +5448,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
 
         if (cmd == "3d") {
             if (!threeDEnabled) { reportError(i + 1, "3D commands need add (3d)"); continue; }
-            if (tokens.size() < 2) { reportError(i + 1, "use 3d box|sphere|move|rotate|scale|color|rename|delete|clear"); continue; }
+            if (tokens.size() < 2) { reportError(i + 1, "use 3d box|sphere|camera|spawn|plane|texture|move|rotate|scale|color|rename|delete|clear"); continue; }
             const std::string action = lower(tokens[1]);
             const auto unique3DName = [&]() {
                 std::string candidate;
@@ -4939,12 +5456,16 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 while (std::any_of(ui3DObjects.begin(), ui3DObjects.end(), [&](const Ui3DObject& item) { return item.name == candidate; }));
                 return candidate;
             };
-            if (action == "box" || action == "sphere") {
+            if (action == "box" || action == "sphere" || action == "camera" ||
+                action == "spawn" || action == "plane") {
                 Ui3DObject object;
                 object.group = currentUiGroup;
                 object.shape = action;
                 object.name = tokens.size() > 2 ? valueFor(tokens[2], variables) : "";
                 if (lower(object.name) == "auto") object.name = unique3DName();
+                if (action == "camera") object.width = 1.1, object.height = 0.8, object.depth = 1.4;
+                else if (action == "spawn") object.width = object.height = object.depth = 1.0;
+                else if (action == "plane") object.width = object.depth = 6.0, object.height = 0.15;
                 bool valid = validName(object.name);
                 bool hasColor = false;
                 for (std::size_t part = 3; valid && part + 1 < tokens.size(); part += 2) {
@@ -4968,9 +5489,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 }
                 const bool exists = std::any_of(ui3DObjects.begin(), ui3DObjects.end(), [&](const Ui3DObject& item) { return item.name == object.name; });
                 if (!valid || !hasColor || exists) {
-                    reportError(i + 1, action == "box" ?
-                        "use 3d box NAME x X y Y z Z w WIDTH h HEIGHT d DEPTH color COLOR" :
-                        "use 3d sphere NAME x X y Y z Z size SIZE color COLOR", object.name);
+                    reportError(i + 1, "use 3d box|sphere|camera|spawn|plane NAME x X y Y z Z ... color COLOR", object.name);
                     continue;
                 }
                 ui3DObjects.push_back(object);
@@ -5017,11 +5536,11 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 if (directoryError) { reportError(i + 1, "could not create the scene directory", directoryError.message()); continue; }
                 std::ofstream sceneFile(scenePath, std::ios::binary | std::ios::trunc);
                 if (!sceneFile) { reportError(i + 1, "could not write the 3D scene", scenePath.string()); continue; }
-                sceneFile << "TRGSCENE 1\n" << ui3DObjects.size() << "\n";
+                sceneFile << "TRGSCENE 2\n" << ui3DObjects.size() << "\n";
                 for (const Ui3DObject& item : ui3DObjects) {
                     sceneFile << std::quoted(item.name) << ' ' << std::quoted(item.group) << ' '
                               << std::quoted(item.shape) << ' ' << std::quoted(item.color) << ' '
-                              << std::setprecision(17)
+                              << std::quoted(item.texture) << ' ' << std::setprecision(17)
                               << item.x << ' ' << item.y << ' ' << item.z << ' '
                               << item.width << ' ' << item.height << ' ' << item.depth << ' '
                               << item.rotateX << ' ' << item.rotateY << ' ' << item.rotateZ << ' '
@@ -5042,7 +5561,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 unsigned version = 0;
                 std::size_t objectCount = 0;
                 if (!sceneFile || !(sceneFile >> magic >> version >> objectCount) ||
-                    magic != "TRGSCENE" || version != 1 || objectCount > 100000) {
+                    magic != "TRGSCENE" || (version != 1 && version != 2) || objectCount > 100000) {
                     reportError(i + 1, "invalid or unsupported 3D scene file", scenePath.string()); continue;
                 }
                 std::vector<Ui3DObject> loadedObjects;
@@ -5053,13 +5572,17 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     Ui3DObject item;
                     int visible = 0;
                     if (!(sceneFile >> std::quoted(item.name) >> std::quoted(item.group)
-                          >> std::quoted(item.shape) >> std::quoted(item.color)
-                          >> item.x >> item.y >> item.z
+                          >> std::quoted(item.shape) >> std::quoted(item.color)) ||
+                        (version >= 2 && !(sceneFile >> std::quoted(item.texture))) ||
+                        !(sceneFile >> item.x >> item.y >> item.z
                           >> item.width >> item.height >> item.depth
                           >> item.rotateX >> item.rotateY >> item.rotateZ
                           >> item.opacity >> visible) ||
                         !validName(item.name) ||
-                        (item.shape != "box" && item.shape != "sphere") ||
+                        (item.shape != "box" && item.shape != "sphere" && item.shape != "camera" &&
+                         item.shape != "spawn" && item.shape != "plane") ||
+                        (item.texture != "smooth" && item.texture != "grid" && item.texture != "metal" &&
+                         item.texture != "wood" && item.texture != "stone") ||
                         item.width <= 0 || item.height <= 0 || item.depth <= 0 ||
                         item.opacity < 0 || item.opacity > 1 ||
                         (visible != 0 && visible != 1) ||
@@ -5078,6 +5601,26 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     reportError(i + 1, "3D scene contains invalid or incomplete object data", scenePath.string()); continue;
                 }
                 ui3DObjects = std::move(loadedObjects);
+                if (variables.count("objects") && types["objects"] == "list") {
+                    if (auto* names = std::get_if<VariableList>(&variables["objects"].value)) {
+                        names->clear();
+                        names->reserve(ui3DObjects.size());
+                        for (const Ui3DObject& item : ui3DObjects)
+                            names->push_back(std::make_shared<VariableValue>(item.name));
+                    }
+                }
+                if (variables.count("objectCount")) {
+                    variables["objectCount"] = static_cast<double>(ui3DObjects.size());
+                    types["objectCount"] = "num";
+                }
+                if (variables.count("selectedIndex")) {
+                    variables["selectedIndex"] = 0.0;
+                    types["selectedIndex"] = "num";
+                }
+                if (variables.count("selectedName")) {
+                    variables["selectedName"] = ui3DObjects.empty() ? std::string() : ui3DObjects.front().name;
+                    types["selectedName"] = "word";
+                }
                 appendOutput("Loaded 3D scene: " + scenePath.string() + "\r\n");
                 continue;
             }
@@ -5128,6 +5671,16 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 unsigned red = 0, green = 0, blue = 0;
                 if (!parseColor(color, red, green, blue)) { reportError(i + 1, "3d color needs a valid color", color); continue; }
                 object->color = color;
+                continue;
+            }
+            if (action == "texture" && tokens.size() == 4) {
+                const std::string texture = lower(valueFor(tokens[3], variables));
+                static const std::unordered_set<std::string> textures = {"smooth","grid","metal","wood","stone"};
+                if (!textures.count(texture)) {
+                    reportError(i + 1, "3d texture must be smooth, grid, metal, wood, or stone", texture);
+                    continue;
+                }
+                object->texture = texture;
                 continue;
             }
             reportError(i + 1, "unknown or invalid 3D operation", action);
@@ -5455,8 +6008,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
         }
 
         
-        const std::string suggestion = suggestedCommand(cmd);
-        reportError(i + 1, suggestion.empty() ? "unknown command" : "unknown command; did you mean '" + suggestion + "'?", cmd);
+        reportError(i + 1, "unknown command", cmd);
     }
 }
 
@@ -5712,21 +6264,578 @@ DesktopLayout desktopLayout(HWND window, const RECT& client) {
     const LONG height = std::max<LONG>(0, client.bottom - client.top);
     const LONG margin = scaleForDpi(window, 20);
     if (previewMode) {
-        return {width, height, 0, height, std::max<LONG>(1, height),
-            margin, height, height};
+        const LONG outputHeight = std::min<LONG>(
+            std::max<LONG>(scaleForDpi(window, 116), height / 5),
+            std::max<LONG>(scaleForDpi(window, 90), height / 3));
+        const LONG panelTop = std::max<LONG>(scaleForDpi(window, 120), height - outputHeight);
+        return {width, height, 0, panelTop, std::max<LONG>(1, panelTop),
+            margin, panelTop, std::max<LONG>(panelTop, height - margin)};
     }
-    const LONG headerHeight = std::min<LONG>(scaleForDpi(window, 76),
-        std::max<LONG>(scaleForDpi(window, 48), height / 5));
-    const LONG outputMinimum = scaleForDpi(window, 80);
+    const LONG headerHeight = scaleForDpi(window, 84);
+    const LONG outputMinimum = scaleForDpi(window, 112);
     const LONG canvasMinimum = scaleForDpi(window, 100);
     const LONG panelMinimum = std::min(height, headerHeight + canvasMinimum);
     const LONG panelMaximum = std::max(panelMinimum, height - outputMinimum);
     const LONG panelTop = std::clamp<LONG>(height * 65 / 100, panelMinimum, panelMaximum);
     return {width, height, headerHeight, panelTop,
-        std::max<LONG>(1, panelTop - headerHeight), margin,
-        panelTop + scaleForDpi(window, 10),
-        std::max<LONG>(panelTop + scaleForDpi(window, 10),
-                       height - scaleForDpi(window, 16))};
+        std::max<LONG>(1, panelTop - headerHeight), margin, panelTop,
+        std::max<LONG>(panelTop, height - margin)};
+}
+
+
+void setDesktop3DLabel(const std::string& name, const std::string& value) {
+    for (UiText& label : uiTexts) if (label.name == name) label.value = value;
+}
+
+void syncDesktop3DEditorState() {
+    if (!desktop3DEngineActive) return;
+    VariableList names;
+    names.reserve(ui3DObjects.size());
+    for (const Ui3DObject& model : ui3DObjects)
+        names.push_back(std::make_shared<VariableValue>(model.name));
+    uiVariables["objects"] = std::move(names);
+    uiTypes["objects"] = "list";
+    uiVariables["objectCount"] = static_cast<double>(ui3DObjects.size());
+    uiTypes["objectCount"] = "num";
+    auto selected = std::find_if(ui3DObjects.begin(), ui3DObjects.end(),
+        [](const Ui3DObject& model) { return model.name == desktop3DSelectedName; });
+    if (selected == ui3DObjects.end() && !ui3DObjects.empty()) {
+        selected = ui3DObjects.begin();
+        desktop3DSelectedName = selected->name;
+    }
+    desktop3DHierarchyScroll = std::clamp(desktop3DHierarchyScroll, 0,
+        std::max(0, static_cast<int>(ui3DObjects.size()) - 11));
+    const std::size_t index = selected == ui3DObjects.end() ? 0 :
+        static_cast<std::size_t>(std::distance(ui3DObjects.begin(), selected));
+    uiVariables["selectedIndex"] = static_cast<double>(index);
+    uiTypes["selectedIndex"] = "num";
+    uiVariables["selectedName"] = selected == ui3DObjects.end() ? std::string() : selected->name;
+    uiTypes["selectedName"] = "word";
+    setDesktop3DLabel("object_count", std::to_string(ui3DObjects.size()) + " OBJECTS");
+    setDesktop3DLabel("hierarchy_selected",
+        selected == ui3DObjects.end() ? "No objects in scene" : selected->name);
+    setDesktop3DLabel("model_label",
+        selected == ui3DObjects.end() ? "Nothing selected" : selected->name);
+    setDesktop3DLabel("viewport_status",
+        selected == ui3DObjects.end() ? "Empty scene — drag an asset into the viewport" : selected->name);
+    if (selected != ui3DObjects.end()) {
+        setDesktop3DLabel("current_color_label", "Material: " + selected->color);
+        setDesktop3DLabel("texture_label", "Texture: " + selected->texture);
+    } else {
+        setDesktop3DLabel("current_color_label", "Material: —");
+        setDesktop3DLabel("texture_label", "Texture: —");
+    }
+    if (mainWindow) InvalidateRect(mainWindow, nullptr, FALSE);
+}
+
+std::string desktop3DUniqueName(const std::string& base) {
+    std::string candidate;
+    unsigned index = 1;
+    do {
+        candidate = base + "_" + std::to_string(index++);
+    } while (std::any_of(ui3DObjects.begin(), ui3DObjects.end(),
+        [&](const Ui3DObject& model) { return model.name == candidate; }));
+    return candidate;
+}
+
+void createDesktop3DAsset(int kind, double x, double y, double z) {
+    Ui3DObject model;
+    model.group = "default";
+    model.x = x;
+    model.y = y;
+    model.z = z;
+    switch (kind) {
+        case 1:
+            model.name = desktop3DUniqueName("Sphere");
+            model.shape = "sphere";
+            model.width = model.height = model.depth = 1.6;
+            model.color = "#4F9CFB";
+            break;
+        case 2:
+            model.name = desktop3DUniqueName("Camera");
+            model.shape = "camera";
+            model.width = 1.1; model.height = 0.8; model.depth = 1.4;
+            model.color = "#B79BEA";
+            break;
+        case 3:
+            model.name = desktop3DUniqueName("Spawn");
+            model.shape = "spawn";
+            model.width = model.height = model.depth = 1.0;
+            model.color = "#E7A85C";
+            break;
+        case 4:
+            model.name = desktop3DUniqueName("Plane");
+            model.shape = "plane";
+            model.width = model.depth = 6.0;
+            model.height = 0.15;
+            model.y = -1.0;
+            model.color = "#70B68A";
+            break;
+        default:
+            model.name = desktop3DUniqueName("Box");
+            model.shape = "box";
+            model.width = model.height = model.depth = 2.0;
+            model.color = "#8B5CF6";
+            break;
+    }
+    ui3DObjects.push_back(std::move(model));
+    desktop3DSelectedName = ui3DObjects.back().name;
+
+    syncDesktop3DEditorState();
+}
+
+void updateDesktop3DLayout(HWND window, const DesktopLayout& layout) {
+    const LONG width = std::max<LONG>(1, layout.width);
+    const LONG canvasBottom = layout.panelTop;
+    const LONG margin = scaleForDpi(window, 10);
+    const LONG gap = scaleForDpi(window, 7);
+    const LONG toolbarHeight = scaleForDpi(window, 40);
+    const LONG shelfHeight = std::clamp<LONG>(layout.canvasHeight / 5,
+        scaleForDpi(window, 96), scaleForDpi(window, 128));
+    const LONG sideTop = toolbarHeight + gap * 2;
+    const LONG shelfTop = std::max<LONG>(sideTop + scaleForDpi(window, 90),
+        canvasBottom - shelfHeight);
+    const LONG hierarchyWidth = std::clamp<LONG>(width / 5,
+        scaleForDpi(window, 168), scaleForDpi(window, 224));
+    const LONG inspectorWidth = std::clamp<LONG>(width / 4,
+        scaleForDpi(window, 194), scaleForDpi(window, 258));
+    desktop3DToolbarRect = {margin, margin,
+        std::max<LONG>(margin + scaleForDpi(window, 360),
+            width - margin - scaleForDpi(window, 86)), margin + toolbarHeight};
+    desktop3DHierarchyRect = {margin, sideTop, margin + hierarchyWidth, shelfTop - gap};
+    desktop3DInspectorRect = {width - margin - inspectorWidth, sideTop,
+        width - margin, shelfTop - gap};
+    desktop3DViewportRect = {desktop3DHierarchyRect.right + gap, sideTop,
+        desktop3DInspectorRect.left - gap, shelfTop - gap};
+    desktop3DAssetShelfRect = {margin, shelfTop, width - margin,
+        std::max<LONG>(shelfTop + scaleForDpi(window, 72), canvasBottom - margin)};
+
+    const LONG toolGap = scaleForDpi(window, 6);
+    const LONG toolPadding = scaleForDpi(window, 8);
+    const LONG toolWidth = std::max<LONG>(scaleForDpi(window, 40),
+        (desktop3DToolbarRect.right - desktop3DToolbarRect.left -
+            toolPadding * 2 - toolGap * 6) / 7);
+    const wchar_t* toolLabels[] = {
+        L"SELECT", L"MOVE", L"ROTATE", L"SCALE", L"SAVE SCENE", L"LOAD SCENE", L"RESET VIEW"
+    };
+    LONG toolX = desktop3DToolbarRect.left + toolPadding;
+    for (std::size_t index = 0; index < desktop3DToolRects.size(); ++index) {
+        const LONG itemWidth = index == 4 || index == 5
+            ? std::max<LONG>(toolWidth, scaleForDpi(window, 78)) : toolWidth;
+        desktop3DToolRects[index] = {toolX, desktop3DToolbarRect.top + scaleForDpi(window, 5),
+            std::min<LONG>(desktop3DToolbarRect.right - toolPadding, toolX + itemWidth),
+            desktop3DToolbarRect.bottom - scaleForDpi(window, 5)};
+        toolX += itemWidth + toolGap;
+    }
+
+    const LONG shelfLabelHeight = scaleForDpi(window, 24);
+    const LONG cardTop = desktop3DAssetShelfRect.top + shelfLabelHeight + scaleForDpi(window, 4);
+    const LONG cardBottom = desktop3DAssetShelfRect.bottom - scaleForDpi(window, 7);
+    const LONG assetStart = desktop3DAssetShelfRect.left + scaleForDpi(window, 82);
+    const LONG textureWidth = std::clamp<LONG>((width - scaleForDpi(window, 40)) / 14,
+        scaleForDpi(window, 48), scaleForDpi(window, 70));
+    const LONG textureGap = scaleForDpi(window, 5);
+    const LONG textureStart = desktop3DAssetShelfRect.right -
+        (textureWidth * 5 + textureGap * 4);
+    const LONG assetEnd = textureStart - scaleForDpi(window, 18);
+    const LONG assetGap = scaleForDpi(window, 5);
+    const LONG assetWidth = std::max<LONG>(scaleForDpi(window, 48),
+        (assetEnd - assetStart - assetGap * 4) / 5);
+    for (std::size_t index = 0; index < desktop3DAssetRects.size(); ++index) {
+        const LONG left = assetStart + static_cast<LONG>(index) * (assetWidth + assetGap);
+        desktop3DAssetRects[index] = {left, cardTop,
+            std::min<LONG>(assetEnd, left + assetWidth), cardBottom};
+        const LONG textureLeft = textureStart +
+            static_cast<LONG>(index) * (textureWidth + textureGap);
+        desktop3DTextureRects[index] = {textureLeft, cardTop,
+            textureLeft + textureWidth, cardBottom};
+    }
+    desktop3DWorldScale = std::max<double>(8.0,
+        std::min<LONG>(desktop3DViewportRect.right - desktop3DViewportRect.left,
+                       desktop3DViewportRect.bottom - desktop3DViewportRect.top) *
+            0.19 * desktop3DZoom);
+}
+
+bool projectDesktop3DPoint(double x, double y, double z, POINT& result) {
+    const double dx = x - desktop3DCameraX;
+    const double dy = y - desktop3DCameraY;
+    const double dz = z - desktop3DCameraZ;
+    const double cosYaw = std::cos(desktop3DCameraYaw);
+    const double sinYaw = std::sin(desktop3DCameraYaw);
+    const double viewX = dx * cosYaw - dz * sinYaw;
+    const double forwardZ = dx * sinYaw + dz * cosYaw;
+    const double cosPitch = std::cos(desktop3DCameraPitch);
+    const double sinPitch = std::sin(desktop3DCameraPitch);
+    const double viewY = dy * cosPitch - forwardZ * sinPitch;
+    const double depth = forwardZ * cosPitch + dy * sinPitch;
+    if (depth <= 0.25) return false;
+    const double perspective = 12.0 / depth;
+    const double centerX = (desktop3DViewportRect.left + desktop3DViewportRect.right) * 0.5;
+    const double centerY = (desktop3DViewportRect.top + desktop3DViewportRect.bottom) * 0.5;
+    result.x = static_cast<LONG>(centerX + viewX * desktop3DWorldScale * perspective);
+    result.y = static_cast<LONG>(centerY - viewY * desktop3DWorldScale * perspective);
+    return true;
+}
+
+void drawDesktop3DGrid(HDC dc) {
+    if (!desktop3DGridVisible) return;
+    HPEN gridPen = CreatePen(PS_SOLID, 1, RGB(43, 37, 57));
+    HGDIOBJ oldPen = SelectObject(dc, gridPen);
+    for (int x = -24; x <= 24; ++x) {
+        POINT first{}, last{};
+        if (projectDesktop3DPoint(x, -1.35, -7, first) &&
+            projectDesktop3DPoint(x, -1.35, 34, last)) {
+            MoveToEx(dc, first.x, first.y, nullptr);
+            LineTo(dc, last.x, last.y);
+        }
+    }
+    for (int z = -7; z <= 34; ++z) {
+        POINT first{}, last{};
+        if (projectDesktop3DPoint(-24, -1.35, z, first) &&
+            projectDesktop3DPoint(24, -1.35, z, last)) {
+            MoveToEx(dc, first.x, first.y, nullptr);
+            LineTo(dc, last.x, last.y);
+        }
+    }
+    HPEN axisX = CreatePen(PS_SOLID, 2, RGB(173, 77, 93));
+    SelectObject(dc, axisX);
+    POINT x1{}, x2{};
+    if (projectDesktop3DPoint(-24, -1.34, 0, x1) &&
+        projectDesktop3DPoint(24, -1.34, 0, x2)) {
+        MoveToEx(dc, x1.x, x1.y, nullptr);
+        LineTo(dc, x2.x, x2.y);
+    }
+    HPEN axisZ = CreatePen(PS_SOLID, 2, RGB(82, 128, 194));
+    SelectObject(dc, axisZ);
+    POINT z1{}, z2{};
+    if (projectDesktop3DPoint(0, -1.34, -7, z1) &&
+        projectDesktop3DPoint(0, -1.34, 34, z2)) {
+        MoveToEx(dc, z1.x, z1.y, nullptr);
+        LineTo(dc, z2.x, z2.y);
+    }
+    SelectObject(dc, oldPen);
+    DeleteObject(gridPen);
+    DeleteObject(axisX);
+    DeleteObject(axisZ);
+}
+
+void runDesktop3DCommand(const std::string& command) {
+    const std::vector<std::string> lines = {command};
+    Flow commandFlow;
+    executeBlock(lines, 0, lines.size(), uiVariables, uiTypes, uiDefaults,
+        commandFlow, false, true);
+    syncDesktop3DEditorState();
+}
+
+void drawDesktop3DWorkspaceChrome(HDC dc, HWND window, const DesktopLayout& layout) {
+    auto fillPanel = [&](const RECT& rect, COLORREF fill, COLORREF border, int radius = 8) {
+        HBRUSH brush = CreateSolidBrush(fill);
+        HPEN pen = CreatePen(PS_SOLID, 1, border);
+        HGDIOBJ oldBrush = SelectObject(dc, brush);
+        HGDIOBJ oldPen = SelectObject(dc, pen);
+        RoundRect(dc, rect.left, rect.top, rect.right, rect.bottom,
+            scaleForDpi(window, radius), scaleForDpi(window, radius));
+        SelectObject(dc, oldBrush);
+        SelectObject(dc, oldPen);
+        DeleteObject(brush);
+        DeleteObject(pen);
+    };
+    auto drawLabel = [&](const std::wstring& value, RECT rect, COLORREF color,
+                         int size, bool bold = false, UINT format = DT_LEFT | DT_VCENTER | DT_SINGLELINE) {
+        HFONT font = CreateFontW(-scaleForDpi(window, size), 0, 0, 0,
+            bold ? FW_BOLD : FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET,
+            OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY,
+            DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+        HGDIOBJ oldFont = SelectObject(dc, font);
+        SetBkMode(dc, TRANSPARENT);
+        SetTextColor(dc, color);
+        DrawTextW(dc, value.c_str(), -1, &rect, format);
+        SelectObject(dc, oldFont);
+        DeleteObject(font);
+    };
+    auto drawButton = [&](const RECT& rect, const wchar_t* label, bool active) {
+        fillPanel(rect, active ? RGB(91, 61, 145) : RGB(39, 31, 54),
+            active ? RGB(165, 127, 236) : RGB(73, 61, 91), 6);
+        drawLabel(label, rect, RGB(242, 235, 255), 10, true,
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+    };
+
+    fillPanel(desktop3DToolbarRect, RGB(29, 22, 42), RGB(65, 51, 88), 8);
+    const wchar_t* toolbarLabels[] = {
+        L"SELECT", L"MOVE", L"ROTATE", L"SCALE", L"SAVE SCENE", L"LOAD SCENE", L"RESET VIEW"
+    };
+    for (std::size_t index = 0; index < desktop3DToolRects.size(); ++index)
+        drawButton(desktop3DToolRects[index], toolbarLabels[index],
+            index < 4 && desktop3DToolMode == static_cast<int>(index));
+
+    fillPanel(desktop3DHierarchyRect, RGB(24, 19, 35), RGB(58, 46, 77), 8);
+    fillPanel(desktop3DInspectorRect, RGB(24, 19, 35), RGB(58, 46, 77), 8);
+    fillPanel(desktop3DAssetShelfRect, RGB(24, 19, 35), RGB(58, 46, 77), 8);
+    RECT hierarchyTitle = {desktop3DHierarchyRect.left + scaleForDpi(window, 12),
+        desktop3DHierarchyRect.top + scaleForDpi(window, 8),
+        desktop3DHierarchyRect.right - scaleForDpi(window, 8),
+        desktop3DHierarchyRect.top + scaleForDpi(window, 32)};
+    drawLabel(L"WORLD  /  HIERARCHY", hierarchyTitle, RGB(207, 184, 246), 11, true);
+    RECT sceneTitle = hierarchyTitle;
+    sceneTitle.top += scaleForDpi(window, 27);
+    sceneTitle.bottom += scaleForDpi(window, 27);
+    drawLabel(L"Scene", sceneTitle, RGB(143, 130, 166), 10, true);
+
+    const LONG rowTop = desktop3DHierarchyRect.top + scaleForDpi(window, 60);
+    const LONG rowHeight = scaleForDpi(window, 25);
+    const LONG maxVisible = std::max<LONG>(0,
+        (desktop3DHierarchyRect.bottom - rowTop - scaleForDpi(window, 8)) / rowHeight);
+    if (ui3DObjects.empty()) {
+        RECT empty = {desktop3DHierarchyRect.left + scaleForDpi(window, 15), rowTop,
+            desktop3DHierarchyRect.right - scaleForDpi(window, 8), rowTop + rowHeight};
+        drawLabel(L"No objects in scene", empty, RGB(133, 121, 151), 10);
+    }
+    for (LONG visible = 0; visible < maxVisible; ++visible) {
+        const std::size_t index = static_cast<std::size_t>(desktop3DHierarchyScroll + visible);
+        if (index >= ui3DObjects.size()) break;
+        const Ui3DObject& model = ui3DObjects[index];
+        RECT row = {desktop3DHierarchyRect.left + scaleForDpi(window, 6),
+            rowTop + visible * rowHeight,
+            desktop3DHierarchyRect.right - scaleForDpi(window, 6),
+            rowTop + (visible + 1) * rowHeight};
+        if (model.name == desktop3DSelectedName) {
+            HBRUSH selectedBrush = CreateSolidBrush(RGB(55, 42, 78));
+            FillRect(dc, &row, selectedBrush);
+            DeleteObject(selectedBrush);
+            RECT accent = {row.left, row.top, row.left + scaleForDpi(window, 3), row.bottom};
+            HBRUSH accentBrush = CreateSolidBrush(RGB(171, 129, 255));
+            FillRect(dc, &accent, accentBrush);
+            DeleteObject(accentBrush);
+        }
+        RECT label = row;
+        InflateRect(&label, -scaleForDpi(window, 10), 0);
+        drawLabel(wideFromUtf8(model.name), label,
+            model.name == desktop3DSelectedName ? RGB(248, 242, 255) : RGB(190, 181, 207),
+            10, model.name == desktop3DSelectedName);
+    }
+    RECT hierarchyFoot = {desktop3DHierarchyRect.left + scaleForDpi(window, 12),
+        desktop3DHierarchyRect.bottom - scaleForDpi(window, 27),
+        desktop3DHierarchyRect.right - scaleForDpi(window, 8),
+        desktop3DHierarchyRect.bottom - scaleForDpi(window, 7)};
+    drawLabel(L"Scroll to browse objects", hierarchyFoot, RGB(119, 108, 137), 9);
+
+    RECT inspectorTitle = {desktop3DInspectorRect.left + scaleForDpi(window, 12),
+        desktop3DInspectorRect.top + scaleForDpi(window, 8),
+        desktop3DInspectorRect.right - scaleForDpi(window, 8),
+        desktop3DInspectorRect.top + scaleForDpi(window, 32)};
+    drawLabel(L"INSPECTOR", inspectorTitle, RGB(207, 184, 246), 11, true);
+    auto selected = std::find_if(ui3DObjects.begin(), ui3DObjects.end(),
+        [](const Ui3DObject& model) { return model.name == desktop3DSelectedName; });
+    LONG inspectorY = desktop3DInspectorRect.top + scaleForDpi(window, 48);
+    if (selected == ui3DObjects.end()) {
+        RECT hint = {desktop3DInspectorRect.left + scaleForDpi(window, 12), inspectorY,
+            desktop3DInspectorRect.right - scaleForDpi(window, 8), inspectorY + scaleForDpi(window, 68)};
+        drawLabel(L"Select an object to edit its properties.", hint,
+            RGB(145, 132, 166), 10, false, DT_LEFT | DT_TOP | DT_WORDBREAK);
+    } else {
+        const Ui3DObject& model = *selected;
+        auto field = [&](const wchar_t* name, const std::string& value) {
+            RECT label = {desktop3DInspectorRect.left + scaleForDpi(window, 12), inspectorY,
+                desktop3DInspectorRect.right - scaleForDpi(window, 8), inspectorY + scaleForDpi(window, 20)};
+            drawLabel(name, label, RGB(141, 126, 165), 9, true);
+            inspectorY += scaleForDpi(window, 17);
+            label.top = inspectorY;
+            label.bottom += scaleForDpi(window, 2);
+            drawLabel(wideFromUtf8(value), label, RGB(231, 222, 246), 10);
+            inspectorY += scaleForDpi(window, 27);
+        };
+        field(L"OBJECT", model.name + "  [" + model.shape + "]");
+        field(L"POSITION  X / Y / Z",
+            std::to_string(model.x) + "  /  " + std::to_string(model.y) + "  /  " + std::to_string(model.z));
+        field(L"ROTATION  X / Y / Z",
+            std::to_string(model.rotateX) + "  /  " + std::to_string(model.rotateY) + "  /  " + std::to_string(model.rotateZ));
+        field(L"SIZE  W / H / D",
+            std::to_string(model.width) + "  /  " + std::to_string(model.height) + "  /  " + std::to_string(model.depth));
+        field(L"MATERIAL", model.color);
+        field(L"TEXTURE", model.texture);
+        RECT hint = {desktop3DInspectorRect.left + scaleForDpi(window, 12),
+            desktop3DInspectorRect.bottom - scaleForDpi(window, 28),
+            desktop3DInspectorRect.right - scaleForDpi(window, 8),
+            desktop3DInspectorRect.bottom - scaleForDpi(window, 8)};
+        drawLabel(L"Right-click the model for actions", hint, RGB(143, 126, 166), 9);
+    }
+
+    RECT assetHeader = {desktop3DAssetShelfRect.left + scaleForDpi(window, 12),
+        desktop3DAssetShelfRect.top + scaleForDpi(window, 4),
+        desktop3DAssetShelfRect.right - scaleForDpi(window, 12),
+        desktop3DAssetShelfRect.top + scaleForDpi(window, 25)};
+    drawLabel(L"CONTENT BROWSER   /   ASSETS", assetHeader, RGB(207, 184, 246), 10, true);
+    const wchar_t* assetNames[] = {L"BOX", L"SPHERE", L"CAMERA", L"SPAWN", L"PLANE"};
+    const COLORREF assetColors[] = {
+        RGB(139, 92, 246), RGB(78, 153, 232), RGB(183, 155, 234),
+        RGB(229, 168, 89), RGB(102, 171, 133)
+    };
+    for (std::size_t index = 0; index < desktop3DAssetRects.size(); ++index) {
+        const RECT& card = desktop3DAssetRects[index];
+        fillPanel(card, RGB(36, 29, 51), RGB(72, 59, 93), 6);
+        const LONG cx = (card.left + card.right) / 2;
+        const LONG cy = card.top + scaleForDpi(window, 15);
+        const LONG unit = scaleForDpi(window, 8);
+        HBRUSH objectBrush = CreateSolidBrush(assetColors[index]);
+        HPEN objectPen = CreatePen(PS_SOLID, 1, assetColors[index]);
+        HGDIOBJ oldBrush = SelectObject(dc, objectBrush);
+        HGDIOBJ oldPen = SelectObject(dc, objectPen);
+        if (index == 1 || index == 3) {
+            if (index == 3) SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+            Ellipse(dc, cx - unit, cy - unit, cx + unit, cy + unit);
+        } else if (index == 2) {
+            SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+            Rectangle(dc, cx - unit - 2, cy - unit / 2, cx + unit - 2, cy + unit / 2);
+            MoveToEx(dc, cx + unit - 2, cy - unit / 2, nullptr);
+            LineTo(dc, cx + unit + 6, cy - unit);
+            LineTo(dc, cx + unit + 6, cy + unit);
+            LineTo(dc, cx + unit - 2, cy + unit / 2);
+        } else if (index == 4) {
+            Rectangle(dc, cx - unit - 4, cy - unit / 2, cx + unit + 4, cy + unit / 2);
+        } else {
+            Rectangle(dc, cx - unit, cy - unit, cx + unit, cy + unit);
+        }
+        SelectObject(dc, oldBrush);
+        SelectObject(dc, oldPen);
+        DeleteObject(objectBrush);
+        DeleteObject(objectPen);
+        RECT nameRect = {card.left + scaleForDpi(window, 2),
+            card.bottom - scaleForDpi(window, 19),
+            card.right - scaleForDpi(window, 2), card.bottom - scaleForDpi(window, 2)};
+        drawLabel(assetNames[index], nameRect, RGB(225, 215, 241), 9, true,
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+    }
+
+    const wchar_t* textureNames[] = {L"SMOOTH", L"GRID", L"METAL", L"WOOD", L"STONE"};
+    const COLORREF textureColors[] = {
+        RGB(130, 100, 177), RGB(70, 100, 137), RGB(130, 139, 153),
+        RGB(137, 90, 57), RGB(100, 104, 117)
+    };
+    for (std::size_t index = 0; index < desktop3DTextureRects.size(); ++index) {
+        const RECT& card = desktop3DTextureRects[index];
+        fillPanel(card, RGB(35, 29, 49), RGB(70, 59, 87), 5);
+        RECT swatch = {card.left + scaleForDpi(window, 5), card.top + scaleForDpi(window, 5),
+            card.right - scaleForDpi(window, 5), card.top + scaleForDpi(window, 24)};
+        HBRUSH swatchBrush = CreateSolidBrush(textureColors[index]);
+        FillRect(dc, &swatch, swatchBrush);
+        DeleteObject(swatchBrush);
+        if (index > 0) {
+            HBRUSH hatch = CreateHatchBrush(index == 1 ? HS_CROSS :
+                index == 2 ? HS_DIAGCROSS : index == 3 ? HS_FDIAGONAL : HS_BDIAGONAL,
+                RGB(225, 217, 238));
+            HGDIOBJ old = SelectObject(dc, hatch);
+            const int oldMode = SetBkMode(dc, TRANSPARENT);
+            Rectangle(dc, swatch.left, swatch.top, swatch.right, swatch.bottom);
+            SetBkMode(dc, oldMode);
+            SelectObject(dc, old);
+            DeleteObject(hatch);
+        }
+        RECT label = {card.left + scaleForDpi(window, 1),
+            card.bottom - scaleForDpi(window, 19), card.right - scaleForDpi(window, 1),
+            card.bottom - scaleForDpi(window, 2)};
+        drawLabel(textureNames[index], label, RGB(225, 215, 241), 8, true,
+            DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+    }
+
+    if (desktop3DEngineActive && desktop3DAssetDragging && desktop3DAssetCandidate >= 0) {
+        const wchar_t* ghostNames[] = {L"BOX", L"SPHERE", L"CAMERA", L"SPAWN", L"PLANE"};
+        HPEN ghostPen = CreatePen(PS_DASH, 2, RGB(190, 150, 255));
+        HGDIOBJ oldPen = SelectObject(dc, ghostPen);
+        HGDIOBJ oldBrush = SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+        Ellipse(dc, desktop3DMouseCurrent.x - scaleForDpi(window, 19),
+            desktop3DMouseCurrent.y - scaleForDpi(window, 19),
+            desktop3DMouseCurrent.x + scaleForDpi(window, 19),
+            desktop3DMouseCurrent.y + scaleForDpi(window, 19));
+        RECT ghost = {desktop3DMouseCurrent.x - scaleForDpi(window, 46),
+            desktop3DMouseCurrent.y + scaleForDpi(window, 22),
+            desktop3DMouseCurrent.x + scaleForDpi(window, 46),
+            desktop3DMouseCurrent.y + scaleForDpi(window, 42)};
+        drawLabel(ghostNames[std::clamp(desktop3DAssetCandidate, 0, 4)], ghost,
+            RGB(225, 212, 255), 9, true, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+        SelectObject(dc, oldBrush);
+        SelectObject(dc, oldPen);
+        DeleteObject(ghostPen);
+    }
+
+    if (desktop3DContextOpen) {
+        const RECT popup = desktop3DContextRect;
+        fillPanel(popup, RGB(30, 24, 43), RGB(119, 89, 163), 8);
+        RECT title = {popup.left + scaleForDpi(window, 12),
+            popup.top + scaleForDpi(window, 7),
+            popup.right - scaleForDpi(window, 8),
+            popup.top + scaleForDpi(window, 38)};
+        drawLabel(wideFromUtf8(desktop3DSelectedName), title,
+            RGB(239, 228, 255), 11, true, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
+        const wchar_t* actions[] = {
+            L"Rename object", L"Duplicate object", L"Delete object",
+            L"Change texture", L"Focus selected object", L"Edit position..."
+        };
+        for (int row = 0; row < 6; ++row) {
+            RECT item = {popup.left + scaleForDpi(window, 7),
+                popup.top + scaleForDpi(window, 43 + row * 29),
+                popup.right - scaleForDpi(window, 7),
+                popup.top + scaleForDpi(window, 43 + (row + 1) * 29)};
+            if (row == 2) {
+                HBRUSH danger = CreateSolidBrush(RGB(74, 37, 55));
+                FillRect(dc, &item, danger);
+                DeleteObject(danger);
+            }
+            drawLabel(actions[row], item, row == 2 ? RGB(255, 163, 190) : RGB(222, 211, 239),
+                10, row == 0, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+        }
+    }
+}
+
+bool buildStandaloneTrgExecutable(const std::filesystem::path& sourcePath,
+                                  std::filesystem::path& outputPath,
+                                  std::string& errorMessage) {
+    std::ifstream source(sourcePath, std::ios::binary);
+    if (!source) {
+        errorMessage = "Could not open source file: " + sourcePath.u8string();
+        return false;
+    }
+#ifdef _WIN32
+    wchar_t executableBuffer[32768] = {};
+    const DWORD executableLength = GetModuleFileNameW(nullptr, executableBuffer, 32768);
+    if (executableLength == 0 || executableLength >= 32768) {
+        errorMessage = "Could not locate the TRG runtime executable.";
+        return false;
+    }
+    const std::filesystem::path executablePath(std::wstring(executableBuffer, executableLength));
+#else
+    errorMessage = "Standalone .exe export is only available on Windows.";
+    return false;
+#endif
+    std::error_code fileError;
+    const std::uint64_t payloadSize = std::filesystem::file_size(sourcePath, fileError);
+    if (fileError) {
+        errorMessage = "Could not determine source size: " + fileError.message();
+        return false;
+    }
+    outputPath = sourcePath;
+    outputPath.replace_extension(".exe");
+    std::error_code copyError;
+    std::filesystem::copy_file(executablePath, outputPath,
+        std::filesystem::copy_options::overwrite_existing, copyError);
+    if (copyError) {
+        errorMessage = "Could not create " + outputPath.u8string() + ": " + copyError.message();
+        return false;
+    }
+    std::ofstream output(outputPath, std::ios::binary | std::ios::app);
+    if (!output) {
+        errorMessage = "Could not append the TRG program to " + outputPath.u8string();
+        return false;
+    }
+    output << source.rdbuf();
+    for (unsigned byte = 0; byte < 8; ++byte)
+        output.put(static_cast<char>((payloadSize >> (byte * 8)) & 0xff));
+    output.write("TRGPKG01", 8);
+    output.close();
+    if (!output) {
+        errorMessage = "Failed while finalizing " + outputPath.u8string();
+        return false;
+    }
+    return true;
 }
 
 LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -5747,7 +6856,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         newButton = CreateWindowExW(0, L"BUTTON", L"New",
             WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(newButtonId), GetModuleHandleW(nullptr), nullptr);
-        buildButton = CreateWindowExW(0, L"BUTTON", L"Compile",
+        buildButton = CreateWindowExW(0, L"BUTTON", L"Build EXE",
             WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(buildButtonId), GetModuleHandleW(nullptr), nullptr);
         dictionaryButton = CreateWindowExW(0, L"BUTTON", L"Dictionary",
@@ -5756,9 +6865,12 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         editor2DButton = CreateWindowExW(0, L"BUTTON", L"2D Editor",
             WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(editor2DButtonId), GetModuleHandleW(nullptr), nullptr);
-        editor3DButton = CreateWindowExW(0, L"BUTTON", L"3D Editor",
+        editor3DButton = CreateWindowExW(0, L"BUTTON", L"3D Engine",
             WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
             reinterpret_cast<HMENU>(editor3DButtonId), GetModuleHandleW(nullptr), nullptr);
+        exportButton = CreateWindowExW(0, L"BUTTON", L"Export TRG",
+            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 0, 0, 100, 32, window,
+            reinterpret_cast<HMENU>(exportButtonId), GetModuleHandleW(nullptr), nullptr);
         richEditModule = LoadLibraryW(L"Msftedit.dll");
         const wchar_t* editorClass = richEditModule ? MSFTEDIT_CLASS : L"EDIT";
         codeEditor = CreateWindowExW(WS_EX_CLIENTEDGE, editorClass, L"",
@@ -5767,13 +6879,53 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             0, 0, 100, 100, window, reinterpret_cast<HMENU>(codeEditorId),
             GetModuleHandleW(nullptr), nullptr);
         SendMessageW(codeEditor, EM_SETLIMITTEXT, 8 * 1024 * 1024, 0);
+        previousCodeEditorProc = reinterpret_cast<WNDPROC>(SetWindowLongPtrW(
+            codeEditor, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(codeEditorWindowProc)));
+        outputControl = CreateWindowExW(WS_EX_CLIENTEDGE, editorClass, L"",
+            WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | ES_MULTILINE |
+                ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | ES_NOHIDESEL,
+            0, 0, 100, 100, window, reinterpret_cast<HMENU>(outputControlId),
+            GetModuleHandleW(nullptr), nullptr);
+        if (outputControl) previousOutputProc = reinterpret_cast<WNDPROC>(
+            SetWindowLongPtrW(outputControl, GWLP_WNDPROC,
+                reinterpret_cast<LONG_PTR>(outputWindowProc)));
+        terminalInputControl = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
+            WS_CHILD | WS_TABSTOP | ES_AUTOHSCROLL,
+            0, 0, 100, 28, window, reinterpret_cast<HMENU>(terminalInputControlId),
+            GetModuleHandleW(nullptr), nullptr);
+        terminalSendButton = CreateWindowExW(0, L"BUTTON", L"Send",
+            WS_CHILD | BS_OWNERDRAW | WS_TABSTOP, 0, 0, 72, 28, window,
+            reinterpret_cast<HMENU>(terminalSendButtonId), GetModuleHandleW(nullptr), nullptr);
+        if (terminalInputControl) previousTerminalInputProc = reinterpret_cast<WNDPROC>(
+            SetWindowLongPtrW(terminalInputControl, GWLP_WNDPROC,
+                reinterpret_cast<LONG_PTR>(terminalInputWindowProc)));
         setOpenButtonFont(window);
+        if (outputControl && richEditModule) {
+            SendMessageW(outputControl, EM_SETBKGNDCOLOR, 0, RGB(8, 7, 12));
+            CHARFORMAT2W outputFormat = {};
+            outputFormat.cbSize = sizeof(outputFormat);
+            outputFormat.dwMask = CFM_COLOR | CFM_FACE | CFM_SIZE;
+            outputFormat.crTextColor = RGB(235, 229, 245);
+            outputFormat.yHeight = 180;
+            std::wcsncpy(outputFormat.szFaceName, L"Consolas", LF_FACESIZE - 1);
+            outputFormat.szFaceName[LF_FACESIZE - 1] = L'\0';
+            SendMessageW(outputControl, EM_SETCHARFORMAT, SCF_ALL, reinterpret_cast<LPARAM>(&outputFormat));
+        }
+        if (terminalInputControl && codeEditorFont)
+            SendMessageW(terminalInputControl, WM_SETFONT, reinterpret_cast<WPARAM>(codeEditorFont), TRUE);
+        if (outputControl && codeEditorFont)
+            SendMessageW(outputControl, WM_SETFONT, reinterpret_cast<WPARAM>(codeEditorFont), TRUE);
+        if (terminalSendButton && openButtonFont)
+            SendMessageW(terminalSendButton, WM_SETFONT, reinterpret_cast<WPARAM>(openButtonFont), TRUE);
+        terminalInputBrush = CreateSolidBrush(RGB(12, 9, 19));
+        outputControlBrush = CreateSolidBrush(RGB(8, 7, 12));
+        restoreDesktopAutosave();
         if (codeEditor && richEditModule) {
-            SendMessageW(codeEditor, EM_SETBKGNDCOLOR, 0, RGB(13, 22, 33));
+            SendMessageW(codeEditor, EM_SETBKGNDCOLOR, 0, RGB(19, 13, 31));
             CHARFORMAT2W baseFormat = {};
             baseFormat.cbSize = sizeof(baseFormat);
             baseFormat.dwMask = CFM_COLOR | CFM_FACE | CFM_SIZE | CFM_BOLD;
-            baseFormat.crTextColor = RGB(220, 234, 243);
+            baseFormat.crTextColor = RGB(239, 232, 250);
             baseFormat.yHeight = 195;
             baseFormat.dwEffects = 0;
             std::wcsncpy(baseFormat.szFaceName, L"Consolas", LF_FACESIZE - 1);
@@ -5787,16 +6939,17 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
     if (message == WM_DRAWITEM) {
         auto* item = reinterpret_cast<DRAWITEMSTRUCT*>(lParam);
         if (item && item->CtlType == ODT_BUTTON) {
-            COLORREF fill = RGB(29, 48, 65);
-            COLORREF textColor = RGB(226, 239, 246);
+            COLORREF fill = RGB(43, 31, 63);
+            COLORREF textColor = RGB(244, 238, 252);
             switch (item->CtlID) {
-                case runButtonId: fill = RGB(20, 119, 111); break;
-                case previewButtonId: fill = RGB(35, 76, 91); break;
-                case buildButtonId: fill = RGB(35, 63, 82); break;
-                case newButtonId: fill = RGB(47, 56, 72); break;
-                case dictionaryButtonId: fill = RGB(35, 48, 65); break;
+                case runButtonId: fill = RGB(103, 69, 168); break;
+                case previewButtonId: fill = RGB(76, 49, 123); break;
+                case buildButtonId: fill = RGB(64, 45, 94); break;
+                case newButtonId: fill = RGB(53, 39, 75); break;
+                case dictionaryButtonId: fill = RGB(48, 35, 68); break;
                 case editor2DButtonId:
-                case editor3DButtonId: fill = RGB(27, 59, 72); break;
+                case editor3DButtonId: fill = RGB(82, 55, 133); break;
+                case exportButtonId: fill = RGB(73, 55, 104); break;
                 default: break;
             }
             if (item->itemState & ODS_SELECTED) {
@@ -5805,7 +6958,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             }
             RECT area = item->rcItem;
             HBRUSH brush = CreateSolidBrush(fill);
-            HPEN pen = CreatePen(PS_SOLID, 1, RGB(48, 76, 94));
+            HPEN pen = CreatePen(PS_SOLID, 1, RGB(104, 76, 151));
             HGDIOBJ oldBrush = SelectObject(item->hDC, brush);
             HGDIOBJ oldPen = SelectObject(item->hDC, pen);
             RoundRect(item->hDC, area.left + 1, area.top + 1, area.right - 1,
@@ -5835,6 +6988,20 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             return TRUE;
         }
     }
+    if ((message == WM_CTLCOLOREDIT || message == WM_CTLCOLORSTATIC) &&
+        reinterpret_cast<HWND>(lParam) == terminalInputControl) {
+        HDC dc = reinterpret_cast<HDC>(wParam);
+        SetTextColor(dc, RGB(241, 235, 250));
+        SetBkColor(dc, RGB(12, 9, 19));
+        return reinterpret_cast<LRESULT>(terminalInputBrush);
+    }
+    if ((message == WM_CTLCOLOREDIT || message == WM_CTLCOLORSTATIC) &&
+        reinterpret_cast<HWND>(lParam) == outputControl) {
+        HDC dc = reinterpret_cast<HDC>(wParam);
+        SetTextColor(dc, RGB(235, 229, 245));
+        SetBkColor(dc, RGB(8, 7, 12));
+        return reinterpret_cast<LRESULT>(outputControlBrush);
+    }
     if (message == WM_SIZE) {
         layoutOutputControls(window);
         InvalidateRect(window, nullptr, TRUE);
@@ -5860,6 +7027,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         if (!loadingEditorText && !highlightingEditor) {
             editorDirty = true;
             updateEditorWindowTitle();
+            SetTimer(window, 2, 500, nullptr);
             applyEditorSyntaxHighlighting();
         }
         return 0;
@@ -5878,49 +7046,63 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         return 0;
     }
     if (message == WM_COMMAND && LOWORD(wParam) == editor2DButtonId) {
-        launchDesktopVisualEditor("2DEditor.trg");
+        launchDesktopVisualEditor("2D Editor");
         return 0;
     }
     if (message == WM_COMMAND && LOWORD(wParam) == editor3DButtonId) {
-        launchDesktopVisualEditor("3DEditor.trg");
+        launchDesktopVisualEditor("3D Editor");
         return 0;
     }
     if (message == WM_COMMAND && LOWORD(wParam) == dictionaryButtonId) {
-        const wchar_t* dictionary =
-            L"TRG COMMAND DICTIONARY\n\n"
-            L"OUTPUT: print / show / say\n"
-            L"INPUT: ask \"Question?\" variable\n"
-            L"VARIABLES: let name = value; num, word, toggle, color\n"
-            L"FLOW: if, else, loop, break, stop, every, wait\n"
-            L"FUNCTIONS: function, return, call\n"
-            L"DATA: list, push, insert, get, set, remove, pop, join, split\n"
-            L"TEXT: upper, lower, trim, length, contains, replace, substring\n"
-            L"MATH: random; add (math) for sin, cos, tan, sqrt, abs, min, max, clamp, distance\n"
-            L"AI: add (ai); ai create, teach, train, predict, classify\n"
-            L"FILES: add (files); read_file, write_file, append_file, file_exists\n"
-            L"JSON: add (json); json GROUP clean RESULT / compressed RESULT\n"
-            L"DATABASE: add (database); database open/save; table create; record add/get/update/delete; query\n"
-            L"UI: add (ui); text, button, rectangle, circle, image, animate\n\n"
-            L"Blocks use parentheses: if score > 0 ( ... )\n"
-            L"Libraries are file-wide: add (math), add (ai), add (json), add (database), add (all).";
-        MessageBoxW(window, dictionary, L"TRG - Command Dictionary", MB_OK | MB_ICONINFORMATION);
+        showDesktopDictionary(window);
+        return 0;
+    }
+    if (message == WM_COMMAND && LOWORD(wParam) == exportButtonId) {
+        std::filesystem::path destination = currentSourcePath.empty()
+            ? std::filesystem::path(L"program.trg") : currentSourcePath.filename();
+        if (saveSourceDialog(destination, window)) {
+            if (lower(destination.extension().u8string()) != ".trg")
+                destination.replace_extension(".trg");
+            const int length = GetWindowTextLengthW(codeEditor);
+            std::wstring wideSource(static_cast<std::size_t>(length) + 1, L'\0');
+            GetWindowTextW(codeEditor, wideSource.data(), length + 1);
+            wideSource.resize(static_cast<std::size_t>(length));
+            const std::string source = utf8FromWide(wideSource);
+            std::ofstream exported(destination, std::ios::binary | std::ios::trunc);
+            if (!exported) appendOutput("ERROR Could not export TRG source.\r\n");
+            else {
+                exported.write(source.data(), static_cast<std::streamsize>(source.size()));
+                if (exported) appendOutput("Exported TRG source: " + destination.u8string() + "\r\n");
+                else appendOutput("ERROR Failed while exporting TRG source.\r\n");
+            }
+        }
+        return 0;
+    }
+    if (message == WM_COMMAND && LOWORD(wParam) == terminalSendButtonId && terminalInputActive) {
+        const int length = GetWindowTextLengthW(terminalInputControl);
+        std::wstring answer(static_cast<std::size_t>(length) + 1, L'\0');
+        GetWindowTextW(terminalInputControl, answer.data(), length + 1);
+        answer.resize(static_cast<std::size_t>(length));
+        inputResult = utf8FromWide(answer);
+        inputAccepted = true;
+        inputFinished = true;
+        terminalInputActive = false;
+        appendOutput("> " + inputResult + "\r\n");
+        SetWindowTextW(terminalInputControl, L"");
+        layoutOutputControls(window);
+        SetFocus(window);
         return 0;
     }
     if (message == WM_COMMAND && LOWORD(wParam) == buildButtonId) {
         if (!saveSourceFile()) return 0;
-        wchar_t executablePath[32768] = {};
-        const DWORD executableLength = GetModuleFileNameW(nullptr, executablePath, 32768);
-        if (executableLength == 0 || executableLength >= 32768) {
-            appendOutput("ERROR Could not locate the TRG runtime for building.\r\n");
-            return 0;
+        appendOutput("Building standalone Windows EXE with the TRG program embedded...\r\n");
+        std::filesystem::path outputPath;
+        std::string errorMessage;
+        if (!buildStandaloneTrgExecutable(currentSourcePath, outputPath, errorMessage)) {
+            appendOutput("ERROR " + errorMessage + "\r\n");
+        } else {
+            appendOutput("Created " + outputPath.u8string() + " (standalone TRG app).\r\n");
         }
-        const std::wstring parameters = L"compile \"" + currentSourcePath.wstring() + L"\"";
-        const HINSTANCE launched = ShellExecuteW(window, L"open", executablePath, parameters.c_str(),
-            projectRoot.c_str(), SW_SHOWNORMAL);
-        if (reinterpret_cast<INT_PTR>(launched) <= 32)
-            appendOutput("ERROR Could not start the TRG build process.\r\n");
-        else
-            appendOutput("Building standalone app for " + currentSourcePath.u8string() + "...\r\n");
         return 0;
     }
     if (message == WM_COMMAND && LOWORD(wParam) == previewButtonId) {
@@ -5942,8 +7124,9 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             loadingEditorText = true;
             SetWindowTextW(codeEditor, L"");
             loadingEditorText = false;
+            saveDesktopAutosave();
             SetWindowTextW(previewButton, L"Preview");
-            outputBuffer.clear();
+            clearDesktopOutput();
             projectRoot = std::filesystem::current_path();
             uiBlocks.clear(); ui3DObjects.clear(); uiSprites.clear(); uiAnimations.clear();
             everyTasks.clear(); uiButtons.clear(); uiTexts.clear();
@@ -5953,6 +7136,366 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             InvalidateRect(window, nullptr, TRUE);
         }
         return 0;
+    }
+    if (message == WM_KEYDOWN && desktop3DEngineActive && previewMode && !terminalInputActive) {
+        const double step = (GetKeyState(VK_SHIFT) & 0x8000) ? 0.9 : 0.32;
+        switch (wParam) {
+            case 'W': case 'A': case 'S': case 'D':
+                return 0; // WASD movement is updated continuously by the camera timer.
+            case 'Q': desktop3DCameraY -= step; break;
+            case 'E': desktop3DCameraY += step; break;
+            case VK_LEFT: desktop3DCameraYaw -= 0.055; break;
+            case VK_RIGHT: desktop3DCameraYaw += 0.055; break;
+            case VK_UP: desktop3DCameraPitch = std::clamp(desktop3DCameraPitch + 0.045, -1.2, 1.2); break;
+            case VK_DOWN: desktop3DCameraPitch = std::clamp(desktop3DCameraPitch - 0.045, -1.2, 1.2); break;
+            default: return DefWindowProcW(window, message, wParam, lParam);
+        }
+        InvalidateRect(window, nullptr, FALSE);
+        return 0;
+    }
+    if (message == WM_TIMER && wParam == 3 && desktop3DEngineActive && previewMode) {
+        if (terminalInputActive || GetFocus() != window) return 0;
+        const double step = (GetAsyncKeyState(VK_SHIFT) & 0x8000) ? 0.23 : 0.075;
+        const double yaw = desktop3DCameraYaw;
+        bool moved = false;
+        if (GetAsyncKeyState('W') & 0x8000) {
+            desktop3DCameraX += std::sin(yaw) * step;
+            desktop3DCameraZ += std::cos(yaw) * step;
+            moved = true;
+        }
+        if (GetAsyncKeyState('S') & 0x8000) {
+            desktop3DCameraX -= std::sin(yaw) * step;
+            desktop3DCameraZ -= std::cos(yaw) * step;
+            moved = true;
+        }
+        if (GetAsyncKeyState('A') & 0x8000) {
+            desktop3DCameraX -= std::cos(yaw) * step;
+            desktop3DCameraZ += std::sin(yaw) * step;
+            moved = true;
+        }
+        if (GetAsyncKeyState('D') & 0x8000) {
+            desktop3DCameraX += std::cos(yaw) * step;
+            desktop3DCameraZ -= std::sin(yaw) * step;
+            moved = true;
+        }
+        if (moved) InvalidateRect(window, nullptr, FALSE);
+        return 0;
+    }
+    if (message == WM_MOUSEWHEEL && desktop3DEngineActive && previewMode) {
+        POINT cursor = {};
+        GetCursorPos(&cursor);
+        ScreenToClient(window, &cursor);
+        const int delta = GET_WHEEL_DELTA_WPARAM(wParam);
+        if (PtInRect(&desktop3DHierarchyRect, cursor)) {
+            const LONG rowTop = desktop3DHierarchyRect.top + scaleForDpi(window, 60);
+            const LONG rowHeight = scaleForDpi(window, 25);
+            const int visibleRows = std::max(1, static_cast<int>(
+                (desktop3DHierarchyRect.bottom - rowTop - scaleForDpi(window, 8)) / rowHeight));
+            const int maximum = std::max(0, static_cast<int>(ui3DObjects.size()) - visibleRows);
+            desktop3DHierarchyScroll = std::clamp(desktop3DHierarchyScroll + (delta > 0 ? -3 : 3),
+                0, maximum);
+        } else if (PtInRect(&desktop3DViewportRect, cursor)) {
+            const double factor = delta > 0 ? 1.12 : 0.89;
+            desktop3DZoom = std::clamp(desktop3DZoom * factor, 0.35, 3.5);
+        }
+        InvalidateRect(window, nullptr, FALSE);
+        return 0;
+    }
+    if (message == WM_RBUTTONDOWN && desktop3DEngineActive && previewMode) {
+        const POINT point = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
+        desktop3DRightClickMoved = false;
+        if (!PtInRect(&desktop3DViewportRect, point)) {
+            desktop3DDraggingCamera = false;
+            return 0;
+        }
+        SetFocus(window);
+        desktop3DDraggingCamera = true;
+        desktop3DMouseDown = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
+        desktop3DMouseCurrent = desktop3DMouseDown;
+        desktop3DDragStartYaw = desktop3DCameraYaw;
+        desktop3DDragStartPitch = desktop3DCameraPitch;
+        SetCapture(window);
+        return 0;
+    }
+    if (message == WM_MOUSEMOVE && desktop3DEngineActive && desktop3DDraggingCamera &&
+        (GetKeyState(VK_RBUTTON) & 0x8000)) {
+        const POINT point = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
+        desktop3DMouseCurrent = point;
+        const LONG dx = point.x - desktop3DMouseDown.x;
+        const LONG dy = point.y - desktop3DMouseDown.y;
+        if (std::abs(dx) + std::abs(dy) > 4) desktop3DRightClickMoved = true;
+        if (desktop3DRightClickMoved) {
+            desktop3DCameraYaw = desktop3DDragStartYaw + dx * 0.0065;
+            desktop3DCameraPitch = std::clamp(desktop3DDragStartPitch + dy * 0.0065, -1.2, 1.2);
+            InvalidateRect(window, nullptr, FALSE);
+        }
+        return 0;
+    }
+    if (message == WM_RBUTTONUP && desktop3DEngineActive && previewMode) {
+        if (GetCapture() == window) ReleaseCapture();
+        desktop3DDraggingCamera = false;
+        const POINT point = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
+        if (!desktop3DRightClickMoved) {
+            bool selectedObject = false;
+            for (auto hit = desktop3DProjectedHits.rbegin(); hit != desktop3DProjectedHits.rend(); ++hit) {
+                if (!PtInRect(&hit->second, point)) continue;
+                desktop3DSelectedName = hit->first;
+                selectedObject = true;
+                break;
+            }
+            if (!selectedObject && PtInRect(&desktop3DHierarchyRect, point)) {
+                const LONG rowTop = desktop3DHierarchyRect.top + scaleForDpi(window, 60);
+                const LONG rowHeight = scaleForDpi(window, 25);
+                const int row = static_cast<int>((point.y - rowTop) / rowHeight) + desktop3DHierarchyScroll;
+                if (row >= 0 && static_cast<std::size_t>(row) < ui3DObjects.size()) {
+                    desktop3DSelectedName = ui3DObjects[static_cast<std::size_t>(row)].name;
+                    selectedObject = true;
+                }
+            }
+            if (selectedObject) {
+                const LONG popupWidth = scaleForDpi(window, 224);
+                const LONG popupHeight = scaleForDpi(window, 236);
+                LONG minX = desktop3DViewportRect.left + 4;
+                LONG maxX = desktop3DViewportRect.right - popupWidth - 4;
+                LONG minY = desktop3DViewportRect.top + 4;
+                RECT client = {};
+                GetClientRect(window, &client);
+                const DesktopLayout layout = desktopLayout(window, client);
+                LONG maxY = layout.panelTop;
+                if (PtInRect(&desktop3DHierarchyRect, point)) {
+                    minX = desktop3DHierarchyRect.right + scaleForDpi(window, 6);
+                    maxX = std::max<LONG>(minX, client.right - popupWidth - scaleForDpi(window, 10));
+                }
+                maxY = std::max<LONG>(minY, maxY - popupHeight - scaleForDpi(window, 4));
+                const LONG x = std::clamp<LONG>(point.x, minX, maxX);
+                const LONG y = std::clamp<LONG>(point.y, minY, maxY);
+                desktop3DContextRect = {x, y, x + popupWidth, y + popupHeight};
+                desktop3DContextPoint = point;
+                desktop3DContextOpen = true;
+                syncDesktop3DEditorState();
+                InvalidateRect(window, nullptr, FALSE);
+            }
+        }
+        return 0;
+    }
+    if (message == WM_LBUTTONDOWN && desktop3DEngineActive && previewMode) {
+        const POINT point = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
+        SetFocus(window);
+        desktop3DMouseDown = point;
+        desktop3DMouseCurrent = point;
+        desktop3DAssetCandidate = -1;
+        desktop3DAssetDragging = false;
+
+        if (desktop3DContextOpen) {
+            if (PtInRect(&desktop3DContextRect, point)) {
+                const int row = (point.y - desktop3DContextRect.top - scaleForDpi(window, 43)) /
+                    scaleForDpi(window, 29);
+                auto selected = std::find_if(ui3DObjects.begin(), ui3DObjects.end(),
+                    [](const Ui3DObject& model) { return model.name == desktop3DSelectedName; });
+                if (selected != ui3DObjects.end() && row >= 0 && row < 6) {
+                    if (row == 0) {
+                        std::string newName;
+                        if (askForInput("Rename object:", newName) && validName(newName)) {
+                            const bool used = std::any_of(ui3DObjects.begin(), ui3DObjects.end(),
+                                [&](const Ui3DObject& model) { return model.name == newName && model.name != selected->name; });
+                            if (!used) {
+                                selected->name = newName;
+                                desktop3DSelectedName = newName;
+                            } else appendOutput("ERROR That object name is already in use.\r\n");
+                        }
+                    } else if (row == 1) {
+                        Ui3DObject copy = *selected;
+                        copy.name = desktop3DUniqueName(copy.shape == "sphere" ? "Sphere" :
+                            copy.shape == "camera" ? "Camera" : copy.shape == "spawn" ? "Spawn" : "Object");
+                        copy.x += 1.0;
+                        copy.z += 1.0;
+                        ui3DObjects.push_back(copy);
+                        desktop3DSelectedName = copy.name;
+                    } else if (row == 2) {
+                        ui3DObjects.erase(selected);
+                        desktop3DSelectedName.clear();
+                    } else if (row == 3) {
+                        if (selected->texture == "smooth") selected->texture = "grid";
+                        else if (selected->texture == "grid") selected->texture = "metal";
+                        else if (selected->texture == "metal") selected->texture = "wood";
+                        else if (selected->texture == "wood") selected->texture = "stone";
+                        else selected->texture = "smooth";
+                    } else if (row == 4) {
+                        desktop3DCameraX = selected->x;
+                        desktop3DCameraY = selected->y + 2.0;
+                        desktop3DCameraZ = selected->z - 8.0;
+                        desktop3DCameraYaw = 0.0;
+                        desktop3DCameraPitch = 0.15;
+                    } else if (row == 5) {
+                        std::string value;
+                        double number = 0;
+                        if (askForInput("Set X position:", value) && parseNumber(value, number)) selected->x = number;
+                        if (askForInput("Set Y position:", value) && parseNumber(value, number)) selected->y = number;
+                        if (askForInput("Set Z position:", value) && parseNumber(value, number)) selected->z = number;
+                    }
+                }
+                desktop3DContextOpen = false;
+                syncDesktop3DEditorState();
+                InvalidateRect(window, nullptr, FALSE);
+                return 0;
+            }
+            desktop3DContextOpen = false;
+        }
+
+        for (std::size_t index = 0; index < desktop3DToolRects.size(); ++index) {
+            if (!PtInRect(&desktop3DToolRects[index], point)) continue;
+            if (index < 4) desktop3DToolMode = static_cast<int>(index);
+            else if (index == 4) runDesktop3DCommand("3d save \"scene.trgscene\"");
+            else if (index == 5) runDesktop3DCommand("3d load \"scene.trgscene\"");
+            else {
+                desktop3DCameraX = 0.0;
+                desktop3DCameraY = 0.0;
+                desktop3DCameraZ = -12.0;
+                desktop3DCameraYaw = 0.0;
+                desktop3DCameraPitch = 0.18;
+                desktop3DZoom = 1.0;
+            }
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
+        }
+
+        for (std::size_t index = 0; index < desktop3DTextureRects.size(); ++index) {
+            if (!PtInRect(&desktop3DTextureRects[index], point)) continue;
+            auto selected = std::find_if(ui3DObjects.begin(), ui3DObjects.end(),
+                [](const Ui3DObject& model) { return model.name == desktop3DSelectedName; });
+            if (selected != ui3DObjects.end()) {
+                const char* textures[] = {"smooth", "grid", "metal", "wood", "stone"};
+                selected->texture = textures[index];
+                syncDesktop3DEditorState();
+            } else {
+                appendOutput("Select a model before applying a material.\r\n");
+            }
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
+        }
+
+        for (std::size_t index = 0; index < desktop3DAssetRects.size(); ++index) {
+            if (!PtInRect(&desktop3DAssetRects[index], point)) continue;
+            desktop3DAssetCandidate = static_cast<int>(index);
+            SetCapture(window);
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
+        }
+
+        if (PtInRect(&desktop3DHierarchyRect, point)) {
+            const LONG rowTop = desktop3DHierarchyRect.top + scaleForDpi(window, 60);
+            const LONG rowHeight = scaleForDpi(window, 25);
+            const int row = static_cast<int>((point.y - rowTop) / rowHeight) + desktop3DHierarchyScroll;
+            if (row >= 0 && static_cast<std::size_t>(row) < ui3DObjects.size()) {
+                desktop3DSelectedName = ui3DObjects[static_cast<std::size_t>(row)].name;
+                syncDesktop3DEditorState();
+            }
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
+        }
+        if (PtInRect(&desktop3DInspectorRect, point) ||
+            PtInRect(&desktop3DAssetShelfRect, point) ||
+            PtInRect(&desktop3DToolbarRect, point))
+            return 0;
+
+        if (PtInRect(&desktop3DViewportRect, point)) {
+            bool hitObject = false;
+            for (auto hit = desktop3DProjectedHits.rbegin(); hit != desktop3DProjectedHits.rend(); ++hit) {
+                if (!PtInRect(&hit->second, point)) continue;
+                desktop3DSelectedName = hit->first;
+                auto selected = std::find_if(ui3DObjects.begin(), ui3DObjects.end(),
+                    [&](const Ui3DObject& model) { return model.name == desktop3DSelectedName; });
+                if (selected != ui3DObjects.end() && desktop3DToolMode != 0) {
+                    desktop3DDraggingObject = true;
+                    desktop3DDragStartX = selected->x;
+                    desktop3DDragStartY = selected->y;
+                    desktop3DDragStartZ = selected->z;
+                    desktop3DDragStartWidth = selected->width;
+                    desktop3DDragStartHeight = selected->height;
+                    desktop3DDragStartDepth = selected->depth;
+                    desktop3DDragStartRotX = selected->rotateX;
+                    desktop3DDragStartRotY = selected->rotateY;
+                    SetCapture(window);
+                }
+                hitObject = true;
+                break;
+            }
+            if (!hitObject) desktop3DSelectedName.clear();
+            syncDesktop3DEditorState();
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
+        }
+        return 0;
+    }
+    if (message == WM_MOUSEMOVE && desktop3DEngineActive && previewMode &&
+        (GetKeyState(VK_LBUTTON) & 0x8000)) {
+        const POINT point = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
+        desktop3DMouseCurrent = point;
+        if (desktop3DAssetCandidate >= 0) {
+            const LONG dx = point.x - desktop3DMouseDown.x;
+            const LONG dy = point.y - desktop3DMouseDown.y;
+            if (std::abs(dx) + std::abs(dy) > 7) desktop3DAssetDragging = true;
+        }
+        if (desktop3DDraggingObject) {
+            auto selected = std::find_if(ui3DObjects.begin(), ui3DObjects.end(),
+                [](const Ui3DObject& model) { return model.name == desktop3DSelectedName; });
+            if (selected != ui3DObjects.end()) {
+                const double scale = std::max(8.0, desktop3DWorldScale);
+                const double dx = point.x - desktop3DMouseDown.x;
+                const double dy = point.y - desktop3DMouseDown.y;
+                if (desktop3DToolMode == 1) {
+                    const double horizontal = dx / scale;
+                    selected->x = desktop3DDragStartX + horizontal * std::cos(desktop3DCameraYaw);
+                    selected->z = desktop3DDragStartZ - horizontal * std::sin(desktop3DCameraYaw);
+                    selected->y = desktop3DDragStartY - dy / scale;
+                } else if (desktop3DToolMode == 2) {
+                    selected->rotateY = desktop3DDragStartRotY + dx * 0.65;
+                    selected->rotateX = desktop3DDragStartRotX + dy * 0.65;
+                } else if (desktop3DToolMode == 3) {
+                    const double factor = std::clamp(std::exp((dx - dy) * 0.004), 0.08, 12.0);
+                    selected->width = std::max(0.05, desktop3DDragStartWidth * factor);
+                    selected->height = std::max(0.05, desktop3DDragStartHeight * factor);
+                    selected->depth = std::max(0.05, desktop3DDragStartDepth * factor);
+                }
+                syncDesktop3DEditorState();
+            }
+        }
+        InvalidateRect(window, nullptr, FALSE);
+    }
+    if (message == WM_LBUTTONUP && desktop3DEngineActive && previewMode) {
+        if (desktop3DAssetCandidate >= 0) {
+            const POINT point = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
+            double worldX = desktop3DCameraX + std::sin(desktop3DCameraYaw) * 12.0;
+            double worldZ = desktop3DCameraZ + std::cos(desktop3DCameraYaw) * 12.0;
+            double worldY = 0.0;
+            if (desktop3DAssetDragging && PtInRect(&desktop3DViewportRect, point)) {
+                const double scale = std::max(8.0, desktop3DWorldScale);
+                const double centerX = (desktop3DViewportRect.left + desktop3DViewportRect.right) * 0.5;
+                const double centerY = (desktop3DViewportRect.top + desktop3DViewportRect.bottom) * 0.5;
+                const double screenX = (point.x - centerX) / scale;
+                const double screenY = (centerY - point.y) / scale;
+                worldX += std::cos(desktop3DCameraYaw) * screenX;
+                worldZ -= std::sin(desktop3DCameraYaw) * screenX;
+                worldY = std::max(-1.0, desktop3DCameraY + screenY);
+            }
+            if (!desktop3DAssetDragging || PtInRect(&desktop3DViewportRect, point))
+                createDesktop3DAsset(desktop3DAssetCandidate, worldX, worldY, worldZ);
+            desktop3DAssetCandidate = -1;
+            desktop3DAssetDragging = false;
+            desktop3DDraggingObject = false;
+            if (GetCapture() == window) ReleaseCapture();
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
+        }
+        if (desktop3DDraggingObject) {
+            desktop3DDraggingObject = false;
+            if (GetCapture() == window) ReleaseCapture();
+            syncDesktop3DEditorState();
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
+        }
+        desktop3DAssetCandidate = -1;
+        desktop3DAssetDragging = false;
     }
     if (message == WM_MOUSEMOVE || message == WM_LBUTTONDOWN || message == WM_LBUTTONUP) {
         RECT client = {};
@@ -5992,12 +7535,24 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                     (buttonY + button->height) * canvasHeight / 100.0)
             };
             if (PtInRect(&area, POINT{mouseX, mouseY})) {
-                outputBuffer.clear();
+                clearDesktopOutput();
                 appendOutput("--- " + button->label + " ---\r\n");
                 conditionIsTrue("false", uiVariables);
                 Flow flow;
                 executeBlock(button->body, 0, button->body.size(), uiVariables, uiTypes,
                              uiDefaults, flow, false, true);
+                if (desktop3DEngineActive) {
+                    if (button->name == "reset_view") {
+                        desktop3DCameraX = 0.0;
+                        desktop3DCameraY = 0.0;
+                        desktop3DCameraZ = -12.0;
+                        desktop3DCameraYaw = 0.0;
+                        desktop3DCameraPitch = 0.18;
+                        desktop3DZoom = 1.0;
+                    }
+                    desktop3DSelectedName = static_cast<std::string>(uiVariables["selectedName"]);
+                    syncDesktop3DEditorState();
+                }
                 refreshCollisionWatches(uiVariables, uiTypes);
                 if (flow.stopped) everyTasks.clear();
                 if (!uiAnimations.empty() || !everyTasks.empty()) SetTimer(window, 1, 16, nullptr);
@@ -6005,6 +7560,11 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 return 0;
             }
         }
+    }
+    if (message == WM_TIMER && wParam == 2) {
+        KillTimer(window, 2);
+        saveDesktopAutosave();
+        return 0;
     }
     if (message == WM_TIMER) {
         const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - uiStart).count();
@@ -6032,17 +7592,18 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         HDC dc = BeginPaint(window, &paint);
         RECT client;
         GetClientRect(window, &client);
-        HBRUSH background = CreateSolidBrush(RGB(24, 22, 32));
+        HBRUSH background = CreateSolidBrush(RGB(17, 12, 27));
         FillRect(dc, &client, background);
         DeleteObject(background);
         const DesktopLayout layout = desktopLayout(window, client);
+        if (desktop3DEngineActive && previewMode) updateDesktop3DLayout(window, layout);
         RECT header = {0, 0, layout.width, layout.headerHeight};
-        HBRUSH headerBrush = CreateSolidBrush(RGB(10, 16, 25));
+        HBRUSH headerBrush = CreateSolidBrush(RGB(24, 17, 38));
         FillRect(dc, &header, headerBrush);
         DeleteObject(headerBrush);
         if (layout.headerHeight > 0) {
             RECT accentBar = {0, 0, layout.width, scaleForDpi(window, 4)};
-            HBRUSH accentBrush = CreateSolidBrush(RGB(85, 214, 190));
+            HBRUSH accentBrush = CreateSolidBrush(RGB(155, 105, 255));
             FillRect(dc, &accentBar, accentBrush);
             DeleteObject(accentBrush);
         }
@@ -6061,7 +7622,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         DeleteObject(titleFont);
         const LONG panelTop = layout.panelTop;
         RECT canvas = {0, layout.headerHeight, layout.width, panelTop};
-        HBRUSH canvasBrush = CreateSolidBrush(RGB(12, 20, 30));
+        HBRUSH canvasBrush = CreateSolidBrush(RGB(15, 10, 25));
         FillRect(dc, &canvas, canvasBrush);
         DeleteObject(canvasBrush);
         HFONT bodyFont = CreateFontW(-scaleForDpi(window, 13), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
@@ -6106,7 +7667,12 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                     HGDIOBJ oldPen2 = SelectObject(dc, glowPen);
                     HGDIOBJ oldBrush2 = SelectObject(dc, glowBrush);
                     if (block->shape == "circle") {
-                        Ellipse(dc, glowArea.left, glowArea.top, glowArea.right, glowArea.bottom);
+                        const LONG diameter = std::min(glowArea.right - glowArea.left,
+                                                        glowArea.bottom - glowArea.top);
+                        const LONG cx = (glowArea.left + glowArea.right) / 2;
+                        const LONG cy = (glowArea.top + glowArea.bottom) / 2;
+                        Ellipse(dc, cx - diameter / 2, cy - diameter / 2,
+                            cx + diameter / 2, cy + diameter / 2);
                     } else if (block->shape == "square" || block->shape == "rect") {
                         RoundRect(dc, glowArea.left, glowArea.top, glowArea.right, glowArea.bottom, glowPad * 2, glowPad * 2);
                     } else {
@@ -6124,7 +7690,11 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             const int centerY = (area.top + area.bottom) / 2;
             const int radius = std::max(1, static_cast<int>(std::min(block->width, block->height) * std::min(canvasWidth, canvasHeight) / 200.0));
             if (block->shape == "circle") {
-                Ellipse(dc, area.left, area.top, area.right, area.bottom);
+                const LONG diameter = std::min(area.right - area.left, area.bottom - area.top);
+                const LONG circleX = (area.left + area.right) / 2;
+                const LONG circleY = (area.top + area.bottom) / 2;
+                Ellipse(dc, circleX - diameter / 2, circleY - diameter / 2,
+                    circleX + diameter / 2, circleY + diameter / 2);
             } else if (block->shape == "triangle") {
                 POINT tri[3] = { {centerX, area.top}, {area.left, area.bottom}, {area.right, area.bottom} };
                 Polygon(dc, tri, 3);
@@ -6209,6 +7779,20 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 graphics.DrawImage(image.get(), destination);
             }
         }
+        const int sceneClipSave = SaveDC(dc);
+        const LONG viewportLeft = desktop3DEngineActive && previewMode
+            ? desktop3DViewportRect.left : static_cast<LONG>(canvasWidth * 0.19);
+        const LONG viewportRight = desktop3DEngineActive && previewMode
+            ? desktop3DViewportRect.right : static_cast<LONG>(canvasWidth * 0.80);
+        const LONG viewportTop = desktop3DEngineActive && previewMode
+            ? desktop3DViewportRect.top : layout.headerHeight + static_cast<LONG>(canvasHeight * 0.13);
+        const LONG viewportBottom = desktop3DEngineActive && previewMode
+            ? desktop3DViewportRect.bottom : layout.headerHeight + static_cast<LONG>(canvasHeight * 0.78);
+        if (desktop3DEngineActive && previewMode) {
+            desktop3DProjectedHits.clear();
+            IntersectClipRect(dc, viewportLeft, viewportTop, viewportRight, viewportBottom);
+            drawDesktop3DGrid(dc);
+        }
         const std::array<std::array<int, 4>, 6> modelFaces = {{
             {{0, 1, 2, 3}}, {{4, 5, 6, 7}}, {{0, 3, 7, 4}},
             {{1, 2, 6, 5}}, {{0, 1, 5, 4}}, {{3, 2, 6, 7}}
@@ -6233,9 +7817,12 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             }};
             std::array<std::array<double, 3>, 8> rotated{};
             std::array<POINT, 8> projected{};
-            const double modelScale = std::min(canvasWidth, canvasHeight) * 0.115;
-            const double centerX = canvasWidth * 0.5;
-            const double centerY = layout.headerHeight + canvasHeight * 0.53;
+            const double viewWidth = std::max<LONG>(1, viewportRight - viewportLeft);
+            const double viewHeight = std::max<LONG>(1, viewportBottom - viewportTop);
+            const double modelScale = std::min(viewWidth, viewHeight) * 0.19 * desktop3DZoom;
+            desktop3DWorldScale = modelScale;
+            const double centerX = (viewportLeft + viewportRight) * 0.5;
+            const double centerY = (viewportTop + viewportBottom) * 0.5;
             for (std::size_t vertex = 0; vertex < local.size(); ++vertex) {
                 const double x1 = local[vertex][0];
                 const double y1 = local[vertex][1] * cosineX - local[vertex][2] * sineX;
@@ -6247,19 +7834,109 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 const double y3 = x2 * sineZ + y2 * cosineZ + model.y;
                 const double z3 = z2 + model.z;
                 rotated[vertex] = {{x3, y3, z3}};
-                projected[vertex].x = static_cast<LONG>(centerX + (x3 - z3 * 0.48) * modelScale);
-                projected[vertex].y = static_cast<LONG>(centerY - (y3 - (x3 + z3) * 0.27) * modelScale);
+                const double dx = x3 - desktop3DCameraX;
+                const double dy = y3 - desktop3DCameraY;
+                const double dz = z3 - desktop3DCameraZ;
+                const double cosYaw = std::cos(desktop3DCameraYaw);
+                const double sinYaw = std::sin(desktop3DCameraYaw);
+                const double viewX = dx * cosYaw - dz * sinYaw;
+                const double forwardZ = dx * sinYaw + dz * cosYaw;
+                const double cosPitch = std::cos(desktop3DCameraPitch);
+                const double sinPitch = std::sin(desktop3DCameraPitch);
+                const double viewY = dy * cosPitch - forwardZ * sinPitch;
+                const double depth = forwardZ * cosPitch + dy * sinPitch;
+                const double perspective = depth > 0.25 ? 12.0 / depth : 0.0;
+                projected[vertex].x = static_cast<LONG>(centerX + viewX * modelScale * perspective);
+                projected[vertex].y = static_cast<LONG>(centerY - viewY * modelScale * perspective);
             }
-            if (model.shape == "sphere") {
-                const LONG radiusX = static_cast<LONG>(std::max(2.0, halfW * modelScale));
-                const LONG radiusY = static_cast<LONG>(std::max(2.0, halfH * modelScale * 0.82));
-                RECT sphereArea = {static_cast<LONG>(centerX) - radiusX, static_cast<LONG>(centerY) - radiusY,
-                    static_cast<LONG>(centerX) + radiusX, static_cast<LONG>(centerY) + radiusY};
+            LONG minX = projected[0].x, maxX = projected[0].x;
+            LONG minY = projected[0].y, maxY = projected[0].y;
+            for (const POINT& point : projected) {
+                minX = std::min(minX, point.x); maxX = std::max(maxX, point.x);
+                minY = std::min(minY, point.y); maxY = std::max(maxY, point.y);
+            }
+            RECT objectHit = {minX - 8, minY - 8, maxX + 8, maxY + 8};
+            RECT clippedHit = {};
+            if (IntersectRect(&clippedHit, &objectHit, &desktop3DViewportRect))
+                desktop3DProjectedHits.emplace_back(model.name, clippedHit);
+            const LONG shapeCenterX = (minX + maxX) / 2;
+            const LONG shapeCenterY = (minY + maxY) / 2;
+            if (model.shape == "sphere" || model.shape == "spawn") {
+                const LONG diameter = std::max<LONG>(10, std::min(maxX - minX, maxY - minY));
+                RECT sphereArea = {shapeCenterX - diameter / 2, shapeCenterY - diameter / 2,
+                    shapeCenterX + diameter / 2, shapeCenterY + diameter / 2};
                 HBRUSH sphereBrush = CreateSolidBrush(RGB(red, green, blue));
-                HPEN spherePen = CreatePen(PS_SOLID, 1, RGB(35, 27, 49));
+                HPEN spherePen = CreatePen(PS_SOLID, 2, RGB(47, 34, 70));
                 HGDIOBJ oldBrush = SelectObject(dc, sphereBrush), oldPen = SelectObject(dc, spherePen);
-                Ellipse(dc, sphereArea.left, sphereArea.top, sphereArea.right, sphereArea.bottom);
-                SelectObject(dc, oldBrush); SelectObject(dc, oldPen); DeleteObject(sphereBrush); DeleteObject(spherePen);
+                if (model.shape == "spawn") {
+                    SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+                    Ellipse(dc, sphereArea.left - 5, sphereArea.top - 5,
+                        sphereArea.right + 5, sphereArea.bottom + 5);
+                    MoveToEx(dc, shapeCenterX, sphereArea.top - 12, nullptr);
+                    LineTo(dc, shapeCenterX, sphereArea.bottom + 12);
+                    SelectObject(dc, sphereBrush);
+                    Ellipse(dc, sphereArea.left, sphereArea.top, sphereArea.right, sphereArea.bottom);
+                } else {
+                    Ellipse(dc, sphereArea.left, sphereArea.top, sphereArea.right, sphereArea.bottom);
+                    HPEN detailPen = CreatePen(PS_SOLID, 1, RGB(220, 206, 255));
+                    HGDIOBJ previousDetailPen = SelectObject(dc, detailPen);
+                    Arc(dc, sphereArea.left + diameter / 5, sphereArea.top + diameter / 5,
+                        sphereArea.right - diameter / 5, sphereArea.bottom - diameter / 5,
+                        sphereArea.left, shapeCenterY, sphereArea.right, shapeCenterY);
+                    if (model.texture != "smooth") {
+                        int sphereHatch = model.texture == "grid" ? HS_CROSS :
+                            model.texture == "wood" ? HS_FDIAGONAL :
+                            model.texture == "stone" ? HS_BDIAGONAL : HS_DIAGCROSS;
+                        HBRUSH textureBrush = CreateHatchBrush(sphereHatch,
+                            RGB(static_cast<BYTE>(std::min(255u, red + 34u)),
+                                static_cast<BYTE>(std::min(255u, green + 34u)),
+                                static_cast<BYTE>(std::min(255u, blue + 34u))));
+                        HGDIOBJ previousTextureBrush = SelectObject(dc, textureBrush);
+                        const int previousMode = SetBkMode(dc, TRANSPARENT);
+                        Ellipse(dc, sphereArea.left, sphereArea.top, sphereArea.right, sphereArea.bottom);
+                        SetBkMode(dc, previousMode);
+                        SelectObject(dc, previousTextureBrush);
+                        DeleteObject(textureBrush);
+                    }
+                    SelectObject(dc, previousDetailPen);
+                    DeleteObject(detailPen);
+                }
+                if (desktop3DEngineActive && model.name == desktop3DSelectedName) {
+                    HPEN selectedPen = CreatePen(PS_SOLID, 2, RGB(196, 164, 255));
+                    HGDIOBJ oldSelectedPen = SelectObject(dc, selectedPen);
+                    HGDIOBJ oldSelectedBrush = SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+                    Ellipse(dc, sphereArea.left - 5, sphereArea.top - 5,
+                        sphereArea.right + 5, sphereArea.bottom + 5);
+                    SelectObject(dc, oldSelectedBrush);
+                    SelectObject(dc, oldSelectedPen);
+                    DeleteObject(selectedPen);
+                }
+                SelectObject(dc, oldBrush); SelectObject(dc, oldPen);
+                DeleteObject(sphereBrush); DeleteObject(spherePen);
+                continue;
+            }
+            if (model.shape == "camera") {
+                HPEN cameraPen = CreatePen(PS_SOLID, 2, RGB(red, green, blue));
+                HGDIOBJ oldCameraPen = SelectObject(dc, cameraPen);
+                SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+                Rectangle(dc, shapeCenterX - 14, shapeCenterY - 9, shapeCenterX + 12, shapeCenterY + 9);
+                POINT lens[3] = {{shapeCenterX + 12, shapeCenterY - 5},
+                    {shapeCenterX + 24, shapeCenterY - 12}, {shapeCenterX + 24, shapeCenterY + 12}};
+                Polyline(dc, lens, 3);
+                MoveToEx(dc, shapeCenterX + 24, shapeCenterY + 12, nullptr);
+                LineTo(dc, shapeCenterX + 12, shapeCenterY + 5);
+                if (desktop3DEngineActive && model.name == desktop3DSelectedName) {
+                    HPEN selectionPen = CreatePen(PS_SOLID, 2, RGB(196, 164, 255));
+                    HGDIOBJ oldSelectionPen = SelectObject(dc, selectionPen);
+                    HGDIOBJ oldSelectionBrush = SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+                    Rectangle(dc, shapeCenterX - 19, shapeCenterY - 14,
+                        shapeCenterX + 29, shapeCenterY + 14);
+                    SelectObject(dc, oldSelectionBrush);
+                    SelectObject(dc, oldSelectionPen);
+                    DeleteObject(selectionPen);
+                }
+                SelectObject(dc, oldCameraPen);
+                DeleteObject(cameraPen);
                 continue;
             }
             std::array<int, 6> faceOrder = {{0, 1, 2, 3, 4, 5}};
@@ -6276,12 +7953,38 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 const COLORREF faceColor = RGB(static_cast<BYTE>(red * shade),
                     static_cast<BYTE>(green * shade), static_cast<BYTE>(blue * shade));
                 HBRUSH faceBrush = CreateSolidBrush(faceColor);
-                HPEN facePen = CreatePen(PS_SOLID, 1, RGB(28, 22, 40));
+                HPEN facePen = CreatePen(PS_SOLID, 1, RGB(38, 27, 57));
                 HGDIOBJ oldBrush = SelectObject(dc, faceBrush), oldPen = SelectObject(dc, facePen);
                 Polygon(dc, polygon, 4);
+                if (model.texture != "smooth") {
+                    int hatch = HS_DIAGCROSS;
+                    if (model.texture == "grid") hatch = HS_CROSS;
+                    else if (model.texture == "wood") hatch = HS_FDIAGONAL;
+                    else if (model.texture == "stone") hatch = HS_BDIAGONAL;
+                    HBRUSH textureBrush = CreateHatchBrush(hatch,
+                        RGB(static_cast<BYTE>(std::min(255u, red + 28u)),
+                            static_cast<BYTE>(std::min(255u, green + 28u)),
+                            static_cast<BYTE>(std::min(255u, blue + 28u))));
+                    HGDIOBJ oldTextureBrush = SelectObject(dc, textureBrush);
+                    const int previousBackgroundMode = SetBkMode(dc, TRANSPARENT);
+                    Polygon(dc, polygon, 4);
+                    SetBkMode(dc, previousBackgroundMode);
+                    SelectObject(dc, oldTextureBrush);
+                    DeleteObject(textureBrush);
+                }
+                if (desktop3DEngineActive && model.name == desktop3DSelectedName) {
+                    HPEN selectionPen = CreatePen(PS_SOLID, 2, RGB(196, 164, 255));
+                    HGDIOBJ oldSelectionPen = SelectObject(dc, selectionPen);
+                    HGDIOBJ oldHollowBrush = SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+                    Polygon(dc, polygon, 4);
+                    SelectObject(dc, oldHollowBrush);
+                    SelectObject(dc, oldSelectionPen);
+                    DeleteObject(selectionPen);
+                }
                 SelectObject(dc, oldBrush); SelectObject(dc, oldPen); DeleteObject(faceBrush); DeleteObject(facePen);
             }
         }
+        if (sceneClipSave) RestoreDC(dc, sceneClipSave);
         for (const UiButton& button : uiButtons) {
             if (!button.visible || !uiGroupIsVisible(button.group)) continue;
             const double buttonX = button.x - viewportX;
@@ -6337,14 +8040,27 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             SelectObject(dc, previousFont);
             DeleteObject(font);
         }
-        RECT outputArea = {
-            layout.margin, layout.outputTop,
-            std::max<LONG>(layout.margin, layout.width - layout.margin), layout.outputBottom
-        };
+        if (desktop3DEngineActive && previewMode)
+            drawDesktop3DWorkspaceChrome(dc, window, layout);
+
+        RECT outputHeader = {layout.margin, layout.panelTop,
+            std::max<LONG>(layout.margin, layout.width - layout.margin),
+            layout.panelTop + scaleForDpi(window, 25)};
+        HBRUSH outputHeaderBrush = CreateSolidBrush(RGB(34, 25, 48));
+        FillRect(dc, &outputHeader, outputHeaderBrush);
+        DeleteObject(outputHeaderBrush);
         SetBkMode(dc, TRANSPARENT);
-        SetTextColor(dc, RGB(245, 242, 255));
-        DrawTextW(dc, outputBuffer.c_str(), static_cast<int>(outputBuffer.size()), &outputArea,
-                  DT_LEFT | DT_TOP | DT_WORDBREAK | DT_NOPREFIX);
+        SetTextColor(dc, RGB(190, 160, 255));
+        HFONT terminalHeaderFont = CreateFontW(-scaleForDpi(window, 11), 0, 0, 0, FW_BOLD,
+            FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
+        HGDIOBJ previousTerminalFont = SelectObject(dc, terminalHeaderFont);
+        RECT terminalCaption = outputHeader;
+        InflateRect(&terminalCaption, -scaleForDpi(window, 9), 0);
+        DrawTextW(dc, L"OUTPUT  /  TERMINAL", -1, &terminalCaption,
+            DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+        SelectObject(dc, previousTerminalFont);
+        DeleteObject(terminalHeaderFont);
         if (bodyFont) {
             SelectObject(dc, previousBodyFont);
             DeleteObject(bodyFont);
@@ -6353,7 +8069,8 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         return 0;
     }
     if (message == WM_CLOSE) {
-        if (!confirmDiscardEditorChanges(window)) return 0;
+        KillTimer(window, 2);
+        saveDesktopAutosave();
         DestroyWindow(window);
         return 0;
     }
@@ -6362,6 +8079,13 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         codeEditor = nullptr;
         openButton = saveButton = runButton = previewButton = newButton = buildButton = dictionaryButton = nullptr;
         editor2DButton = editor3DButton = nullptr;
+        exportButton = outputControl = terminalInputControl = terminalSendButton = nullptr;
+        previousOutputProc = nullptr;
+        dictionaryWindow = dictionaryEdit = nullptr;
+        if (terminalInputBrush) DeleteObject(terminalInputBrush);
+        if (outputControlBrush) DeleteObject(outputControlBrush);
+        terminalInputBrush = nullptr;
+        outputControlBrush = nullptr;
         desktopSpriteCache.clear();
         if (gdiplusToken != 0) {
             Gdiplus::GdiplusShutdown(gdiplusToken);
@@ -6425,41 +8149,34 @@ bool askForInput(const std::string& prompt, std::string& answer) {
     appendOutput(prompt + " ");
     return static_cast<bool>(std::getline(std::cin, answer));
 #else
-    inputPrompt = wideFromUtf8(prompt);
+    if (!mainWindow || !terminalInputControl || !terminalSendButton) {
+        appendOutput(prompt + "\r\n[Input unavailable: desktop terminal is not active.]\r\n");
+        return false;
+    }
     inputFinished = false;
     inputAccepted = false;
     inputResult.clear();
-    const wchar_t* className = L"TRGInputWindow";
-    WNDCLASSW windowClass = {};
-    windowClass.lpfnWndProc = inputWindowProc;
-    windowClass.hInstance = GetModuleHandleW(nullptr);
-    windowClass.lpszClassName = className;
-    windowClass.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
-    if (!RegisterClassW(&windowClass) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) return false;
-    if (mainWindow) EnableWindow(mainWindow, FALSE);
-    const auto scale = [](int value) {
-        return mainWindow ? scaleForDpi(mainWindow, value) : value;
-    };
-    HWND dialog = CreateWindowExW(WS_EX_DLGMODALFRAME, className, L"TRG input",
-        WS_CAPTION | WS_SYSMENU, CW_USEDEFAULT, CW_USEDEFAULT, scale(450), scale(180),
-        mainWindow, nullptr, windowClass.hInstance, nullptr);
-    if (!dialog) {
-        if (mainWindow) EnableWindow(mainWindow, TRUE);
-        return false;
-    }
-    ShowWindow(dialog, SW_SHOW);
-    UpdateWindow(dialog);
+    terminalInputActive = true;
+    appendOutput(prompt + "\r\n");
+    SetWindowTextW(terminalInputControl, L"");
+    layoutOutputControls(mainWindow);
+    ShowWindow(terminalInputControl, SW_SHOW);
+    ShowWindow(terminalSendButton, SW_SHOW);
+    SetFocus(terminalInputControl);
     MSG message;
-    while (!inputFinished && GetMessageW(&message, nullptr, 0, 0) > 0) {
-        if (!IsDialogMessageW(dialog, &message)) {
-            TranslateMessage(&message);
-            DispatchMessageW(&message);
+    while (!inputFinished) {
+        const BOOL result = GetMessageW(&message, nullptr, 0, 0);
+        if (result <= 0) {
+            inputFinished = true;
+            inputAccepted = false;
+            break;
         }
+        TranslateMessage(&message);
+        DispatchMessageW(&message);
     }
-    if (mainWindow) {
-        EnableWindow(mainWindow, TRUE);
-        SetForegroundWindow(mainWindow);
-    }
+    terminalInputActive = false;
+    layoutOutputControls(mainWindow);
+    if (mainWindow) SetFocus(mainWindow);
     if (inputAccepted) answer = inputResult;
     return inputAccepted;
 #endif
@@ -6527,35 +8244,10 @@ std::vector<std::string> readProgram(std::istream& source) {
         rawLines.push_back(stripComment(line));
     }
 
-    // Discover user-defined function names before typo correction so calls to
-    // names resembling built-in commands are never silently rewritten.
-    std::unordered_set<std::string> functionNames;
-    for (const std::string& rawLine : rawLines) {
-        const auto tokens = tokenize(trim(rawLine));
-        if (tokens.size() >= 2 && lower(tokens[0]) == "define" && validName(tokens[1]))
-            functionNames.insert(lower(tokens[1]));
-    }
-
+    // Preserve source exactly as written. TRG never rewrites command names.
     std::vector<std::string> program;
     program.reserve(rawLines.size());
-    for (std::string cleanLine : rawLines) {
-        const std::size_t first = cleanLine.find_first_not_of(" \t");
-        if (first != std::string::npos) {
-            std::size_t last = first;
-            while (last < cleanLine.size() &&
-                   (std::isalnum(static_cast<unsigned char>(cleanLine[last])) || cleanLine[last] == '_')) ++last;
-            if (last > first) {
-                const std::string typed = cleanLine.substr(first, last - first);
-                const std::string corrected = suggestedCommand(typed);
-                if (!functionNames.count(lower(typed)) &&
-                    !corrected.empty() && lower(typed) != corrected) {
-                    cleanLine.replace(first, last - first, corrected);
-                    appendOutput("AUTO-CORRECTED command '" + typed + "' to '" + corrected + "'\r\n");
-                }
-            }
-        }
-        program.push_back(std::move(cleanLine));
-    }
+    for (std::string& cleanLine : rawLines) program.push_back(std::move(cleanLine));
     return program;
 }
 void executeProgram(const std::vector<std::string>& program) {
@@ -6665,6 +8357,7 @@ void applyEditorSyntaxHighlighting() {
     GetWindowTextW(codeEditor, source.data(), length + 1);
     source.resize(static_cast<std::size_t>(length));
     highlightingEditor = true;
+    SendMessageW(codeEditor, WM_SETREDRAW, FALSE, 0);
     DWORD selectionStart = 0, selectionEnd = 0;
     SendMessageW(codeEditor, EM_GETSEL, reinterpret_cast<WPARAM>(&selectionStart),
                  reinterpret_cast<LPARAM>(&selectionEnd));
@@ -6677,14 +8370,20 @@ void applyEditorSyntaxHighlighting() {
     SendMessageW(codeEditor, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&base));
     static const std::unordered_set<std::wstring> keywords = {
         L"let",L"num",L"word",L"toggle",L"color",L"list",L"record",L"struct",L"class",L"new",
-        L"if",L"else",L"loop",L"every",L"wait",L"break",L"stop",L"return",L"function",L"call",
-        L"say",L"print",L"show",L"ask",L"random",L"add",L"create",L"json",L"read_file",
-        L"write_file",L"append_file",L"file_exists",L"delete_file",L"push",L"insert",L"get",
-        L"set",L"remove",L"pop",L"join",L"split",L"upper",L"lower",L"trim",L"length",
-        L"contains",L"index_of",L"replace",L"substring",L"find",L"find_position",L"replace_text",
-        L"count_text",L"starts_with",L"ends_with",L"add_numbers",L"subtract_numbers",L"multiply_numbers",
-        L"divide_numbers",L"square_root",L"round_number",L"absolute_number",L"minimum",L"maximum",L"distance_between",L"math",L"ai",L"text",L"button",
-        L"rectangle",L"circle",L"image",L"animate",L"true",L"false",L"none"
+        L"if",L"else",L"loop",L"every",L"wait",L"break",L"stop",L"exit",L"continue",L"return",
+        L"function",L"define",L"call",L"for",L"each",L"group",L"hide",L"show",
+        L"say",L"print",L"ask",L"random",L"add",L"create",L"run",L"json",L"database",L"table",
+        L"query",L"sql",L"read_file",L"write_file",L"append_file",L"file_exists",L"delete_file",
+        L"push",L"insert",L"get",L"set",L"remove",L"pop",L"join",L"split",L"upper",L"lower",
+        L"trim",L"ttrim",L"length",L"contains",L"index_of",L"replace",L"substring",L"find",
+        L"find_position",L"replace_text",L"count_text",L"starts_with",L"ends_with",
+        L"dictionary",L"dict_set",L"dict_get",L"dict_has",L"dict_remove",L"dict_keys",L"dict_count",
+        L"binary",L"bit",L"checksum",L"regex",L"compress",L"http_get",L"http_post",L"run_wasm",
+        L"math",L"stats",L"units",L"convert",L"time",L"physics",L"collides",L"watch_collision",
+        L"particle",L"scroll",L"set_text",L"set_color",L"ai",L"text",L"button",L"block",
+        L"rectangle",L"circle",L"image",L"sprite",L"animate",L"ui",L"3d",L"box",L"sphere",
+        L"camera",L"spawn",L"plane",L"texture",L"save",L"load",L"move",L"rotate",L"scale",
+        L"duplicate",L"rename",L"delete",L"true",L"false",L"none"
     };
     auto paint = [&](std::size_t start, std::size_t count, COLORREF color, bool bold = false) {
         if (!count) return;
@@ -6701,7 +8400,7 @@ void applyEditorSyntaxHighlighting() {
         if (source[i] == L'/' && i + 1 < source.size() && source[i + 1] == L'/') {
             const std::size_t start = i;
             while (i < source.size() && source[i] != L'\n') ++i;
-            paint(start, i - start, RGB(106, 153, 85));
+            paint(start, i - start, RGB(143, 124, 171));
         } else if (source[i] == L'"') {
             const std::size_t start = i++;
             bool escaped = false;
@@ -6715,13 +8414,13 @@ void applyEditorSyntaxHighlighting() {
         } else if (std::iswdigit(source[i])) {
             const std::size_t start = i++;
             while (i < source.size() && (std::iswalnum(source[i]) || source[i] == L'.')) ++i;
-            paint(start, i - start, RGB(181, 206, 168));
+            paint(start, i - start, RGB(190, 170, 220));
         } else if (std::iswalpha(source[i]) || source[i] == L'_') {
             const std::size_t start = i++;
             while (i < source.size() && (iswalnum(source[i]) || source[i] == L'_')) ++i;
             std::wstring word = source.substr(start, i - start);
             std::transform(word.begin(), word.end(), word.begin(), [](wchar_t ch) { return static_cast<wchar_t>(std::towlower(ch)); });
-            if (keywords.count(word)) paint(start, i - start, RGB(86, 156, 214), true);
+            if (keywords.count(word)) paint(start, i - start, RGB(168, 139, 255), true);
         } else if (source[i] == L'#') {
             const std::size_t start = i++;
             while (i < source.size() && std::iswxdigit(source[i])) ++i;
@@ -6730,6 +8429,8 @@ void applyEditorSyntaxHighlighting() {
     }
     SendMessageW(codeEditor, EM_SETSEL, selectionStart, selectionEnd);
     highlightingEditor = false;
+    SendMessageW(codeEditor, WM_SETREDRAW, TRUE, 0);
+    InvalidateRect(codeEditor, nullptr, FALSE);
 }
 
 bool loadSourceFile(const std::filesystem::path& path) {
@@ -6752,13 +8453,88 @@ bool loadSourceFile(const std::filesystem::path& path) {
     projectRoot = currentSourcePath.parent_path();
     editorDirty = false;
     previewMode = false;
+    saveDesktopAutosave();
     if (previewButton) SetWindowTextW(previewButton, L"Preview");
     updateEditorWindowTitle();
     layoutOutputControls(mainWindow);
-    outputBuffer.clear();
+    clearDesktopOutput();
     appendOutput("Opened: " + currentSourcePath.u8string() + "\r\n");
     InvalidateRect(mainWindow, nullptr, TRUE);
     return true;
+}
+
+std::filesystem::path desktopAutosavePath() {
+    static const std::filesystem::path path = [] {
+        const DWORD required = GetEnvironmentVariableW(L"LOCALAPPDATA", nullptr, 0);
+        if (required > 1) {
+            std::wstring root(static_cast<std::size_t>(required), L'\0');
+            const DWORD copied = GetEnvironmentVariableW(L"LOCALAPPDATA", root.data(), required);
+            if (copied > 0 && copied < required) {
+                root.resize(copied);
+                return std::filesystem::path(root) / L"TRG Studio" / L"desktop-autosave.trg";
+            }
+        }
+        return std::filesystem::temp_directory_path() / L"TRG Studio" / L"desktop-autosave.trg";
+    }();
+    return path;
+}
+
+void saveDesktopAutosave() {
+    if (!codeEditor) return;
+    try {
+        const std::filesystem::path path = desktopAutosavePath();
+        std::filesystem::create_directories(path.parent_path());
+        const int length = GetWindowTextLengthW(codeEditor);
+        std::wstring wideSource(static_cast<std::size_t>(length) + 1, L'\0');
+        GetWindowTextW(codeEditor, wideSource.data(), length + 1);
+        wideSource.resize(static_cast<std::size_t>(length));
+        const std::string source = utf8FromWide(wideSource);
+        std::ofstream output(path, std::ios::binary | std::ios::trunc);
+        if (!output) return;
+        output.write(source.data(), static_cast<std::streamsize>(source.size()));
+        if (!output) return;
+        std::filesystem::path metadataPath = path;
+        metadataPath += ".meta";
+        std::ofstream metadata(metadataPath, std::ios::binary | std::ios::trunc);
+        if (metadata) metadata << currentSourcePath.u8string() << "\n" << (editorDirty ? "1" : "0");
+    } catch (...) {
+        // Autosave is best-effort and must never interrupt editing.
+    }
+}
+
+void restoreDesktopAutosave() {
+    if (!codeEditor) return;
+    try {
+        const std::filesystem::path path = desktopAutosavePath();
+        std::ifstream input(path, std::ios::binary);
+        if (!input) return;
+        std::ostringstream contents;
+        contents << input.rdbuf();
+        const std::string source = contents.str();
+        std::string sourcePath;
+        bool wasDirty = true;
+        std::filesystem::path metadataPath = path;
+        metadataPath += ".meta";
+        std::ifstream metadata(metadataPath, std::ios::binary);
+        if (metadata) {
+            std::getline(metadata, sourcePath);
+            std::string dirty;
+            std::getline(metadata, dirty);
+            wasDirty = dirty != "0";
+        }
+        loadingEditorText = true;
+        SetWindowTextW(codeEditor, wideFromUtf8(source).c_str());
+        loadingEditorText = false;
+        applyEditorSyntaxHighlighting();
+        if (!sourcePath.empty()) {
+            currentSourcePath = std::filesystem::u8path(sourcePath);
+            projectRoot = currentSourcePath.parent_path();
+        }
+        editorDirty = wasDirty;
+        updateEditorWindowTitle();
+    } catch (...) {
+        loadingEditorText = false;
+    }
 }
 
 bool saveSourceFile() {
@@ -6783,54 +8559,81 @@ bool saveSourceFile() {
     projectRoot = currentSourcePath.parent_path();
     editorDirty = false;
     updateEditorWindowTitle();
+    saveDesktopAutosave();
     appendOutput("Saved: " + currentSourcePath.u8string() + "\r\n");
     return true;
 }
 
 bool launchDesktopVisualEditor(const std::string& fileName) {
     if (!codeEditor) return false;
-    if (!desktopVisualEditorActive) {
-        const int length = GetWindowTextLengthW(codeEditor);
-        std::wstring current(static_cast<std::size_t>(length) + 1, L'\0');
-        GetWindowTextW(codeEditor, current.data(), length + 1);
-        current.resize(static_cast<std::size_t>(length));
-        desktopPreviousSource = current;
-        desktopPreviousPath = currentSourcePath;
-        desktopPreviousDirty = editorDirty;
-        desktopVisualEditorActive = true;
-    }
-    std::filesystem::path editorPath = std::filesystem::current_path() / fileName;
-    if (!std::filesystem::exists(editorPath)) {
-        wchar_t executable[32768] = {};
-        const DWORD count = GetModuleFileNameW(nullptr, executable, 32768);
-        if (count > 0 && count < 32768)
-            editorPath = std::filesystem::path(executable).parent_path() / fileName;
-    }
-    if (!std::filesystem::exists(editorPath) || !loadSourceFile(editorPath)) {
-        appendOutput("ERROR Could not find the bundled " + fileName + ".\r\n");
-        desktopVisualEditorActive = false;
+    const char* embeddedSource = nullptr;
+    if (fileName == "2DEditor.trg" || fileName == "2D Editor")
+        embeddedSource = trg_builtin::editor2D;
+    else if (fileName == "3DEditor.trg" || fileName == "3D Editor")
+        embeddedSource = trg_builtin::desktopEditor3D;
+
+    if (!embeddedSource) {
+        appendOutput("ERROR Unknown built-in visual editor.\r\n");
         return false;
     }
-    runEditorSource();
+
+    if (!desktopVisualEditorActive) {
+        desktopPreviousPath = currentSourcePath;
+        desktopPreviousDirty = editorDirty;
+    }
+    desktopVisualEditorActive = true;
+    desktop3DEngineActive = fileName == "3D Editor";
+    desktop3DContextOpen = false;
+    desktop3DDraggingObject = false;
+    desktop3DDraggingCamera = false;
+    desktop3DAssetCandidate = -1;
+    desktop3DAssetDragging = false;
+    if (desktop3DEngineActive) {
+        desktop3DSelectedName.clear();
+        desktop3DCameraX = 0.0;
+        desktop3DCameraY = 0.0;
+        desktop3DCameraZ = -12.0;
+        desktop3DCameraYaw = 0.0;
+        desktop3DCameraPitch = 0.18;
+        desktop3DZoom = 1.0;
+        desktop3DToolMode = 1;
+        desktop3DGridVisible = true;
+        desktop3DHierarchyScroll = 0;
+    }
+    currentSourcePath.clear();
+    projectRoot = std::filesystem::current_path();
+    clearDesktopOutput();
+    appendOutput("Opening built-in " + fileName + " workspace...\r\n\r\n");
+    std::istringstream builtInStream(embeddedSource);
+    const std::vector<std::string> builtInProgram = readProgram(builtInStream);
+    executeProgram(builtInProgram);
+    if (desktop3DEngineActive) syncDesktop3DEditorState();
+    currentSourcePath = desktopPreviousPath;
+    projectRoot = currentSourcePath.empty() ? std::filesystem::current_path() : currentSourcePath.parent_path();
     previewMode = true;
-    SetWindowTextW(previewButton, L"Code");
+    if (desktop3DEngineActive && mainWindow) SetTimer(mainWindow, 3, 16, nullptr);
+    if (previewButton) SetWindowTextW(previewButton, L"Code");
     layoutOutputControls(mainWindow);
+    if (mainWindow) SetFocus(mainWindow);
     InvalidateRect(mainWindow, nullptr, TRUE);
     return true;
 }
 
 bool returnFromDesktopVisualEditor() {
     if (!desktopVisualEditorActive || !codeEditor) return false;
-    loadingEditorText = true;
-    SetWindowTextW(codeEditor, desktopPreviousSource.c_str());
-    loadingEditorText = false;
     currentSourcePath = desktopPreviousPath;
     projectRoot = currentSourcePath.empty() ? std::filesystem::current_path() : currentSourcePath.parent_path();
     editorDirty = desktopPreviousDirty;
     desktopVisualEditorActive = false;
+    desktop3DEngineActive = false;
+    KillTimer(mainWindow, 3);
+    desktop3DContextOpen = false;
+    desktop3DDraggingObject = false;
+    desktop3DDraggingCamera = false;
+    desktop3DAssetCandidate = -1;
+    desktop3DAssetDragging = false;
     previewMode = false;
     SetWindowTextW(previewButton, L"Preview");
-    applyEditorSyntaxHighlighting();
     updateEditorWindowTitle();
     layoutOutputControls(mainWindow);
     InvalidateRect(mainWindow, nullptr, TRUE);
@@ -6846,7 +8649,7 @@ bool runEditorSource() {
     const std::string source = utf8FromWide(wideSource);
     if (!currentSourcePath.empty()) projectRoot = currentSourcePath.parent_path();
     else projectRoot = std::filesystem::current_path();
-    outputBuffer.clear();
+    clearDesktopOutput();
     appendOutput("Running: " + (currentSourcePath.empty() ? std::string("Untitled.trg") : currentSourcePath.u8string()) + "\r\n\r\n");
     std::istringstream input(source);
     executeProgram(readProgram(input));
