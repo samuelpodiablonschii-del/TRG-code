@@ -277,7 +277,7 @@ void installPackage() {
         installed = true;
     } catch (const std::exception& error) {
         const std::wstring message(error.what(), error.what() + strlen(error.what()));
-        updateProgress(L"Installation failed. No source code was installed.");
+        updateProgress(L"Installation failed. Some files may have been installed; see the error details.");
         MessageBoxW(installerWindow, message.c_str(), L"TRG Installer error", MB_OK | MB_ICONERROR);
         EnableWindow(installButton, TRUE);
     }
