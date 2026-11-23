@@ -6757,7 +6757,9 @@ void saveDesktopAutosave() {
         if (!output) return;
         output.write(source.data(), static_cast<std::streamsize>(source.size()));
         if (!output) return;
-        std::ofstream metadata(path.string() + ".meta", std::ios::binary | std::ios::trunc);
+        std::filesystem::path metadataPath = path;
+        metadataPath += ".meta";
+        std::ofstream metadata(metadataPath, std::ios::binary | std::ios::trunc);
         if (metadata) metadata << currentSourcePath.u8string() << "\n" << (editorDirty ? "1" : "0");
     } catch (...) {
         // Autosave is best-effort and must never interrupt editing.
@@ -6775,7 +6777,9 @@ void restoreDesktopAutosave() {
         const std::string source = contents.str();
         std::string sourcePath;
         bool wasDirty = true;
-        std::ifstream metadata(path.string() + ".meta", std::ios::binary);
+        std::filesystem::path metadataPath = path;
+        metadataPath += ".meta";
+        std::ifstream metadata(metadataPath, std::ios::binary);
         if (metadata) {
             std::getline(metadata, sourcePath);
             std::string dirty;
