@@ -248,7 +248,7 @@ block z 1 x 0 y 0 w 100 h 7 color #1B1525 name ENGINE_TITLEBAR
 block z 2 x 0 y 7 w 100 h 6 color #241B32 name ENGINE_TOOLBAR
 
 text "TRG ENGINE" x 18 y 4.5 size 2.0 color #F5EDFF bold true
-text "3D SCENE EDITOR" x 98 y 5.2 size 1.0 color #BCA8DA align right
+text "3D EDITOR" x 50 y 5.2 size 1.0 color #BCA8DA align center
 
 button reset_view "RESET" x 2 y 7.8 w 18 h 4.4 color #483363 (
     say "Camera reset. Drag empty viewport space to orbit; use two fingers to orbit and zoom."
