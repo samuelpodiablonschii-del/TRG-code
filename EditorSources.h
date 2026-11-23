@@ -445,10 +445,13 @@ button material "CHANGE MATERIAL" x 82 y 57 w 16 h 4 color #56368F (
 button reset_view "RESET VIEW" x 70 y 19 w 9 h 4 color #30243F (
     say "Camera view reset."
 )
-button save_scene "SAVE SCENE" x 70 y 24 w 9 h 4 color #56368F (
-    say "Use the TRG source editor to save the scene program."
+button load_scene "LOAD SCENE" x 70 y 24 w 9 h 4 color #30243F (
+    3d load "scene.trgscene"
 )
-button controls "CONTROLS" x 70 y 29 w 9 h 4 color #30243F (
+button save_scene "SAVE SCENE" x 70 y 29 w 9 h 4 color #56368F (
+    3d save "scene.trgscene"
+)
+button controls "CONTROLS" x 70 y 34 w 9 h 4 color #30243F (
     say "Drag a model to move it. Drag empty space to orbit. Pinch to zoom on touch screens."
 )
 )TRGEDITOR3D"
