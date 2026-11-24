@@ -15,7 +15,6 @@ public:
 
 private:
     QLabel* imageView_{nullptr};
-    QLabel* imageInfo_{nullptr};
     QScrollArea* canvasScroll_{nullptr};
     QListWidget* layerList_{nullptr};
     QSlider* zoomSlider_{nullptr};
@@ -24,6 +23,7 @@ private:
     QVector<QImage> history_;
     int historyIndex_{-1};
     QImage image_;
+    QString currentPath_;
 
     void buildInterface();
     void openImage();
