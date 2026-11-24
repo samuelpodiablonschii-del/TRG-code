@@ -1,4 +1,4 @@
-name: TRG APK build
+name: TRG Android app builds
 
 on:
   workflow_dispatch:
@@ -6,6 +6,10 @@ on:
     branches: [main]
     paths:
       - "android-app/**"
+      - "apps/photo-editor/android/**"
+      - "apps/font-maker/android/**"
+      - "apps/photo-editor/android/**"
+      - "apps/font-maker/android/**"
       - "build-apk.bat"
       - "TRG.cpp"
       - "EditorSources.h"
@@ -27,7 +31,7 @@ concurrency:
 
 jobs:
   android:
-    name: Build Android APK
+    name: Build TRG Android applications
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
@@ -67,7 +71,10 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: TRG-Studio-debug-apk
-          path: android-app/app/build/outputs/apk/debug/app-debug.apk
+          name: TRG-Android-Apps
+          path: |
+            android-app/app/build/outputs/apk/debug/app-debug.apk
+            apps/photo-editor/android/build/outputs/apk/debug/*.apk
+            apps/font-maker/android/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 14
