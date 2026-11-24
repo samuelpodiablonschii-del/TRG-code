@@ -72,6 +72,9 @@ jobs:
           if (!output.includes("TRG WebAssembly smoke test passed")) {
             throw new Error("The interpreter did not return the expected output: " + output);
           }
+          if (output.includes("Program finished")) {
+            throw new Error("The web terminal should not display the interpreter completion banner: " + output);
+          }
           if (!ui || ui.blocks?.length !== 1 || ui.sprites?.length !== 1 || ui.texts?.length !== 1 || !ui.sprites[0].data.startsWith("data:image/png;base64,")) {
             throw new Error("The UI preview bridge did not return the expected block and text: " + JSON.stringify(ui));
           }
