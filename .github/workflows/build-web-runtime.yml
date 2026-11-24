@@ -65,7 +65,7 @@ jobs:
             locateFile: name => new URL(name, import.meta.url).href
           });
           module.ccall("trg_web_run", null, ["string"], [
-            'add (ui)\\nblock x 10 y 15 w 30 h 20 color #8B5CF6 name panel\\ntext "TRG preview" x 10 y 42 size 6 color #FFFFFF\\nsay "TRG WebAssembly smoke test passed"'
+            'add (ui)\nblock x 10 y 15 w 30 h 20 color #8B5CF6 name panel\ntext "TRG preview" x 10 y 42 size 6 color #FFFFFF\nsay "TRG WebAssembly smoke test passed"'
           ]);
           if (!output.includes("TRG WebAssembly smoke test passed")) {
             throw new Error("The interpreter did not return the expected output: " + output);
