@@ -8,6 +8,7 @@
 #include <limits>
 #include <map>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -166,12 +167,14 @@ BuiltGlyph makeGlyph(const FontGlyph& glyph) {
     std::int32_t previous = 0;
     for (const auto& point : points) {
         const std::int32_t delta = static_cast<std::int32_t>(point.x) - previous;
+        if (delta < -32768 || delta > 32767) throw std::runtime_error("Horizontal point delta exceeds the TrueType coordinate range.");
         putS16(built.data, static_cast<std::int16_t>(delta));
         previous = point.x;
     }
     previous = 0;
     for (const auto& point : points) {
         const std::int32_t delta = static_cast<std::int32_t>(point.y) - previous;
+        if (delta < -32768 || delta > 32767) throw std::runtime_error("Vertical point delta exceeds the TrueType coordinate range.");
         putS16(built.data, static_cast<std::int16_t>(delta));
         previous = point.y;
     }
