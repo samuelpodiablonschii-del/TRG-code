@@ -46,6 +46,7 @@ jobs:
             -sFILESYSTEM=1 \
             -sFORCE_FILESYSTEM=1 \
             -sDISABLE_EXCEPTION_CATCHING=0 \
+            -sASYNCIFY=1 \
             -s'EXPORTED_FUNCTIONS=["_trg_web_run","_trg_web_get_ui_snapshot","_malloc","_free"]' \
             -s'EXPORTED_RUNTIME_METHODS=["ccall","lengthBytesUTF8","stringToUTF8","UTF8ToString"]'
 
@@ -63,9 +64,9 @@ jobs:
             locateFile: name => new URL(name, import.meta.url).href
           });
           module.FS_createDataFile("/", "pixel.png", new Uint8Array(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/pXcAAAAASUVORK5CYII=", "base64")), true, true, true);
-          module.ccall("trg_web_run", null, ["string"], [
+          await module.ccall("trg_web_run", null, ["string"], [
             'add (ui)\nblock x 10 y 15 w 30 h 20 color #8B5CF6 name panel\nsprite sample "pixel.png" x 50 y 50 w 10 h 10\ntext "TRG preview" x 10 y 42 size 6 color #FFFFFF\nsay "TRG WebAssembly smoke test passed"'
-          ]);
+          ], { async: true });
           const uiPointer = module.ccall("trg_web_get_ui_snapshot", "number", [], []);
           const ui = JSON.parse(module.UTF8ToString(uiPointer));
           if (!output.includes("TRG WebAssembly smoke test passed")) {
@@ -76,6 +77,16 @@ jobs:
           }
           console.log(output.trim());
           console.log("UI preview smoke test passed: " + ui.blocks.length + " block, " + ui.sprites.length + " sprite, " + ui.texts.length + " text.");
+
+          output = "";
+          globalThis.trgCompilerRequestInput = resolve => resolve("Ada");
+          await module.ccall("trg_web_run", null, ["string"], [
+            'var name = "there"\\nask "What is your name?" name\\nsay "Hello," name'
+          ], { async: true });
+          if (!output.includes("What is your name?") || !output.includes("Hello, Ada")) {
+            throw new Error("Terminal input smoke test failed: " + output);
+          }
+          console.log("Terminal input smoke test passed.");
           EOF
           node "$RUNNER_TEMP/trg-web-runtime/smoke-test.mjs"
 
