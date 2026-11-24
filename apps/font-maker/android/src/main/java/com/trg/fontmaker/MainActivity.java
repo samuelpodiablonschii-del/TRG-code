@@ -397,7 +397,7 @@ public final class MainActivity extends Activity {
                 canvas.drawLine(left, y, left + areaWidth, y, paint);
             }
             paint.setColor(Color.rgb(139, 121, 201));
-            paint.setStrokeWidth(dp(1.5f));
+            paint.setStrokeWidth(dp(2));
             canvas.drawLine(left, baseline, left + areaWidth, baseline, paint);
             if (!points.isEmpty()) {
                 Path path = new Path();
