@@ -81,7 +81,7 @@ jobs:
           output = "";
           globalThis.trgCompilerRequestInput = resolve => resolve("Ada");
           await module.ccall("trg_web_run", null, ["string"], [
-            'var name = "there"\\nask "What is your name?" name\\nsay "Hello," name'
+            'var name = "there"\nask "What is your name?" name\nsay "Hello," name'
           ], { async: true });
           if (!output.includes("What is your name?") || !output.includes("Hello, Ada")) {
             throw new Error("Terminal input smoke test failed: " + output);
