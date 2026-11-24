@@ -32,12 +32,6 @@ EM_JS(void, trg_web_emit_output, (const char* value), {
     }
 });
 
-EM_JS(void, trg_web_emit_ui, (const char* value), {
-    if (typeof globalThis.trgCompilerSetUi === "function") {
-        globalThis.trgCompilerSetUi(UTF8ToString(value));
-    }
-});
-
 class TrgBrowserInputBuffer final : public std::streambuf {
 public:
     int_type underflow() override {
@@ -189,7 +183,8 @@ static void trgEmitUiSnapshot() {
     }
     json << "]}";
     const std::string snapshot = json.str();
-    trg_web_emit_ui(snapshot.c_str());
+    const std::string taggedSnapshot = std::string("\\x1eTRG_UI:") + snapshot;
+    trg_web_emit_output(taggedSnapshot.c_str());
 }
 
 extern "C" {
