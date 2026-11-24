@@ -317,7 +317,7 @@ void PhotoEditorWindow::refreshHistoryActions() {
     }
 }
 
-void PhotoEditorWindow::applyImageOperation(const char* label, const QImage& (*operation)(const QImage&)) {
+void PhotoEditorWindow::applyImageOperation(const char* label, QImage (*operation)(const QImage&)) {
     if (image_.isNull()) return;
     try {
         setImage(operation(image_));
