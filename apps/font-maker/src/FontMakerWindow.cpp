@@ -1,6 +1,7 @@
 #include "FontMakerWindow.h"
 #include "TrueTypeWriter.h"
 
+#include <QAction>
 #include <QApplication>
 #include <QFileDialog>
 #include <QFileInfo>
