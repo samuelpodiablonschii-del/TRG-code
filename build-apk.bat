@@ -8,6 +8,8 @@ set "PROJECT_DIR=%~dp0android-app"
 set "GRADLEW=%PROJECT_DIR%\gradlew.bat"
 set "SDK_DIR="
 set "APK=%PROJECT_DIR%\app\build\outputs\apk\debug\app-debug.apk"
+set "PHOTO_APK_DIR=%~dp0apps\photo-editor\android\build\outputs\apk\debug"
+set "FONT_APK_DIR=%~dp0apps\font-maker\android\build\outputs\apk\debug"
 
 echo ========================================
 echo       TRG STUDIO - ANDROID APK
@@ -140,14 +142,34 @@ for %%F in ("%APK%") do if %%~zF LEQ 0 (
     goto :failed
 )
 
+set "PHOTO_APK="
+for %%F in ("%PHOTO_APK_DIR%\*.apk") do if exist "%%~fF" set "PHOTO_APK=%%~fF"
+if not defined PHOTO_APK (
+    echo ERROR: TRG Photo Editor APK was not generated.
+    echo Expected an APK in:
+    echo   %PHOTO_APK_DIR%
+    goto :failed
+)
+
+set "FONT_APK="
+for %%F in ("%FONT_APK_DIR%\*.apk") do if exist "%%~fF" set "FONT_APK=%%~fF"
+if not defined FONT_APK (
+    echo ERROR: TRG Font Maker APK was not generated.
+    echo Expected an APK in:
+    echo   %FONT_APK_DIR%
+    goto :failed
+)
+
 echo.
 echo ========================================
 echo           BUILD SUCCESSFUL
 echo ========================================
 echo APK:
 echo   %APK%
+echo   %PHOTO_APK%
+echo   %FONT_APK%
 echo.
-echo Copy this APK to your Android device and install it.
+echo Copy any APK to your Android device and install it.
 if not defined CI if not defined TRG_NO_PAUSE (
     if exist "%WINDIR%\explorer.exe" start "" explorer.exe /select,"%APK%"
 )
