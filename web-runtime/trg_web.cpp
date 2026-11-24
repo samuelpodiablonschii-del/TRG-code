@@ -14,10 +14,16 @@
 
 #include <emscripten.h>
 
-EM_JS(char*, trg_web_prompt, (), {
-    if (typeof globalThis.prompt !== "function") return 0;
-    const value = globalThis.prompt("TRG asks for input");
-    if (value === null) return 0;
+EM_ASYNC_JS(char*, trg_web_prompt, (), {
+    const answer = await new Promise(resolve => {
+        if (typeof globalThis.trgCompilerRequestInput !== "function") {
+            resolve(null);
+            return;
+        }
+        globalThis.trgCompilerRequestInput(resolve);
+    });
+    if (answer === null || answer === undefined) return 0;
+    const value = String(answer);
     const size = lengthBytesUTF8(value) + 1;
     const pointer = _malloc(size);
     if (!pointer) return 0;
