@@ -20,6 +20,7 @@
 #include <QSpinBox>
 #include <QSplitter>
 #include <QStatusBar>
+#include <QToolBar>
 #include <QVBoxLayout>
 #include <QWidget>
 
