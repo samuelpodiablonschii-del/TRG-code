@@ -183,7 +183,7 @@ static void trgEmitUiSnapshot() {
     }
     json << "]}";
     const std::string snapshot = json.str();
-    const std::string taggedSnapshot = std::string("\\x1eTRG_UI:") + snapshot;
+    const std::string taggedSnapshot = std::string("\x1eTRG_UI:") + snapshot;
     trg_web_emit_output(taggedSnapshot.c_str());
 }
 
