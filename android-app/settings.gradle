@@ -16,3 +16,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "TRGStudio"
 include(":app")
+include(":photoeditor")
+project(":photoeditor").projectDir = file("../apps/photo-editor/android")
+include(":fontmaker")
+project(":fontmaker").projectDir = file("../apps/font-maker/android")
