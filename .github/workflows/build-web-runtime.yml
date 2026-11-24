@@ -64,17 +64,18 @@ jobs:
           const module = await createTRGModule({
             locateFile: name => new URL(name, import.meta.url).href
           });
+          module.FS_createDataFile("/", "pixel.png", new Uint8Array(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/pXcAAAAASUVORK5CYII=", "base64")), true, true, true);
           module.ccall("trg_web_run", null, ["string"], [
-            'add (ui)\nblock x 10 y 15 w 30 h 20 color #8B5CF6 name panel\ntext "TRG preview" x 10 y 42 size 6 color #FFFFFF\nsay "TRG WebAssembly smoke test passed"'
+            'add (ui)\nblock x 10 y 15 w 30 h 20 color #8B5CF6 name panel\nsprite sample "pixel.png" x 50 y 50 w 10 h 10\ntext "TRG preview" x 10 y 42 size 6 color #FFFFFF\nsay "TRG WebAssembly smoke test passed"'
           ]);
           if (!output.includes("TRG WebAssembly smoke test passed")) {
             throw new Error("The interpreter did not return the expected output: " + output);
           }
-          if (!ui || ui.blocks?.length !== 1 || ui.texts?.length !== 1) {
+          if (!ui || ui.blocks?.length !== 1 || ui.sprites?.length !== 1 || ui.texts?.length !== 1 || !ui.sprites[0].data.startsWith("data:image/png;base64,")) {
             throw new Error("The UI preview bridge did not return the expected block and text: " + JSON.stringify(ui));
           }
           console.log(output.trim());
-          console.log("UI preview smoke test passed: " + ui.blocks.length + " block, " + ui.texts.length + " text.");
+          console.log("UI preview smoke test passed: " + ui.blocks.length + " block, " + ui.sprites.length + " sprite, " + ui.texts.length + " text.");
           EOF
           node "$RUNNER_TEMP/trg-web-runtime/smoke-test.mjs"
 
