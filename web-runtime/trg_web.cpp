@@ -109,6 +109,8 @@ static std::string trgNumber(double value) {
     return stream.str();
 }
 
+static std::string trgUiSnapshotJson;
+
 static void trgEmitUiSnapshot() {
     std::ostringstream json;
     json << "{\"blocks\":[";
@@ -182,12 +184,14 @@ static void trgEmitUiSnapshot() {
              << ",\"visible\":" << (item.visible ? "true" : "false") << '}';
     }
     json << "]}";
-    const std::string snapshot = json.str();
-    const std::string taggedSnapshot = std::string("\x1eTRG_UI:") + snapshot;
-    trg_web_emit_output(taggedSnapshot.c_str());
+    trgUiSnapshotJson = json.str();
 }
 
 extern "C" {
+EMSCRIPTEN_KEEPALIVE const char* trg_web_get_ui_snapshot() {
+    return trgUiSnapshotJson.c_str();
+}
+
 EMSCRIPTEN_KEEPALIVE void trg_web_run(const char* source) {
     std::ostringstream capturedOutput;
     TrgBrowserInputBuffer browserInput;
