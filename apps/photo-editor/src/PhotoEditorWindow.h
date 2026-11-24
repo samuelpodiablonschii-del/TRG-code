@@ -2,6 +2,7 @@
 
 #include <QImage>
 #include <QMainWindow>
+#include <QString>
 #include <QVector>
 
 class QLabel;
