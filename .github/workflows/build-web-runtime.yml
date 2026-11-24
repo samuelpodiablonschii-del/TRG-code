@@ -58,8 +58,12 @@ jobs:
 
           let output = "";
           let ui = null;
-          globalThis.trgCompilerAppendOutput = value => { output += String(value ?? ""); };
-          globalThis.trgCompilerSetUi = value => { ui = JSON.parse(String(value)); };
+          globalThis.trgCompilerAppendOutput = value => {
+            const chunk = String(value ?? "");
+            const marker = String.fromCharCode(30) + "TRG_UI:";
+            if (chunk.startsWith(marker)) ui = JSON.parse(chunk.slice(marker.length));
+            else output += chunk;
+          };
 
           const module = await createTRGModule({
             locateFile: name => new URL(name, import.meta.url).href
