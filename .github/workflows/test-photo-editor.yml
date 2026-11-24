@@ -17,6 +17,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: trg-creative-apps-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   photo-editor-core:
     runs-on: ubuntu-latest
