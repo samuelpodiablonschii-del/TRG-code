@@ -1,14 +1,16 @@
-name: Test TRG Photo Editor image core
+name: Test TRG application C++ cores
 
 on:
   push:
     branches: [main]
     paths:
       - "apps/photo-editor/**"
+      - "apps/font-maker/**"
       - ".github/workflows/test-photo-editor.yml"
   pull_request:
     paths:
       - "apps/photo-editor/**"
+      - "apps/font-maker/**"
       - ".github/workflows/test-photo-editor.yml"
   workflow_dispatch:
 
@@ -16,17 +18,26 @@ permissions:
   contents: read
 
 jobs:
-  image-core:
+  photo-editor-core:
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
         uses: actions/checkout@v4
-
-      - name: Configure C++ project
+      - name: Configure photo editor core
         run: cmake -S apps/photo-editor -B build/photo-editor -DCMAKE_BUILD_TYPE=Release -DTRG_PHOTO_EDITOR_BUILD_UI=OFF
-
-      - name: Build image core and tests
+      - name: Build photo editor core
         run: cmake --build build/photo-editor --parallel
-
-      - name: Run image operation tests
+      - name: Test photo editor operations
         run: ctest --test-dir build/photo-editor --output-on-failure
+
+  font-maker-core:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Configure font maker core
+        run: cmake -S apps/font-maker -B build/font-maker -DCMAKE_BUILD_TYPE=Release -DTRG_FONT_MAKER_BUILD_UI=OFF
+      - name: Build font maker core
+        run: cmake --build build/font-maker --parallel
+      - name: Test TrueType export
+        run: ctest --test-dir build/font-maker --output-on-failure
