@@ -1,0 +1,32 @@
+name: Test TRG Photo Editor image core
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/photo-editor/**"
+      - ".github/workflows/test-photo-editor.yml"
+  pull_request:
+    paths:
+      - "apps/photo-editor/**"
+      - ".github/workflows/test-photo-editor.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  image-core:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Configure C++ project
+        run: cmake -S apps/photo-editor -B build/photo-editor -DCMAKE_BUILD_TYPE=Release -DTRG_PHOTO_EDITOR_BUILD_UI=OFF
+
+      - name: Build image core and tests
+        run: cmake --build build/photo-editor --parallel
+
+      - name: Run image operation tests
+        run: ctest --test-dir build/photo-editor --output-on-failure
