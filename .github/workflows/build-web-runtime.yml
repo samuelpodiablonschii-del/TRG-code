@@ -1,0 +1,89 @@
+name: Build TRG WebAssembly runtime
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "TRG.cpp"
+      - "EditorSources.h"
+      - "web-runtime/**"
+      - ".github/workflows/build-web-runtime.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Compile and publish browser runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout TRG source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Install Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.64
+
+      - name: Compile the official C++ interpreter
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/trg-web-runtime"
+          em++ web-runtime/trg_web.cpp -I. -std=c++17 -O2 -fexceptions \
+            -o "$RUNNER_TEMP/trg-web-runtime/trg-runtime.js" \
+            --no-entry \
+            -sEXPORT_ES6=1 \
+            -sMODULARIZE=1 \
+            -sEXPORT_NAME=createTRGModule \
+            -sENVIRONMENT=web,node \
+            -sNO_EXIT_RUNTIME=1 \
+            -sALLOW_MEMORY_GROWTH=1 \
+            -sFILESYSTEM=1 \
+            -sFORCE_FILESYSTEM=1 \
+            -sDISABLE_EXCEPTION_CATCHING=0 \
+            -s'EXPORTED_FUNCTIONS=["_trg_web_run","_malloc","_free"]' \
+            -s'EXPORTED_RUNTIME_METHODS=["ccall","lengthBytesUTF8","stringToUTF8","UTF8ToString"]'
+
+      - name: Smoke-test the compiled TRG runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/trg-web-runtime/smoke-test.mjs" <<'EOF'
+          import createTRGModule from "./trg-runtime.js";
+
+          let output = "";
+          globalThis.trgCompilerAppendOutput = value => { output += String(value ?? ""); };
+
+          const module = await createTRGModule({
+            locateFile: name => new URL(name, import.meta.url).href
+          });
+          module.ccall("trg_web_run", null, ["string"], ['say "TRG WebAssembly smoke test passed"']);
+          if (!output.includes("TRG WebAssembly smoke test passed")) {
+            throw new Error("The interpreter did not return the expected output: " + output);
+          }
+          console.log(output.trim());
+          EOF
+          node "$RUNNER_TEMP/trg-web-runtime/smoke-test.mjs"
+
+      - name: Publish tested runtime to the web-runtime branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --orphan web-runtime
+          git rm -rf . >/dev/null 2>&1 || true
+          mkdir -p compiler
+          cp "$RUNNER_TEMP/trg-web-runtime/trg-runtime.js" compiler/
+          cp "$RUNNER_TEMP/trg-web-runtime/trg-runtime.wasm" compiler/
+          cat > README.md <<'EOF'
+          Generated TRG browser runtime. Built from the official TRG C++ interpreter by GitHub Actions.
+          EOF
+          git add compiler README.md
+          git commit -m "Publish tested TRG WebAssembly runtime"
+          git push --force origin web-runtime
