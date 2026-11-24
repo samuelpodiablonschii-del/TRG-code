@@ -25,11 +25,12 @@ option(TRG_PHOTO_EDITOR_BUILD_UI "Build the Qt desktop/mobile application" ON)
 if(TRG_PHOTO_EDITOR_BUILD_UI)
     find_package(Qt6 6.5 QUIET COMPONENTS Core Gui Widgets)
     if(Qt6_FOUND)
-        add_executable(TRGPhotoEditor
+        qt_add_executable(TRGPhotoEditor
             src/main.cpp
             src/PhotoEditorWindow.cpp
             src/PhotoEditorWindow.h
         )
+        set_target_properties(TRGPhotoEditor PROPERTIES QT_ANDROID_PACKAGE_NAME "com.techrivergames.trgphotoeditor")
         target_link_libraries(TRGPhotoEditor PRIVATE
             trg_photo_core
             Qt6::Core
