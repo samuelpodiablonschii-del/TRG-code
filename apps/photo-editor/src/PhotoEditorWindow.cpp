@@ -14,6 +14,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QScreen>
 #include <QSlider>
 #include <QSplitter>
 #include <QStatusBar>
