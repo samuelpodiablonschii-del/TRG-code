@@ -7,6 +7,10 @@
 #include <iterator>
 #include <string>
 #include <vector>
+#ifdef TRG_FONT_TEST_FREETYPE
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#endif
 
 using namespace trg::font;
 
@@ -49,6 +53,17 @@ int main() {
     assert(raw.find("glyf") != std::string::npos);
     assert(raw.find("head") != std::string::npos);
     assert(raw.find("name") != std::string::npos);
+
+#ifdef TRG_FONT_TEST_FREETYPE
+    FT_Library library = nullptr;
+    FT_Face face = nullptr;
+    assert(FT_Init_FreeType(&library) == 0);
+    assert(FT_New_Face(library, path.c_str(), 0, &face) == 0);
+    assert(FT_Get_Char_Index(face, 65) != 0);
+    assert(FT_Load_Char(face, 65, FT_LOAD_NO_SCALE) == 0);
+    FT_Done_Face(face);
+    FT_Done_FreeType(library);
+#endif
 
     std::remove(path.c_str());
     std::cout << "TRG Font Maker TrueType export tests passed.\n";
