@@ -46,7 +46,7 @@ jobs:
             -sFILESYSTEM=1 \
             -sFORCE_FILESYSTEM=1 \
             -sDISABLE_EXCEPTION_CATCHING=0 \
-            -s'EXPORTED_FUNCTIONS=["_trg_web_run","_malloc","_free"]' \
+            -s'EXPORTED_FUNCTIONS=["_trg_web_run","_trg_web_get_ui_snapshot","_malloc","_free"]' \
             -s'EXPORTED_RUNTIME_METHODS=["ccall","lengthBytesUTF8","stringToUTF8","UTF8ToString"]'
 
       - name: Smoke-test the compiled TRG runtime
@@ -57,13 +57,7 @@ jobs:
           import createTRGModule from "./trg-runtime.js";
 
           let output = "";
-          let ui = null;
-          globalThis.trgCompilerAppendOutput = value => {
-            const chunk = String(value ?? "");
-            const marker = String.fromCharCode(30) + "TRG_UI:";
-            if (chunk.startsWith(marker)) ui = JSON.parse(chunk.slice(marker.length));
-            else output += chunk;
-          };
+          globalThis.trgCompilerAppendOutput = value => { output += String(value ?? ""); };
 
           const module = await createTRGModule({
             locateFile: name => new URL(name, import.meta.url).href
@@ -72,6 +66,8 @@ jobs:
           module.ccall("trg_web_run", null, ["string"], [
             'add (ui)\nblock x 10 y 15 w 30 h 20 color #8B5CF6 name panel\nsprite sample "pixel.png" x 50 y 50 w 10 h 10\ntext "TRG preview" x 10 y 42 size 6 color #FFFFFF\nsay "TRG WebAssembly smoke test passed"'
           ]);
+          const uiPointer = module.ccall("trg_web_get_ui_snapshot", "number", [], []);
+          const ui = JSON.parse(module.UTF8ToString(uiPointer));
           if (!output.includes("TRG WebAssembly smoke test passed")) {
             throw new Error("The interpreter did not return the expected output: " + output);
           }
