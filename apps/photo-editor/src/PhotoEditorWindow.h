@@ -33,7 +33,7 @@ private:
     void setImage(const QImage& image, bool recordHistory = true);
     void refreshCanvas();
     void refreshHistoryActions();
-    void applyImageOperation(const char* label, const QImage& (*operation)(const QImage&));
+    void applyImageOperation(const char* label, QImage (*operation)(const QImage&));
     void applyAdjustments();
     void cropImage();
     void undo();
