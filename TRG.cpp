@@ -978,7 +978,7 @@ void showDesktopDictionary(HWND owner) {
         L"  show VALUE...             Alias for say\r\n"
         L"  ask PROMPT VARIABLE       Read a value from the terminal input line\r\n\r\n"
         L"VARIABLES AND TYPES\r\n"
-        L"  let NAME = VALUE          Declare a value\r\n"
+        L"  var NAME = VALUE          Declare a value\r\n"
         L"  num NAME = EXPRESSION     Number\r\n"
         L"  word NAME = TEXT          String\r\n"
         L"  toggle NAME = true|false  Boolean\r\n"
@@ -1180,7 +1180,7 @@ void showDesktopDictionary(HWND owner) {
         L"  add (accessibility) (time) (convert) (stats) (units) (all)\r\n"
         L"  Most library declarations apply to the whole file and belong at the top.\r\n\r\n"
         L"COMMAND INDEX\r\n"
-        L"  let num word toggle color list default register registry dictionary\r\n"
+        L"  var let num word toggle color list default register registry dictionary\r\n"
         L"  if else loop for each every wait break continue stop define call return\r\n"
         L"  say print show ask add run create set increase decrease move\r\n"
         L"  add subtract multiply divide random math stats units convert time\r\n"
@@ -3203,7 +3203,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             for (const std::string& bodyLine : uf.body) {
                 const auto declaration = tokenize(trim(bodyLine));
                 if (declaration.size() >= 2 &&
-                    (declaration[0] == "let" || declaration[0] == "word" ||
+                    (declaration[0] == "let" || declaration[0] == "var" || declaration[0] == "word" ||
                      declaration[0] == "num" || declaration[0] == "toggle" ||
                      declaration[0] == "color" || declaration[0] == "list" ||
                      declaration[0] == "dictionary")) {
@@ -4889,26 +4889,26 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
         }
 
         
-        // Beginner-friendly inferred variable declaration: let name = value.
-        if (cmd == "let") {
+        // Beginner-friendly inferred variable declaration: var name = value.
+        if (cmd == "let" || cmd == "var") {
             if (tokens.size() < 4 || !validName(tokens[1])) {
-                reportError(i + 1, "use let NAME = VALUE", "let");
+                reportError(i + 1, "use var NAME = VALUE", "var");
                 continue;
             }
             const std::size_t namePos = positionAfterArgument(line, tokens[1]);
             if (namePos == std::string::npos) {
-                reportError(i + 1, "let needs a variable name", tokens[1]);
+                reportError(i + 1, "var needs a variable name", tokens[1]);
                 continue;
             }
             std::string rawValue = trim(line.substr(namePos));
             if (!rawValue.empty() && rawValue.front() == '=') rawValue = trim(rawValue.substr(1));
             if (rawValue.empty()) {
-                reportError(i + 1, "let needs a value", tokens[1]);
+                reportError(i + 1, "var needs a value", tokens[1]);
                 continue;
             }
             const std::string name = tokens[1];
             const std::vector<std::string> valueTokens = tokenize(rawValue);
-            if (valueTokens.empty()) { reportError(i + 1, "let needs a value", name); continue; }
+            if (valueTokens.empty()) { reportError(i + 1, "var needs a value", name); continue; }
             const std::string first = lower(valueTokens[0]);
             double number = 0;
             if (first == "true" || first == "false") {
@@ -8369,7 +8369,7 @@ void applyEditorSyntaxHighlighting() {
     SendMessageW(codeEditor, EM_SETSEL, 0, length);
     SendMessageW(codeEditor, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&base));
     static const std::unordered_set<std::wstring> keywords = {
-        L"let",L"num",L"word",L"toggle",L"color",L"list",L"record",L"struct",L"class",L"new",
+        L"var",L"let",L"num",L"word",L"toggle",L"color",L"list",L"record",L"struct",L"class",L"new",
         L"if",L"else",L"loop",L"every",L"wait",L"break",L"stop",L"exit",L"continue",L"return",
         L"function",L"define",L"call",L"for",L"each",L"group",L"hide",L"show",
         L"say",L"print",L"ask",L"random",L"add",L"create",L"run",L"json",L"database",L"table",
