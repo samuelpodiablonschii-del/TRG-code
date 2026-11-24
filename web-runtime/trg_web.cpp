@@ -38,12 +38,26 @@ EM_JS(void, trg_web_emit_output, (const char* value), {
     }
 });
 
+static std::ostringstream* trgActiveCapturedOutput = nullptr;
+static std::size_t trgEmittedOutputSize = 0;
+
+static void trg_web_flush_captured_output() {
+    if (!trgActiveCapturedOutput) return;
+    const std::string output = trgActiveCapturedOutput->str();
+    if (output.size() <= trgEmittedOutputSize) return;
+    const std::string pending = output.substr(trgEmittedOutputSize);
+    trgEmittedOutputSize = output.size();
+    trg_web_emit_output(pending.c_str());
+}
+
 class TrgBrowserInputBuffer final : public std::streambuf {
 public:
     int_type underflow() override {
         if (gptr() && gptr() < egptr()) {
             return traits_type::to_int_type(*gptr());
         }
+        std::cout.flush();
+        trg_web_flush_captured_output();
         char* answer = trg_web_prompt();
         if (!answer) return traits_type::eof();
         pending_.assign(answer);
@@ -201,6 +215,8 @@ EMSCRIPTEN_KEEPALIVE const char* trg_web_get_ui_snapshot() {
 EMSCRIPTEN_KEEPALIVE void trg_web_run(const char* source) {
     std::ostringstream capturedOutput;
     TrgBrowserInputBuffer browserInput;
+    trgActiveCapturedOutput = &capturedOutput;
+    trgEmittedOutputSize = 0;
     std::streambuf* previousOutput = std::cout.rdbuf(capturedOutput.rdbuf());
     std::streambuf* previousInput = std::cin.rdbuf(&browserInput);
     std::cout.clear();
@@ -218,13 +234,13 @@ EMSCRIPTEN_KEEPALIVE void trg_web_run(const char* source) {
     }
 
     std::cout.flush();
+    trg_web_flush_captured_output();
+    trgActiveCapturedOutput = nullptr;
     std::cin.clear();
     std::cin.rdbuf(previousInput);
     std::cout.clear();
     std::cout.rdbuf(previousOutput);
 
-    const std::string output = capturedOutput.str();
-    trg_web_emit_output(output.c_str());
     trgEmitUiSnapshot();
 }
 }
