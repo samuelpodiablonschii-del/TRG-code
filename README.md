@@ -68,7 +68,7 @@ text "TRG Studio" x 8 y 10 size 8 color #FFFFFF
 
 ## Learn TRG the easy way
 
-You can start coding without learning variable types first. TRG figures out the type when you use `let`.
+You can start coding without learning variable types first. TRG infers the value type when you use `var` (`let` remains accepted as a legacy alias).
 
 Your first program:
 
@@ -84,7 +84,7 @@ say "New score:" score
 ```
 
 That's the basics:
-- `let` creates a variable. Numbers, text, and true/false values are detected automatically.
+- `var` creates a variable. Numbers, text, and true/false values are detected automatically. The older `let` spelling remains supported.
 - `say` displays something. It is the easy-to-remember version of `say`.
 - `ask` asks the user a question and stores their answer.
 - `if` checks something; `else` runs when it is not true.
@@ -94,7 +94,7 @@ That's the basics:
 A small interactive program:
 
 ```text
-let name = "there"
+var name = "there"
 ask "What is your name?" name
 
 if name = "Sam" (
