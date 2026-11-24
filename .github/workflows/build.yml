@@ -8,8 +8,6 @@ on:
       - "android-app/**"
       - "apps/photo-editor/android/**"
       - "apps/font-maker/android/**"
-      - "apps/photo-editor/android/**"
-      - "apps/font-maker/android/**"
       - "build-apk.bat"
       - "TRG.cpp"
       - "EditorSources.h"
@@ -18,6 +16,8 @@ on:
     branches: [main]
     paths:
       - "android-app/**"
+      - "apps/photo-editor/android/**"
+      - "apps/font-maker/android/**"
       - "build-apk.bat"
       - "TRG.cpp"
       - ".github/workflows/build.yml"
