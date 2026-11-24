@@ -55,11 +55,11 @@ static void trg_web_remove_completion_message() {
     std::string output = trgActiveCapturedOutput->str();
     if (output.empty()) return;
     const std::size_t previousNewline = output.size() > 1
-        ? output.find_last_of('\\n', output.size() - 2)
+        ? output.find_last_of('\n', output.size() - 2)
         : std::string::npos;
     const std::size_t lineStart = previousNewline == std::string::npos ? 0 : previousNewline + 1;
     const std::string finalLine = output.substr(lineStart);
-    const bool normalCompletion = finalLine == "Program finished.\\n" || finalLine == "Program finished.";
+    const bool normalCompletion = finalLine == "Program finished.\n" || finalLine == "Program finished.";
     const bool errorCompletion = finalLine.rfind("Program finished with ", 0) == 0 &&
         finalLine.find(" error(s).") != std::string::npos;
     if (normalCompletion || errorCompletion) {
