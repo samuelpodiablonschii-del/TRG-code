@@ -51,7 +51,7 @@ jobs:
       - name: Install Qt 6 development packages
         run: |
           sudo apt-get update
-          sudo apt-get install -y qt6-base-dev
+          sudo apt-get install -y qt6-base-dev libfreetype-dev
       - name: Configure Photo Editor
         run: cmake -S apps/photo-editor -B build/photo-editor-qt -DCMAKE_BUILD_TYPE=Release -DTRG_PHOTO_EDITOR_BUILD_UI=ON
       - name: Build Photo Editor
