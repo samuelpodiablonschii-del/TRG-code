@@ -3,6 +3,7 @@
 #include "FontProject.h"
 
 #include <QWidget>
+#include <QRectF>
 
 #include <functional>
 
