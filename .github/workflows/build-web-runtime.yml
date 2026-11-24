@@ -57,7 +57,9 @@ jobs:
           import createTRGModule from "./trg-runtime.js";
 
           let output = "";
+          let ui = null;
           globalThis.trgCompilerAppendOutput = value => { output += String(value ?? ""); };
+          globalThis.trgCompilerSetUi = value => { ui = JSON.parse(String(value)); };
 
           const module = await createTRGModule({
             locateFile: name => new URL(name, import.meta.url).href
