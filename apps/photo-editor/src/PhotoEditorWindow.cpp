@@ -13,6 +13,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QPixmap>
 #include <QScrollArea>
 #include <QScreen>
 #include <QSlider>
@@ -250,16 +251,17 @@ void PhotoEditorWindow::openImage() {
         return;
     }
     setImage(loaded);
+    currentPath_ = path;
     statusBar()->showMessage(tr("Opened %1").arg(QFileInfo(path).fileName()), 5000);
 }
 
 void PhotoEditorWindow::saveImage() {
     if (image_.isNull()) return;
-    if (image_.text(QStringLiteral("trg.filePath")).isEmpty()) {
+    if (currentPath_.isEmpty()) {
         saveImageAs();
         return;
     }
-    const QString path = image_.text(QStringLiteral("trg.filePath"));
+    const QString path = currentPath_;
     if (!image_.save(path)) QMessageBox::warning(this, tr("Save failed"), tr("The image could not be saved."));
     else statusBar()->showMessage(tr("Saved %1").arg(QFileInfo(path).fileName()), 4000);
 }
@@ -273,7 +275,7 @@ void PhotoEditorWindow::saveImageAs() {
         QMessageBox::warning(this, tr("Save failed"), tr("The image could not be saved in that format."));
         return;
     }
-    image_.setText(QStringLiteral("trg.filePath"), path);
+    currentPath_ = path;
     statusBar()->showMessage(tr("Saved %1").arg(QFileInfo(path).fileName()), 4000);
 }
 
@@ -297,7 +299,6 @@ void PhotoEditorWindow::refreshCanvas() {
     );
     imageView_->setPixmap(QPixmap::fromImage(image_).scaled(displaySize, Qt::KeepAspectRatio, Qt::FastTransformation));
     imageView_->resize(displaySize);
-    imageInfo_ = imageView_;
     imageView_->setToolTip(tr("%1 × %2 pixels · %3% zoom").arg(image_.width()).arg(image_.height()).arg(zoom));
     statusBar()->showMessage(tr("%1 × %2 px · %3% zoom").arg(image_.width()).arg(image_.height()).arg(zoom));
     if (layerList_ && layerList_->count() > 0) {
