@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 FontCanvas::FontCanvas(QWidget* parent) : QWidget(parent) {
     setMinimumSize(300, 300);
