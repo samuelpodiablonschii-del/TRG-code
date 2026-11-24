@@ -42,7 +42,7 @@ int main() {
     assert(gray.at(0, 0).a == source.at(0, 0).a);
 
     const ImageBuffer inverted = source.inverted();
-    assert(inverted.at(0, 0) == Pixel{0, 255, 255, 17});
+    assert((inverted.at(0, 0) == Pixel{0, 255, 255, 17}));
 
     const ImageBuffer cropped = source.cropped(1, 0, 1, 2);
     assert(cropped.width() == 1 && cropped.height() == 2);
