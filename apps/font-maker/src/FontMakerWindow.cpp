@@ -15,6 +15,7 @@
 #include <QPushButton>
 #include <QSaveFile>
 #include <QScrollArea>
+#include <QScreen>
 #include <QSpinBox>
 #include <QSplitter>
 #include <QStatusBar>
