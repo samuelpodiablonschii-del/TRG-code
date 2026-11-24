@@ -1,5 +1,7 @@
 #include <cstdlib>
 #include <iomanip>
+#include <fstream>
+#include <iterator>
 #include <iostream>
 #include <sstream>
 #include <streambuf>
@@ -76,6 +78,37 @@ static std::string trgJsonEscape(const std::string& value) {
     return result;
 }
 
+static std::string trgBase64(const std::string& bytes) {
+    static const char alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string output;
+    output.reserve(((bytes.size() + 2) / 3) * 4);
+    for (std::size_t i = 0; i < bytes.size(); i += 3) {
+        const unsigned a = static_cast<unsigned char>(bytes[i]);
+        const unsigned b = i + 1 < bytes.size() ? static_cast<unsigned char>(bytes[i + 1]) : 0;
+        const unsigned d = i + 2 < bytes.size() ? static_cast<unsigned char>(bytes[i + 2]) : 0;
+        const unsigned value = (a << 16) | (b << 8) | d;
+        output += alphabet[(value >> 18) & 63];
+        output += alphabet[(value >> 12) & 63];
+        output += i + 1 < bytes.size() ? alphabet[(value >> 6) & 63] : '=';
+        output += i + 2 < bytes.size() ? alphabet[value & 63] : '=';
+    }
+    return output;
+}
+
+static std::string trgSpriteData(const UiSprite& sprite) {
+    std::ifstream input(sprite.path, std::ios::binary);
+    if (!input) return {};
+    std::string bytes((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+    if (bytes.empty() || bytes.size() > 2 * 1024 * 1024) return {};
+    std::string extension = std::filesystem::path(sprite.path).extension().u8string();
+    std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+    std::string mime = extension == ".jpg" || extension == ".jpeg" ? "image/jpeg" :
+                       extension == ".webp" ? "image/webp" :
+                       extension == ".gif" ? "image/gif" :
+                       extension == ".svg" ? "image/svg+xml" : "image/png";
+    return "data:" + mime + ";base64," + trgBase64(bytes);
+}
+
 static std::string trgNumber(double value) {
     std::ostringstream stream;
     stream << std::setprecision(10) << value;
@@ -100,6 +133,21 @@ static void trgEmitUiSnapshot() {
              << "\",\"opacity\":" << trgNumber(item.opacity)
              << ",\"angle\":" << trgNumber(item.angle)
              << ",\"visible\":" << (item.visible ? "true" : "false") << '}';
+    }
+    json << "],\"sprites\":[";
+    first = true;
+    for (const auto& item : uiSprites) {
+        if (!first) json << ',';
+        first = false;
+        json << "{\"name\":\"" << trgJsonEscape(item.name)
+             << "\",\"group\":\"" << trgJsonEscape(item.group)
+             << "\",\"x\":" << trgNumber(item.x)
+             << ",\"y\":" << trgNumber(item.y)
+             << ",\"width\":" << trgNumber(item.width)
+             << ",\"height\":" << trgNumber(item.height)
+             << ",\"opacity\":" << trgNumber(item.opacity)
+             << ",\"visible\":" << (item.visible ? "true" : "false")
+             << ",\"data\":\"" << trgJsonEscape(trgSpriteData(item)) << "\"}";
     }
     json << "],\"texts\":[";
     first = true;
