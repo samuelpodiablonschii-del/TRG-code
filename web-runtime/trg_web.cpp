@@ -50,6 +50,26 @@ static void trg_web_flush_captured_output() {
     trg_web_emit_output(pending.c_str());
 }
 
+static void trg_web_remove_completion_message() {
+    if (!trgActiveCapturedOutput) return;
+    std::string output = trgActiveCapturedOutput->str();
+    if (output.empty()) return;
+    const std::size_t previousNewline = output.size() > 1
+        ? output.find_last_of('\\n', output.size() - 2)
+        : std::string::npos;
+    const std::size_t lineStart = previousNewline == std::string::npos ? 0 : previousNewline + 1;
+    const std::string finalLine = output.substr(lineStart);
+    const bool normalCompletion = finalLine == "Program finished.\\n" || finalLine == "Program finished.";
+    const bool errorCompletion = finalLine.rfind("Program finished with ", 0) == 0 &&
+        finalLine.find(" error(s).") != std::string::npos;
+    if (normalCompletion || errorCompletion) {
+        output.erase(lineStart);
+        trgActiveCapturedOutput->str(output);
+        trgActiveCapturedOutput->clear();
+        trgEmittedOutputSize = std::min(trgEmittedOutputSize, output.size());
+    }
+}
+
 class TrgBrowserInputBuffer final : public std::streambuf {
 public:
     int_type underflow() override {
@@ -234,6 +254,7 @@ EMSCRIPTEN_KEEPALIVE void trg_web_run(const char* source) {
     }
 
     std::cout.flush();
+    trg_web_remove_completion_message();
     trg_web_flush_captured_output();
     trgActiveCapturedOutput = nullptr;
     std::cin.clear();
