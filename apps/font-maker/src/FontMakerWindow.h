@@ -5,6 +5,8 @@
 
 #include <QMainWindow>
 
+using trg::font::FontProject;
+
 class QLabel;
 class QLineEdit;
 class QListWidget;
