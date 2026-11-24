@@ -1,4 +1,4 @@
-name: Test TRG application C++ cores
+name: Test TRG creative applications
 
 on:
   push:
@@ -21,8 +21,7 @@ jobs:
   photo-editor-core:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out source
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       - name: Configure photo editor core
         run: cmake -S apps/photo-editor -B build/photo-editor -DCMAKE_BUILD_TYPE=Release -DTRG_PHOTO_EDITOR_BUILD_UI=OFF
       - name: Build photo editor core
@@ -33,11 +32,30 @@ jobs:
   font-maker-core:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out source
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       - name: Configure font maker core
         run: cmake -S apps/font-maker -B build/font-maker -DCMAKE_BUILD_TYPE=Release -DTRG_FONT_MAKER_BUILD_UI=OFF
       - name: Build font maker core
         run: cmake --build build/font-maker --parallel
       - name: Test TrueType export
         run: ctest --test-dir build/font-maker --output-on-failure
+
+  qt-desktop-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Qt 6
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.3"
+          host: linux
+          target: desktop
+          arch: gcc_64
+      - name: Configure Photo Editor
+        run: cmake -S apps/photo-editor -B build/photo-editor-qt -DCMAKE_BUILD_TYPE=Release -DTRG_PHOTO_EDITOR_BUILD_UI=ON
+      - name: Build Photo Editor
+        run: cmake --build build/photo-editor-qt --parallel
+      - name: Configure Font Maker
+        run: cmake -S apps/font-maker -B build/font-maker-qt -DCMAKE_BUILD_TYPE=Release -DTRG_FONT_MAKER_BUILD_UI=ON
+      - name: Build Font Maker
+        run: cmake --build build/font-maker-qt --parallel
