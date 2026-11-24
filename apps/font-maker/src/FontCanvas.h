@@ -5,6 +5,9 @@
 #include <QWidget>
 #include <QRectF>
 
+using trg::font::GlyphContour;
+using trg::font::GlyphPoint;
+
 #include <functional>
 
 class FontCanvas final : public QWidget {
