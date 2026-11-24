@@ -25,13 +25,14 @@ option(TRG_FONT_MAKER_BUILD_UI "Build the Qt desktop/mobile application" ON)
 if(TRG_FONT_MAKER_BUILD_UI)
     find_package(Qt6 6.5 QUIET COMPONENTS Core Gui Widgets)
     if(Qt6_FOUND)
-        add_executable(TRGFontMaker
+        qt_add_executable(TRGFontMaker
             src/main.cpp
             src/FontMakerWindow.cpp
             src/FontMakerWindow.h
             src/FontCanvas.cpp
             src/FontCanvas.h
         )
+        set_target_properties(TRGFontMaker PROPERTIES QT_ANDROID_PACKAGE_NAME "com.techrivergames.trgfontmaker")
         target_link_libraries(TRGFontMaker PRIVATE
             trg_font_core
             Qt6::Core
