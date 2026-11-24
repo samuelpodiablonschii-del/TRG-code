@@ -17,6 +17,12 @@ add_executable(trg_font_core_tests
 )
 target_link_libraries(trg_font_core_tests PRIVATE trg_font_core)
 
+find_package(Freetype QUIET)
+if(Freetype_FOUND)
+    target_link_libraries(trg_font_core_tests PRIVATE Freetype::Freetype)
+    target_compile_definitions(trg_font_core_tests PRIVATE TRG_FONT_TEST_FREETYPE=1)
+endif()
+
 if(BUILD_TESTING)
     add_test(NAME trg_font_core_tests COMMAND trg_font_core_tests)
 endif()
