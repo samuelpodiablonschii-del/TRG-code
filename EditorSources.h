@@ -435,7 +435,6 @@ button asset_box "◆\nBox" x 3 y 85 w 17.5 h 12.2 color #302044 (
     get objects selectedIndex selectedName
     set_text model_label selectedName
     set_text rename_value selectedName
-    set_text object_count objectCount
     posX = 0
     posY = 0
     posZ = 0
@@ -457,7 +456,6 @@ button asset_sphere "●\nSphere" x 22 y 85 w 17.5 h 12.2 color #302044 (
     get objects selectedIndex selectedName
     set_text model_label selectedName
     set_text rename_value selectedName
-    set_text object_count objectCount
     posX = 0
     posY = 0
     posZ = 0
@@ -479,7 +477,6 @@ button asset_camera "◉\nCamera" x 41 y 85 w 17.5 h 12.2 color #302044 (
     get objects selectedIndex selectedName
     set_text model_label selectedName
     set_text rename_value selectedName
-    set_text object_count objectCount
     posX = 0
     posY = 0
     posZ = 0
@@ -501,7 +498,6 @@ button asset_spawn "▶\nSpawn" x 60 y 85 w 17.5 h 12.2 color #302044 (
     get objects selectedIndex selectedName
     set_text model_label selectedName
     set_text rename_value selectedName
-    set_text object_count objectCount
     posX = 0
     posY = 0
     posZ = 0
@@ -523,7 +519,6 @@ button asset_plane "◇\nPlane" x 79 y 85 w 18 h 12.2 color #302044 (
     get objects selectedIndex selectedName
     set_text model_label selectedName
     set_text rename_value selectedName
-    set_text object_count objectCount
     posX = 0
     posY = 0
     posZ = 0
