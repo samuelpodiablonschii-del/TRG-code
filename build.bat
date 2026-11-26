@@ -110,6 +110,12 @@ if errorlevel 1 (
 ) else (
     echo Updated TRG.exe successfully.
 )
+copy /Y "%OUTPUT%" "%ROOT%Runtime.exe" >nul
+if errorlevel 1 (
+    echo WARNING: Could not update Runtime.exe. Close any running TRG runtime and rebuild.
+) else (
+    echo Updated Runtime.exe successfully.
+)
 
 echo.
 echo ========================================
