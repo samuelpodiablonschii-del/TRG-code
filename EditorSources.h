@@ -285,7 +285,10 @@ button load_scene "▰  Load" x 62 y 7.1 w 18 h 4.7 color #302044 (
         set_text scale_x_value scaleX
         set_text scale_y_value scaleY
         set_text scale_z_value scaleZ
-        set_text material_value currentColor
+        if currentColor = "#8B42F5" ( set_text material_value "●  Purple" )
+        else ( if currentColor = "#438FF5" ( set_text material_value "●  Blue" )
+        else ( if currentColor = "#E2A34D" ( set_text material_value "●  Gold" )
+        else ( set_text material_value "●  Green" ) ) )
     )
     say "Scene loaded."
 )
