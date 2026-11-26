@@ -9449,13 +9449,15 @@ int runApplication(int argc, char** argv) {
         SetWindowTextW(mainWindow, ((standaloneAppMode ? L"TRG App - " : L"TRG Terminal - ") + appName).c_str());
         layoutOutputControls(mainWindow);
     }
-#endif
-    executeProgram(program);
-#if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
+    // Display the selected app window before executing user code. Programs that
+    // wait for input or run continuously must not keep their window hidden.
     if (launchingProgram && mainWindow) {
         ShowWindow(mainWindow, SW_SHOW);
         UpdateWindow(mainWindow);
     }
+#endif
+    executeProgram(program);
+#if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
     runMessageLoop();
 #endif
     return 0;
