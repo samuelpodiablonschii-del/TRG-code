@@ -1350,7 +1350,8 @@ sourceText = exampleSource;
                 } catch (JSONException ignored) { }
             }
             nativeSetMobileInput("mobile_tap", "released");
-            runOnUiThread(() -> applyState(result));
+            String finalResult = result;
+            runOnUiThread(() -> applyState(finalResult));
         });
     }
 
