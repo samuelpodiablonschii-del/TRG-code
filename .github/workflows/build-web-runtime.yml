@@ -110,6 +110,22 @@ jobs:
             throw new Error("Legacy parenthesis-block regression failed: " + output);
           }
           console.log("Legacy parenthesis block smoke test passed.");
+          
+          output = "";
+          await module.ccall("trg_web_run", null, ["string"], [
+            'add (ui)\\nadd (style)\\nstyle name glow (\\n background #171329\\n glow #A88AFF 0.8\\n radius 12\\n opacity 0.9\\n)\\nblock name panel x 10 y 10 w 40 h 20 color #FFFFFF\\nstyle apply panel glow\\nsay "TRG style library smoke test passed"'
+          ], { async: true });
+          const styledPointer = module.ccall("trg_web_get_ui_snapshot", "number", [], []);
+          const styledUi = JSON.parse(module.UTF8ToString(styledPointer));
+          if (!output.includes("TRG style library smoke test passed") ||
+              styledUi.blocks?.length !== 1 ||
+              styledUi.blocks[0].glowColor !== "#A88AFF" ||
+              Math.abs(styledUi.blocks[0].glowIntensity - 0.8) > 0.001 ||
+              Math.abs(styledUi.blocks[0].cornerRadius - 12) > 0.001) {
+            throw new Error("Style library smoke test failed: " + output + " " + JSON.stringify(styledUi));
+          }
+          console.log("TRG style library smoke test passed.");
+
           EOF
           node "$RUNNER_TEMP/trg-web-runtime/smoke-test.mjs"
 
