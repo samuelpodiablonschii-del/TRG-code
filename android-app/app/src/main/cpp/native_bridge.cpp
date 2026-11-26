@@ -306,12 +306,52 @@ Java_com_trg_studio_MainActivity_nativeSetPointer(JNIEnv*, jclass, jfloat x, jfl
     androidMobileInputs["pointer_down"] = down == JNI_TRUE ? "press" : "released";
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_trg_studio_MainActivity_nativeSetEditorSelection(JNIEnv* env, jclass, jstring nameValue) {
-    const std::string name = fromJavaString(env, nameValue);
-    if (name.empty()) return;
-    uiVariables["selectedName"] = name;
+static std::string formatEditorNumber(double value) {
+    std::ostringstream formatted;
+    formatted << std::fixed << std::setprecision(2) << value;
+    return formatted.str();
+}
+
+static void syncMobile3DInspector(const std::string& name) {
+    auto found = std::find_if(ui3DObjects.begin(), ui3DObjects.end(),
+        [&](const Ui3DObject& item) { return item.name == name; });
+    if (found == ui3DObjects.end()) return;
+
+    uiVariables["selectedName"] = found->name;
     uiTypes["selectedName"] = "word";
+    uiVariables["currentColor"] = found->color;
+    uiTypes["currentColor"] = "word";
+    uiVariables["posX"] = found->x;
+    uiVariables["posY"] = found->y;
+    uiVariables["posZ"] = found->z;
+    uiVariables["scaleX"] = found->width / 2.0;
+    uiVariables["scaleY"] = found->height / 2.0;
+    uiVariables["scaleZ"] = found->depth / 2.0;
+    for (const char* key : {"posX", "posY", "posZ", "scaleX", "scaleY", "scaleZ"})
+        uiTypes[key] = "num";
+
+    const std::string selectedLabel = found->name + " (Selected)";
+    for (UiText& item : uiTexts) {
+        if (item.name == "model_label") item.value = selectedLabel;
+        else if (item.name == "rename_value") item.value = found->name;
+        else if (item.name == "material_value") {
+            const std::string colour = found->color;
+            const std::string lowered = colour;
+            item.value = "●  " + (lowered == "#8B42F5" ? std::string("Purple") :
+                lowered == "#438FF5" ? std::string("Blue") :
+                lowered == "#E2A34D" ? std::string("Gold") :
+                lowered == "#58B985" ? std::string("Green") : colour);
+        }
+    }
+    for (UiButton& item : uiButtons) {
+        if (item.name == "pos_x") item.label = formatEditorNumber(found->x);
+        else if (item.name == "pos_y") item.label = formatEditorNumber(found->y);
+        else if (item.name == "pos_z") item.label = formatEditorNumber(found->z);
+        else if (item.name == "scale_x") item.label = formatEditorNumber(found->width / 2.0);
+        else if (item.name == "scale_y") item.label = formatEditorNumber(found->height / 2.0);
+        else if (item.name == "scale_z") item.label = formatEditorNumber(found->depth / 2.0);
+    }
+
     auto list = uiVariables.find("objects");
     if (list != uiVariables.end()) {
         if (auto* items = std::get_if<std::vector<std::string>>(&list->second.value)) {
@@ -324,6 +364,16 @@ Java_com_trg_studio_MainActivity_nativeSetEditorSelection(JNIEnv* env, jclass, j
             }
         }
     }
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_trg_studio_MainActivity_nativeSetEditorSelection(JNIEnv* env, jclass, jstring nameValue) {
+    const std::string name = fromJavaString(env, nameValue);
+    if (!name.empty()) {
+        syncMobile3DInspector(name);
+        refreshCollisionWatches(uiVariables, uiTypes);
+    }
+    return toJavaString(env, serializeState());
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -350,7 +400,10 @@ Java_com_trg_studio_MainActivity_nativeTransformEditorObject(JNIEnv* env, jclass
             item.x += dx; item.y += dy; changed = true; break;
         }
     }
-    if (changed) refreshCollisionWatches(uiVariables, uiTypes);
+    if (changed) {
+        if (kind == "3d") syncMobile3DInspector(name);
+        refreshCollisionWatches(uiVariables, uiTypes);
+    }
     return toJavaString(env, serializeState());
 }
 
