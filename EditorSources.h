@@ -302,12 +302,12 @@ block z 1 x 0.6 y 13.1 w 98.8 h 34.2 color #0C0915 edges round name VIEWPORT_PAN
 
 // Hierarchy / inspector navigation tabs.
 block z 1 x 0 y 47.7 w 100 h 5.4 color #160F23 name EDITOR_TABS
-button tab_hierarchy "▰  Hierarchy" x 1.5 y 48.2 w 48 h 4.7 color #572A9B (
+button tab_hierarchy "▰  Hierarchy" x 1.5 y 48.2 w 41 h 4.7 color #572A9B (
     set_color tab_hierarchy #572A9B
     set_color tab_inspector #281B3A
     say "Hierarchy selected. Tap a model in the viewport to select it."
 )
-button tab_inspector "⚙  Inspector" x 50.5 y 48.2 w 48 h 4.7 color #281B3A (
+button tab_inspector "⚙  Inspector" x 43.5 y 48.2 w 35.5 h 4.7 color #281B3A (
     set_color tab_hierarchy #281B3A
     set_color tab_inspector #572A9B
     say "Inspector selected. Edit the selected model below."
