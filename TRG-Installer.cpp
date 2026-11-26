@@ -271,6 +271,8 @@ void installPackage() {
         writeEmbeddedFile(uiAppResourceId, uiAppPath, L"UI-app.exe");
         writeEmbeddedFile(consoleAppResourceId, consoleAppPath, L"Console-app.exe");
         writeEmbeddedFile(checkerResourceId, checkerPath, L"Checker.exe");
+        std::error_code legacyRuntimeError;
+        std::filesystem::remove(installDirectory / L"Runtime.exe", legacyRuntimeError);
         writeEmbeddedFile(readmeResourceId, installDirectory / L"README.md", L"README.md");
         writeEmbeddedFile(iconResourceId, installDirectory / L"trg.ico", L"trg.ico");
         writeEmbeddedFile(editor2DResourceId, installDirectory / L"2DEditor.trg", L"2DEditor.trg");
