@@ -426,11 +426,27 @@ button material "▾" x 89 y 74.3 w 7 h 3.8 color #39264F (
 block z 1 x 0.7 y 80.2 w 98.6 h 19.2 color #191226 edges round name ASSET_BROWSER
 text "◆" x 4 y 83.2 size 2.0 color #A65BFF
 text "Asset Browser" x 11 y 83.2 size 1.45 color #F4ECFF bold true
-button asset_more "›" x 91.5 y 81.5 w 6 h 3.2 color #191226 (
+button asset_more "›" x 91.5 y 81.5 w 6 h 3.2 color #191226 text_color #A65BFF (
     say "The Asset Browser contains the built-in scene primitives."
 )
 
-button asset_box "◆\nBox" x 3 y 85 w 17.5 h 12.2 color #302044 (
+block z 2 x 3 y 85 w 17.5 h 12.2 color #302044 edges round name ASSET_BOX_CARD
+block z 2 x 22 y 85 w 17.5 h 12.2 color #302044 edges round name ASSET_SPHERE_CARD
+block z 2 x 41 y 85 w 17.5 h 12.2 color #302044 edges round name ASSET_CAMERA_CARD
+block z 2 x 60 y 85 w 17.5 h 12.2 color #302044 edges round name ASSET_SPAWN_CARD
+block z 2 x 79 y 85 w 18 h 12.2 color #302044 edges round name ASSET_PLANE_CARD
+text asset_box_icon "◆" x 11.75 y 92.5 size 5.0 color #A65BFF align center
+text asset_sphere_icon "●" x 30.75 y 92.5 size 5.0 color #A65BFF align center
+text asset_camera_icon "◉" x 49.75 y 92.5 size 5.0 color #D5D3E2 align center
+text asset_spawn_icon "▶" x 68.75 y 92.5 size 5.0 color #58C78D align center
+text asset_plane_icon "◇" x 88 y 92.5 size 5.0 color #D5D3E2 align center
+text asset_box_label "Box" x 11.75 y 96.4 size 1.7 color #F4ECFF align center
+text asset_sphere_label "Sphere" x 30.75 y 96.4 size 1.7 color #F4ECFF align center
+text asset_camera_label "Camera" x 49.75 y 96.4 size 1.7 color #F4ECFF align center
+text asset_spawn_label "Spawn" x 68.75 y 96.4 size 1.7 color #F4ECFF align center
+text asset_plane_label "Plane" x 88 y 96.4 size 1.7 color #F4ECFF align center
+
+button asset_box "" x 3 y 85 w 17.5 h 12.2 color #302044 opacity 0 (
     3d box auto x 0 y 0 z 0 w 2 h 2 d 2 color currentColor
     push objects last_3d_object
     length objects objectCount
@@ -453,7 +469,7 @@ button asset_box "◆\nBox" x 3 y 85 w 17.5 h 12.2 color #302044 (
     set_text scale_y_value scaleY
     set_text scale_z_value scaleZ
 )
-button asset_sphere "●\nSphere" x 22 y 85 w 17.5 h 12.2 color #302044 (
+button asset_sphere "" x 22 y 85 w 17.5 h 12.2 color #302044 opacity 0 (
     3d sphere auto x 0 y 0 z 0 size 1.7 color #8B42F5
     push objects last_3d_object
     length objects objectCount
@@ -476,7 +492,7 @@ button asset_sphere "●\nSphere" x 22 y 85 w 17.5 h 12.2 color #302044 (
     set_text scale_y_value scaleY
     set_text scale_z_value scaleZ
 )
-button asset_camera "◉\nCamera" x 41 y 85 w 17.5 h 12.2 color #302044 (
+button asset_camera "" x 41 y 85 w 17.5 h 12.2 color #302044 opacity 0 (
     3d box auto x 0 y 1 z 0 w 1.1 h 0.8 d 1.4 color #8B42F5
     push objects last_3d_object
     length objects objectCount
@@ -499,7 +515,7 @@ button asset_camera "◉\nCamera" x 41 y 85 w 17.5 h 12.2 color #302044 (
     set_text scale_y_value scaleY
     set_text scale_z_value scaleZ
 )
-button asset_spawn "▶\nSpawn" x 60 y 85 w 17.5 h 12.2 color #302044 (
+button asset_spawn "" x 60 y 85 w 17.5 h 12.2 color #302044 opacity 0 (
     3d sphere auto x 0 y 0 z 0 size 1 color #58B985
     push objects last_3d_object
     length objects objectCount
@@ -522,7 +538,7 @@ button asset_spawn "▶\nSpawn" x 60 y 85 w 17.5 h 12.2 color #302044 (
     set_text scale_y_value scaleY
     set_text scale_z_value scaleZ
 )
-button asset_plane "◇\nPlane" x 79 y 85 w 18 h 12.2 color #302044 (
+button asset_plane "" x 79 y 85 w 18 h 12.2 color #302044 opacity 0 (
     3d box auto x 0 y -1 z 0 w 6 h 0.15 d 6 color #58B985
     push objects last_3d_object
     length objects objectCount
