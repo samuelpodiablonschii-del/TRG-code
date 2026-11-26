@@ -302,21 +302,17 @@ block z 1 x 0.6 y 13.1 w 98.8 h 34.2 color #0C0915 edges round name VIEWPORT_PAN
 
 // Hierarchy / inspector navigation tabs.
 block z 1 x 0 y 47.7 w 100 h 5.4 color #160F23 name EDITOR_TABS
-button tab_hierarchy "▰  Hierarchy" x 1.5 y 48.2 w 41 h 4.7 color #572A9B (
+button tab_hierarchy "▰  Hierarchy" x 1.5 y 48.2 w 48 h 4.7 color #281B3A (
     set_color tab_hierarchy #572A9B
     set_color tab_inspector #281B3A
-    if objectCount > 0 (
-        selectedIndex = selectedIndex + 1
-        if selectedIndex >= objectCount ( selectedIndex = 0 )
-        get objects selectedIndex selectedName
-        set_text model_label selectedName
-        set_text rename_value selectedName
-    )
+    hide INSPECTOR_CARD
+    show HIERARCHY_CARD
 )
-button tab_inspector "⚙  Inspector" x 43.5 y 48.2 w 35.5 h 4.7 color #281B3A (
+button tab_inspector "⚙  Inspector" x 50.5 y 48.2 w 48 h 4.7 color #572A9B (
     set_color tab_hierarchy #281B3A
     set_color tab_inspector #572A9B
-    say "Inspector selected. Edit the selected model below."
+    hide HIERARCHY_CARD
+    show INSPECTOR_CARD
 )
 
 // Inspector card, matching the reference's compact stacked form.
@@ -430,6 +426,26 @@ button material "▾" x 89 y 74.3 w 7 h 3.8 color #39264F (
     )
 )
 
+// Hierarchy view: shown when the Hierarchy tab is selected.
+block z 1 x 0.7 y 53.4 w 98.6 h 26.1 color #191226 edges round name HIERARCHY_CARD
+text "◆" x 4 y 57.3 size 2.4 color #A65BFF
+text "SCENE HIERARCHY" x 10 y 57.3 size 1.7 color #F5EEFF bold true
+block z 2 x 4 y 59.1 w 92 h 0.12 color #342447 name HIERARCHY_DIVIDER
+text "Selected object" x 4 y 62.3 size 1.35 color #D8CBEA
+block z 2 x 4 y 64 w 92 h 5.2 color #2B203D edges round name HIERARCHY_SELECTED_ROW
+text hierarchy_selected selectedName x 8 y 67.1 size 1.6 color #F1E9FF bold true
+button hierarchy_select "Select next object  ›" x 4 y 71 w 92 h 5.2 color #56368F (
+    if objectCount > 0 (
+        selectedIndex = selectedIndex + 1
+        if selectedIndex >= objectCount ( selectedIndex = 0 )
+        get objects selectedIndex selectedName
+        set_text hierarchy_selected selectedName
+        set_text model_label selectedName
+        set_text rename_value selectedName
+    )
+)
+hide HIERARCHY_CARD
+
 // Asset browser dock.
 block z 1 x 0.7 y 80.2 w 98.6 h 19.2 color #191226 edges round name ASSET_BROWSER
 text "◆" x 4 y 83.2 size 2.0 color #A65BFF
@@ -462,6 +478,7 @@ button asset_box " " x 3 y 85 w 17.5 h 12.2 color #302044 opacity 0 (
     get objects selectedIndex selectedName
     set_text model_label selectedName
     set_text rename_value selectedName
+    set_text hierarchy_selected selectedName
     posX = 0
     posY = 0
     posZ = 0
