@@ -2052,10 +2052,25 @@ sourceText = exampleSource;
                 if (bitmap != null) {
                     float[] spritePosition = animatedPosition(sprite.optString("name"),
                             (float) sprite.optDouble("x"), (float) sprite.optDouble("y"), elapsed, animations);
-                    buttonRect.set(spritePosition[0] * width / 100,
-                            spritePosition[1] * height / 100,
-                            (spritePosition[0] + (float) sprite.optDouble("w")) * width / 100,
-                            (spritePosition[1] + (float) sprite.optDouble("h")) * height / 100);
+                    float naturalWidth = Math.max(1, bitmap.getWidth());
+                    float naturalHeight = Math.max(1, bitmap.getHeight());
+                    float aspect = naturalWidth / naturalHeight;
+                    boolean autoWidth = sprite.optBoolean("autoW", false);
+                    boolean autoHeight = sprite.optBoolean("autoH", false);
+                    float drawWidth = autoWidth ? naturalWidth :
+                            (float) sprite.optDouble("w") * width / 100f;
+                    float drawHeight = autoHeight ? naturalHeight :
+                            (float) sprite.optDouble("h") * height / 100f;
+                    if (autoWidth && !autoHeight) drawWidth = drawHeight * aspect;
+                    else if (!autoWidth && autoHeight) drawHeight = drawWidth / aspect;
+                    else if (autoWidth && autoHeight) {
+                        float fit = Math.min(1f, Math.min(width / naturalWidth, height / naturalHeight));
+                        drawWidth *= fit;
+                        drawHeight *= fit;
+                    }
+                    float left = spritePosition[0] * width / 100f;
+                    float top = spritePosition[1] * height / 100f;
+                    buttonRect.set(left, top, left + drawWidth, top + drawHeight);
                     paint.setAlpha(Math.round(255 * Math.max(0f, Math.min(1f,
                             (float) sprite.optDouble("opacity", 1.0)))));
                     canvas.drawBitmap(bitmap, null, buttonRect, paint);

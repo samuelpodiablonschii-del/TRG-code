@@ -80,6 +80,8 @@ std::string serializeState() {
                << ",\"path\":" << jsonString(sprite.path)
                << ",\"x\":" << sprite.x << ",\"y\":" << sprite.y
                << ",\"w\":" << sprite.width << ",\"h\":" << sprite.height
+               << ",\"autoW\":" << (sprite.widthAuto ? "true" : "false")
+               << ",\"autoH\":" << (sprite.heightAuto ? "true" : "false")
                << ",\"opacity\":" << sprite.opacity
                << ",\"visible\":" << (sprite.visible && uiGroupIsVisible(sprite.group) ? "true" : "false") << '}';
     }
