@@ -177,6 +177,9 @@ static void trgEmitUiSnapshot() {
              << ",\"height\":" << trgNumber(item.height)
              << ",\"color\":\"" << trgJsonEscape(item.color)
              << "\",\"shape\":\"" << trgJsonEscape(item.shape)
+             << ",\"cornerRadius\":" << trgNumber(item.cornerRadius)
+             << ",\"glowColor\":\"" << trgJsonEscape(item.glowColor) << "\""
+             << ",\"glowIntensity\":" << trgNumber(item.glowIntensity)
              << "\",\"opacity\":" << trgNumber(item.opacity)
              << ",\"angle\":" << trgNumber(item.angle)
              << ",\"visible\":" << (item.visible ? "true" : "false") << '}';
