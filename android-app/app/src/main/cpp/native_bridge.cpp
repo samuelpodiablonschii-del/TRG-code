@@ -362,6 +362,14 @@ static void syncMobile3DInspector(const std::string& name) {
                     break;
                 }
             }
+        } else if (auto* items = std::get_if<VariableList>(&list->second.value)) {
+            for (std::size_t index = 0; index < items->size(); ++index) {
+                if ((*items)[index] && static_cast<std::string>(*(*items)[index]) == name) {
+                    uiVariables["selectedIndex"] = static_cast<double>(index);
+                    uiTypes["selectedIndex"] = "num";
+                    break;
+                }
+            }
         }
     }
 }
