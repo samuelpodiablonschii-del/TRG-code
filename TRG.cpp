@@ -9187,7 +9187,24 @@ bool runSourceFile(const std::filesystem::path& path) {
 #ifndef TRG_ANDROID_BRIDGE
 int runApplication(int argc, char** argv) {
 #if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
-    const bool launchingProgram = argc > 1 && lower(argv[1]) != "compile";
+    bool launchingProgram = argc > 1 && lower(argv[1]) != "compile";
+    if (argc == 1) {
+        wchar_t ownPath[32768] = {};
+        const DWORD ownLength = GetModuleFileNameW(nullptr, ownPath, 32768);
+        if (ownLength > 0 && ownLength < 32768) {
+            std::ifstream ownExecutable(std::filesystem::path(std::wstring(ownPath, ownLength)), std::ios::binary);
+            if (ownExecutable) {
+                ownExecutable.seekg(0, std::ios::end);
+                const std::streamoff ownSize = ownExecutable.tellg();
+                if (ownSize >= 16) {
+                    ownExecutable.seekg(ownSize - 8);
+                    char marker[8] = {};
+                    ownExecutable.read(marker, 8);
+                    launchingProgram = ownExecutable && std::string(marker, 8) == "TRGPKG01";
+                }
+            }
+        }
+    }
     if (!runUi(!launchingProgram)) {
         MessageBoxW(nullptr, L"Could not create the TRG window.", L"TRG error", MB_OK | MB_ICONERROR);
         return 1;
@@ -9312,6 +9329,12 @@ int runApplication(int argc, char** argv) {
         if (!file.is_open()) {
             appendOutput("ERROR Could not open \"" + scriptPath.u8string() + "\".\r\n");
 #if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
+            standaloneTerminalMode = true;
+            previewMode = true;
+            SetWindowTextW(mainWindow, L"TRG Terminal - Launch error");
+            layoutOutputControls(mainWindow);
+            ShowWindow(mainWindow, SW_SHOW);
+            UpdateWindow(mainWindow);
             runMessageLoop();
 #endif
             return 1;
@@ -9347,7 +9370,8 @@ int runApplication(int argc, char** argv) {
 
 #if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
     LibraryState launchLibraries;
-    scanLibraries(program, launchLibraries);
+    const std::vector<std::string> launchProgram = mergePrograms(program, currentSourcePath, true, true);
+    scanLibraries(launchProgram, launchLibraries);
     standaloneAppMode = launchLibraries.ui;
     standaloneTerminalMode = !launchLibraries.ui;
     previewMode = true;
