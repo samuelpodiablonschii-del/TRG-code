@@ -306,6 +306,13 @@ Java_com_trg_studio_MainActivity_nativeSetPointer(JNIEnv*, jclass, jfloat x, jfl
     androidMobileInputs["pointer_down"] = down == JNI_TRUE ? "press" : "released";
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_com_trg_studio_MainActivity_nativeSetScreenSize(JNIEnv*, jclass, jint width, jint height) {
+    trgScreenWidth = std::max(1, static_cast<int>(width));
+    trgScreenHeight = std::max(1, static_cast<int>(height));
+    refreshDisplayVariables(uiVariables, uiTypes);
+}
+
 static std::string formatEditorNumber(double value) {
     std::ostringstream formatted;
     formatted << std::fixed << std::setprecision(2) << value;

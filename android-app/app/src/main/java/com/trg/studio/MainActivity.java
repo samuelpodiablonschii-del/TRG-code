@@ -119,6 +119,7 @@ public final class MainActivity extends Activity {
     private static native String nativeClickButton(int index);
     private static native void nativeSetMobileInput(String name, String state);
     private static native void nativeSetPointer(float x, float y, boolean down);
+    private static native void nativeSetScreenSize(int width, int height);
     private static native void nativeStop();
     private static native String nativeSetEditorSelection(String name);
     private static native String nativeTransformEditorObject(String kind, String name, float dx, float dy, float dz);
@@ -1986,6 +1987,12 @@ sourceText = exampleSource;
             double rx = model.optDouble("rx"), ry = model.optDouble("ry"), rz = model.optDouble("rz");
             if (Math.abs(rx) < 0.001 && Math.abs(ry) < 0.001 && Math.abs(rz) < 0.001) return "";
             return "\n3d rotate " + name + " " + number(rx) + " " + number(ry) + " " + number(rz);
+        }
+
+        @Override
+        protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
+            super.onSizeChanged(width, height, oldWidth, oldHeight);
+            if (width > 0 && height > 0) nativeSetScreenSize(width, height);
         }
 
         @Override
