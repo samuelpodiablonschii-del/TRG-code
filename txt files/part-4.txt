@@ -612,6 +612,30 @@
                     reportError(i + 1, "3D scene contains invalid or incomplete object data", scenePath.string()); continue;
                 }
                 ui3DObjects = std::move(loadedObjects);
+                std::vector<std::string> loadedNames;
+                loadedNames.reserve(ui3DObjects.size());
+                for (const Ui3DObject& item : ui3DObjects) loadedNames.push_back(item.name);
+                variables["objects"] = std::move(loadedNames);
+                types["objects"] = "list";
+                variables["objectCount"] = static_cast<double>(ui3DObjects.size());
+                types["objectCount"] = "num";
+                variables["selectedIndex"] = 0.0;
+                types["selectedIndex"] = "num";
+                if (!ui3DObjects.empty()) {
+                    const Ui3DObject& selected = ui3DObjects.front();
+                    variables["selectedName"] = selected.name;
+                    variables["currentColor"] = selected.color;
+                    variables["posX"] = selected.x;
+                    variables["posY"] = selected.y;
+                    variables["posZ"] = selected.z;
+                    variables["scaleX"] = selected.width / 2.0;
+                    variables["scaleY"] = selected.height / 2.0;
+                    variables["scaleZ"] = selected.depth / 2.0;
+                    types["selectedName"] = "word";
+                    types["currentColor"] = "word";
+                    types["posX"] = types["posY"] = types["posZ"] = "num";
+                    types["scaleX"] = types["scaleY"] = types["scaleZ"] = "num";
+                }
                 appendOutput("Loaded 3D scene: " + scenePath.string() + "\r\n");
                 continue;
             }
