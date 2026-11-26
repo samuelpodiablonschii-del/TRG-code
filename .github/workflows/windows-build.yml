@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - "TRG.cpp"
+      - "Checker.cpp"
+      - "build.bat"
+      - "build-installer.bat"
       - "EditorSources.h"
       - "TRG.rc"
       - "TRG-Installer.cpp"
@@ -27,12 +30,28 @@ jobs:
       - name: Set up MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Build TRG desktop runtime
+      - name: Build the UI application
         shell: cmd
         run: |
           rc.exe /nologo /fo trg-resource.res TRG.rc
           if errorlevel 1 exit /b 1
-          cl.exe /nologo /std:c++17 /EHsc /O2 /MT TRG.cpp trg-resource.res /link /SUBSYSTEM:WINDOWS comdlg32.lib shell32.lib gdiplus.lib user32.lib gdi32.lib winhttp.lib winmm.lib /OUT:TRG-build.exe
+          cl.exe /nologo /std:c++17 /EHsc /O2 /MT /DTRG_FORCE_UI_APP TRG.cpp trg-resource.res /link /SUBSYSTEM:WINDOWS comdlg32.lib shell32.lib gdiplus.lib user32.lib gdi32.lib winhttp.lib winmm.lib /OUT:TRG-build.exe
+          if errorlevel 1 exit /b 1
+          copy /Y TRG-build.exe UI-app.exe
+          if errorlevel 1 exit /b 1
+          copy /Y TRG-build.exe TRG.exe
+          if errorlevel 1 exit /b 1
+
+      - name: Build the console application
+        shell: cmd
+        run: |
+          cl.exe /nologo /std:c++17 /EHsc /O2 /MT /DTRG_FORCE_CONSOLE_APP TRG.cpp trg-resource.res /link /SUBSYSTEM:WINDOWS comdlg32.lib shell32.lib gdiplus.lib user32.lib gdi32.lib winhttp.lib winmm.lib /OUT:Console-app.exe
+          if errorlevel 1 exit /b 1
+
+      - name: Build Checker
+        shell: cmd
+        run: |
+          cl.exe /nologo /std:c++17 /EHsc /O2 /MT Checker.cpp trg-resource.res /link /SUBSYSTEM:WINDOWS shell32.lib user32.lib /OUT:Checker.exe
           if errorlevel 1 exit /b 1
 
       - name: Build TRG installer
@@ -46,5 +65,6 @@ jobs:
       - name: Verify generated executables
         shell: pwsh
         run: |
-          if (!(Test-Path TRG-build.exe) -or (Get-Item TRG-build.exe).Length -eq 0) { throw "TRG desktop build is missing or empty." }
-          if (!(Test-Path TRG-Installer.exe) -or (Get-Item TRG-Installer.exe).Length -eq 0) { throw "TRG installer build is missing or empty." }
+          foreach ($file in @("TRG-build.exe", "TRG.exe", "UI-app.exe", "Console-app.exe", "Checker.exe", "TRG-Installer.exe")) {
+            if (!(Test-Path $file) -or (Get-Item $file).Length -eq 0) { throw "$file is missing or empty." }
+          }
