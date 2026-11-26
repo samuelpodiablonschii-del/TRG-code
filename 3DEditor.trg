@@ -61,6 +61,7 @@ button part_tool "◆  Part" x 36 y 9.5 w 8 h 5.6 color #2B203D (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text selected_label selectedName
+    set_text tree_selected selectedName
     set_text hierarchy_count objectCount
 )
 button mesh_tool "⬡  Sphere" x 44.3 y 9.5 w 8 h 5.6 color #2B203D (
@@ -70,6 +71,7 @@ button mesh_tool "⬡  Sphere" x 44.3 y 9.5 w 8 h 5.6 color #2B203D (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text selected_label selectedName
+    set_text tree_selected selectedName
     set_text hierarchy_count objectCount
 )
 button terrain_tool "▱  Terrain" x 52.6 y 9.5 w 8 h 5.6 color #2B203D (
@@ -79,6 +81,7 @@ button terrain_tool "▱  Terrain" x 52.6 y 9.5 w 8 h 5.6 color #2B203D (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text selected_label selectedName
+    set_text tree_selected selectedName
     set_text hierarchy_count objectCount
 )
 button insert_tool "+  Insert" x 60.9 y 9.5 w 8 h 5.6 color #2B203D (
@@ -88,6 +91,7 @@ button insert_tool "+  Insert" x 60.9 y 9.5 w 8 h 5.6 color #2B203D (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text selected_label selectedName
+    set_text tree_selected selectedName
     set_text hierarchy_count objectCount
 )
 block z 2 x 69.5 y 8.2 w 0.18 h 7.5 color #45315E name RIBBON_DIVIDER_B
@@ -112,22 +116,26 @@ block z 2 x 0.6 y 17.2 w 17 h 5 color #211832 edges round name EXPLORER_HEADER
 text "EXPLORER" x 1.8 y 20.4 size 1.25 color #F4ECFF bold true
 text hierarchy_count "3 objects" x 16.5 y 20.4 size 0.85 color #A995C5 align right
 text "▼  Workspace" x 1.8 y 26 size 1.1 color #E6DDF4 bold true
+text tree_selected "▶  Cube (Selected)" x 2.8 y 44 size 0.92 color #BFA0FF bold true
 text "   ◉  Camera" x 2.8 y 31 size 1.0 color #CFC1E6
 text "   ▱  Baseplate" x 2.8 y 36 size 1.0 color #CFC1E6
 text "   ◆  Cube" x 2.8 y 41 size 1.0 color #CFC1E6
 button select_cube "Select Cube" x 1.5 y 44 w 15 h 4.2 color #392451 (
     selectedName = "Cube"
     set_text selected_label selectedName
+    set_text tree_selected selectedName
     say "Cube selected."
 )
 button select_baseplate "Select Baseplate" x 1.5 y 49 w 15 h 4.2 color #2B203D (
     selectedName = "Baseplate"
     set_text selected_label selectedName
+    set_text tree_selected selectedName
     say "Baseplate selected."
 )
 button select_camera "Select Camera" x 1.5 y 54 w 15 h 4.2 color #2B203D (
     selectedName = "Camera"
     set_text selected_label selectedName
+    set_text tree_selected selectedName
     say "Camera selected."
 )
 text "SERVICES" x 1.8 y 63 size 0.9 color #9D8CB8 bold true
@@ -194,6 +202,8 @@ button rename_object "Rename" x 80.4 y 71 w 8.2 h 4.3 color #302044 (
     3d rename selectedName renameInput
     selectedName = renameInput
     set_text selected_label selectedName
+    set_text tree_selected selectedName
+    set_text tree_selected selectedName
 )
 button delete_object "Delete" x 89.2 y 71 w 8.7 h 4.3 color #63304A (
     3d delete selectedName
@@ -203,10 +213,12 @@ button delete_object "Delete" x 89.2 y 71 w 8.7 h 4.3 color #63304A (
         selectedIndex = 0
         get objects selectedIndex selectedName
         set_text selected_label selectedName
+    set_text tree_selected selectedName
     )
     else (
         selectedName = ""
         set_text selected_label "No selection"
+        set_text tree_selected "No selection"
     )
     set_text hierarchy_count objectCount
 )
@@ -223,6 +235,7 @@ button asset_box "◆  Box" x 19.5 y 69 w 10 h 8 color #302044 (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text selected_label selectedName
+    set_text tree_selected selectedName
     set_text hierarchy_count objectCount
 )
 button asset_sphere "●  Sphere" x 30.2 y 69 w 10 h 8 color #302044 (
@@ -232,6 +245,7 @@ button asset_sphere "●  Sphere" x 30.2 y 69 w 10 h 8 color #302044 (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text selected_label selectedName
+    set_text tree_selected selectedName
     set_text hierarchy_count objectCount
 )
 button asset_camera "◉  Camera" x 40.9 y 69 w 10 h 8 color #302044 (
@@ -241,6 +255,7 @@ button asset_camera "◉  Camera" x 40.9 y 69 w 10 h 8 color #302044 (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text selected_label selectedName
+    set_text tree_selected selectedName
     set_text hierarchy_count objectCount
 )
 button asset_spawn "▶  Spawn" x 51.6 y 69 w 10 h 8 color #245C48 (
@@ -250,6 +265,7 @@ button asset_spawn "▶  Spawn" x 51.6 y 69 w 10 h 8 color #245C48 (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text selected_label selectedName
+    set_text tree_selected selectedName
     set_text hierarchy_count objectCount
 )
 button asset_plane "▱  Plane" x 62.3 y 69 w 10 h 8 color #302044 (
@@ -259,6 +275,7 @@ button asset_plane "▱  Plane" x 62.3 y 69 w 10 h 8 color #302044 (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text selected_label selectedName
+    set_text tree_selected selectedName
     set_text hierarchy_count objectCount
 )
 button duplicate_object "Duplicate" x 73 y 69 w 4.2 h 8 color #4A3470 (
@@ -268,6 +285,7 @@ button duplicate_object "Duplicate" x 73 y 69 w 4.2 h 8 color #4A3470 (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text selected_label selectedName
+    set_text tree_selected selectedName
     set_text hierarchy_count objectCount
 )
 
