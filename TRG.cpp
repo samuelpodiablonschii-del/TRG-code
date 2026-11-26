@@ -448,6 +448,8 @@ std::vector<UiGroup> uiGroups;
 std::string currentUiGroup = "default";
 std::unordered_map<std::string, StructDefinition> userStructs;
 std::vector<std::string> uiProgram;
+std::vector<std::string> preparedLaunchProgram;
+bool preparedLaunchProgramReady = false;
 std::filesystem::path projectRoot = std::filesystem::current_path();
 bool filesEnabled = false;
 bool jsonEnabled = false;
@@ -2773,9 +2775,18 @@ void collectTrgFiles(const std::filesystem::path& root, std::vector<std::filesys
     std::filesystem::recursive_directory_iterator iterator(root,
         std::filesystem::directory_options::skip_permission_denied, error);
     const std::filesystem::recursive_directory_iterator end;
+    static const std::unordered_set<std::string> ignoredDirectories = {
+        ".git", ".svn", ".hg", ".idea", ".vs", ".gradle", ".cache",
+        "node_modules", "vendor", "build", "dist", "target", "out",
+        "bin", "obj", "debug", "release", ".venv", "venv", "__pycache__"
+    };
     while (!error && iterator != end) {
         std::error_code entryError;
-        if (iterator->is_regular_file(entryError) && !entryError &&
+        if (iterator->is_directory(entryError) && !entryError) {
+            const std::string directoryName = lower(iterator->path().filename().u8string());
+            if ((!directoryName.empty() && directoryName.front() == '.') ||
+                ignoredDirectories.count(directoryName)) iterator.disable_recursion_pending();
+        } else if (iterator->is_regular_file(entryError) && !entryError &&
             lower(iterator->path().extension().u8string()) == ".trg") {
             
             std::error_code canonicalError;
@@ -2817,18 +2828,22 @@ std::vector<std::string> mergePrograms(const std::vector<std::string>& mainProgr
     const std::string mainKey = mainCanonical.empty() ? "__main__" : lower(mainCanonical.u8string());
 
     std::unordered_map<std::string, ProjectNode> nodes;
-    std::vector<std::filesystem::path> files;
-    collectTrgFiles(projectRoot, files);
-    for (const auto& file : files) {
-        const std::filesystem::path canonical = canonicalProjectPath(file);
-        const std::string key = lower(canonical.u8string());
-        if (key == mainKey) continue;
-        std::ifstream input(file, std::ios::binary);
-        if (!input) continue;
-        std::vector<std::string> kept, localGlobals, connects;
-        stripProjectDirectives(readProgram(input), kept, localGlobals, connects, false, &seenGlobals);
-        if (includeProjectGlobals) globals.insert(globals.end(), localGlobals.begin(), localGlobals.end());
-        nodes[key] = {canonical, std::move(kept), std::move(connects)};
+    // Only project-wide globals require directory discovery. Explicitly connected
+    // modules are loaded lazily below, so ordinary scripts avoid scanning folders.
+    if (includeProjectGlobals) {
+        std::vector<std::filesystem::path> files;
+        collectTrgFiles(projectRoot, files);
+        for (const auto& file : files) {
+            const std::filesystem::path canonical = canonicalProjectPath(file);
+            const std::string key = lower(canonical.u8string());
+            if (key == mainKey) continue;
+            std::ifstream input(file, std::ios::binary);
+            if (!input) continue;
+            std::vector<std::string> kept, localGlobals, connects;
+            stripProjectDirectives(readProgram(input), kept, localGlobals, connects, false, &seenGlobals);
+            globals.insert(globals.end(), localGlobals.begin(), localGlobals.end());
+            nodes[key] = {canonical, std::move(kept), std::move(connects)};
+        }
     }
     nodes[mainKey] = {mainCanonical, keptMain, mainConnects};
 
@@ -8820,7 +8835,13 @@ void executeProgram(const std::vector<std::string>& program) {
     // discovery would merge every neighbouring test file into each test run.
     uiProgram = program;
 #else
-    uiProgram = mergePrograms(program, currentSourcePath, true, true);
+    if (preparedLaunchProgramReady) {
+        uiProgram = std::move(preparedLaunchProgram);
+        preparedLaunchProgram.clear();
+        preparedLaunchProgramReady = false;
+    } else {
+        uiProgram = mergePrograms(program, currentSourcePath, true, true);
+    }
 #endif
     LibraryState libraries;
     scanLibraries(uiProgram, libraries);
@@ -8874,6 +8895,21 @@ void applyEditorSyntaxHighlighting() {
     std::wstring source(static_cast<std::size_t>(length) + 1, L'\0');
     GetWindowTextW(codeEditor, source.data(), length + 1);
     source.resize(static_cast<std::size_t>(length));
+
+    // RichEdit formatting for every token can freeze the editor on large files.
+    // Large documents remain immediately readable with the normal editor colour.
+    if (length > 48000) {
+        CHARFORMAT2W plain = {};
+        plain.cbSize = sizeof(plain);
+        plain.dwMask = CFM_COLOR | CFM_BOLD;
+        plain.crTextColor = RGB(239, 232, 250);
+        plain.dwEffects = 0;
+        SendMessageW(codeEditor, EM_SETSEL, 0, length);
+        SendMessageW(codeEditor, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&plain));
+        SendMessageW(codeEditor, EM_SETSEL, 0, 0);
+        return;
+    }
+
     highlightingEditor = true;
     SendMessageW(codeEditor, WM_SETREDRAW, FALSE, 0);
     DWORD selectionStart = 0, selectionEnd = 0;
@@ -9372,6 +9408,8 @@ int runApplication(int argc, char** argv) {
     LibraryState launchLibraries;
     const std::vector<std::string> launchProgram = mergePrograms(program, currentSourcePath, true, true);
     scanLibraries(launchProgram, launchLibraries);
+    preparedLaunchProgram = launchProgram;
+    preparedLaunchProgramReady = true;
     standaloneAppMode = launchLibraries.ui;
     standaloneTerminalMode = !launchLibraries.ui;
     previewMode = true;
