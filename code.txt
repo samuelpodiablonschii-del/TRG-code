@@ -641,6 +641,7 @@ RECT desktop3DInspectorRect = {};
 RECT desktop3DAssetShelfRect = {};
 std::array<RECT, 13> desktop3DToolRects = {};
 bool desktop3DPlayMode = false;
+int desktop3DActiveTab = 0;
 std::array<RECT, 5> desktop3DAssetRects = {};
 std::array<RECT, 5> desktop3DTextureRects = {};
 int desktop3DToolMode = 1;
@@ -6770,9 +6771,36 @@ void drawDesktop3DWorkspaceChrome(HDC dc, HWND window, const DesktopLayout& layo
             (index < 4 && desktop3DToolMode == static_cast<int>(index)) ||
             (index == 9 && desktop3DPlayMode));
 
-    fillPanel(desktop3DHierarchyRect, RGB(24, 19, 35), RGB(58, 46, 77), 8);
-    fillPanel(desktop3DInspectorRect, RGB(24, 19, 35), RGB(58, 46, 77), 8);
-    fillPanel(desktop3DAssetShelfRect, RGB(24, 19, 35), RGB(58, 46, 77), 8);
+    fillPanel(desktop3DHierarchyRect, RGB(24, 19, 35), RGB(76, 56, 108), 8);
+    fillPanel(desktop3DInspectorRect, RGB(24, 19, 35), RGB(76, 56, 108), 8);
+    fillPanel(desktop3DAssetShelfRect, RGB(24, 19, 35), RGB(76, 56, 108), 8);
+    HPEN viewportBorder = CreatePen(PS_SOLID, 1, RGB(91, 61, 135));
+    HGDIOBJ oldViewportPen = SelectObject(dc, viewportBorder);
+    HGDIOBJ oldViewportBrush = SelectObject(dc, GetStockObject(HOLLOW_BRUSH));
+    RoundRect(dc, desktop3DViewportRect.left, desktop3DViewportRect.top,
+        desktop3DViewportRect.right, desktop3DViewportRect.bottom,
+        scaleForDpi(window, 7), scaleForDpi(window, 7));
+    SelectObject(dc, oldViewportBrush);
+    SelectObject(dc, oldViewportPen);
+    DeleteObject(viewportBorder);
+    const LONG gizmoX = desktop3DViewportRect.right - scaleForDpi(window, 42);
+    const LONG gizmoY = desktop3DViewportRect.top + scaleForDpi(window, 64);
+    auto drawAxis = [&](int dx, int dy, COLORREF color, const wchar_t* label) {
+        HPEN axisPen = CreatePen(PS_SOLID, 2, color);
+        HGDIOBJ previousPen = SelectObject(dc, axisPen);
+        MoveToEx(dc, gizmoX, gizmoY, nullptr);
+        LineTo(dc, gizmoX + scaleForDpi(window, dx), gizmoY + scaleForDpi(window, dy));
+        SelectObject(dc, previousPen);
+        DeleteObject(axisPen);
+        RECT textRect = {gizmoX + scaleForDpi(window, dx) - scaleForDpi(window, 8),
+            gizmoY + scaleForDpi(window, dy) - scaleForDpi(window, 10),
+            gizmoX + scaleForDpi(window, dx) + scaleForDpi(window, 12),
+            gizmoY + scaleForDpi(window, dy) + scaleForDpi(window, 10)};
+        drawLabel(label, textRect, color, 9, true, DT_CENTER | DT_VCENTER | DT_SINGLELINE);
+    };
+    drawAxis(0, -25, RGB(91, 220, 128), L"Y");
+    drawAxis(28, 9, RGB(240, 82, 105), L"X");
+    drawAxis(-25, 16, RGB(84, 137, 255), L"Z");
     RECT hierarchyTitle = {desktop3DHierarchyRect.left + scaleForDpi(window, 12),
         desktop3DHierarchyRect.top + scaleForDpi(window, 8),
         desktop3DHierarchyRect.right - scaleForDpi(window, 8),
@@ -7483,6 +7511,24 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
     if (message == WM_LBUTTONDOWN && desktop3DEngineActive && previewMode) {
         const POINT point = {static_cast<short>(LOWORD(lParam)), static_cast<short>(HIWORD(lParam))};
         SetFocus(window);
+        const LONG tabTop = scaleForDpi(window, 9);
+        const LONG tabBottom = scaleForDpi(window, 43);
+        const LONG tabStart = scaleForDpi(window, 250);
+        const LONG tabStep = scaleForDpi(window, 94);
+        if (point.y >= tabTop && point.y <= tabBottom &&
+            point.x >= tabStart && point.x < tabStart + tabStep * 5) {
+            const int tab = static_cast<int>((point.x - tabStart) / tabStep);
+            desktop3DActiveTab = std::clamp(tab, 0, 4);
+            if (desktop3DActiveTab == 2)
+                appendOutput("Terrain tools selected. Use Plane in the ribbon or Toolbox to create terrain.\\r\\n");
+            else if (desktop3DActiveTab == 3) {
+                desktop3DGridVisible = !desktop3DGridVisible;
+                appendOutput(desktop3DGridVisible ? "Viewport grid enabled.\\r\\n" : "Viewport grid hidden.\\r\\n");
+            } else if (desktop3DActiveTab == 4)
+                appendOutput("No desktop plugins are installed yet.\\r\\n");
+            InvalidateRect(window, nullptr, FALSE);
+            return 0;
+        }
         desktop3DMouseDown = point;
         desktop3DMouseCurrent = point;
         desktop3DAssetCandidate = -1;
@@ -7888,7 +7934,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 RECT tab = {tabX, scaleForDpi(window, 9),
                     tabX + scaleForDpi(window, index == 0 ? 82 : 88),
                     scaleForDpi(window, 43)};
-                if (index == 0) {
+                if (index == desktop3DActiveTab) {
                     HBRUSH activeTab = CreateSolidBrush(RGB(75, 39, 121));
                     HPEN activePen = CreatePen(PS_SOLID, 1, RGB(142, 83, 224));
                     HGDIOBJ oldB = SelectObject(dc, activeTab);
