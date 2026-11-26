@@ -256,7 +256,9 @@ push objects "Cube"
 block z 0 x 0 y 0 w 100 h 100 color #100B1C name ENGINE_BACKGROUND
 block z 1 x 0 y 0 w 100 h 6.2 color #171027 name ENGINE_TITLEBAR
 text "TRG ENGINE" x 15 y 4.15 size 2.55 color #F8F3FF bold true
-text "☰" x 94 y 4.4 size 3.0 color #A65BFF align center
+button engine_menu "☰" x 90 y 1.1 w 8 h 4.7 color #171027 (
+    say "TRG ENGINE menu: use Save, Load, Reset or Code from the toolbar."
+)
 
 // Main action toolbar.
 block z 1 x 0 y 6.2 w 100 h 6.3 color #130D20 name TOOLBAR_BACKGROUND
@@ -421,7 +423,9 @@ button material "▾" x 89 y 74.3 w 7 h 3.8 color #39264F (
 block z 1 x 0.7 y 80.2 w 98.6 h 19.2 color #191226 edges round name ASSET_BROWSER
 text "◆" x 4 y 83.2 size 2.0 color #A65BFF
 text "Asset Browser" x 11 y 83.2 size 1.45 color #F4ECFF bold true
-text "›" x 95 y 83.3 size 2.4 color #A65BFF align center
+button asset_more "›" x 91.5 y 81.2 w 6 h 4.2 color #191226 (
+    say "The Asset Browser contains the built-in scene primitives."
+)
 
 button asset_box "◆\nBox" x 3 y 85 w 17.5 h 12.2 color #302044 (
     3d box auto x 0 y 0 z 0 w 2 h 2 d 2 color currentColor
