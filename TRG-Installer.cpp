@@ -21,7 +21,10 @@ constexpr int downloadButtonId = 301;
 constexpr int progressBarId = 302;
 constexpr int statusLabelId = 303;
 constexpr int storageLabelId = 304;
-constexpr UINT runtimeResourceId = 201;
+constexpr UINT editorResourceId = 201;
+constexpr UINT uiAppResourceId = 207;
+constexpr UINT consoleAppResourceId = 208;
+constexpr UINT checkerResourceId = 209;
 constexpr UINT exampleResourceId = 202;
 constexpr UINT readmeResourceId = 203;
 constexpr UINT iconResourceId = 204;
@@ -34,7 +37,10 @@ HWND progressBar = nullptr;
 HWND statusLabel = nullptr;
 HWND storageLabel = nullptr;
 std::filesystem::path installDirectory;
-std::filesystem::path runtimePath;
+std::filesystem::path editorPath;
+std::filesystem::path uiAppPath;
+std::filesystem::path consoleAppPath;
+std::filesystem::path checkerPath;
 std::filesystem::path examplePath;
 std::filesystem::path shortcutPath;
 std::uint64_t requiredStorage = 0;
@@ -118,10 +124,10 @@ void createDesktopShortcut() {
                                       IID_IShellLinkW, reinterpret_cast<void**>(&shellLink));
     if (FAILED(result)) throw std::runtime_error("Could not create the TRG Desktop shortcut.");
 
-    result = shellLink->SetPath(runtimePath.c_str());
+    result = shellLink->SetPath(editorPath.c_str());
     if (SUCCEEDED(result)) result = shellLink->SetWorkingDirectory(installDirectory.c_str());
     if (SUCCEEDED(result)) result = shellLink->SetIconLocation((installDirectory / L"trg.ico").c_str(), 0);
-    if (SUCCEEDED(result)) result = shellLink->SetDescription(L"Open TRG or run a .trg program");
+    if (SUCCEEDED(result)) result = shellLink->SetDescription(L"Open TRG Studio");
 
     IPersistFile* persistFile = nullptr;
     if (SUCCEEDED(result)) result = shellLink->QueryInterface(IID_IPersistFile,
@@ -231,10 +237,13 @@ void registerTrgFileType() {
     setRegistryString(HKEY_LOCAL_MACHINE, L"Software\\Classes\\" + applicationId, L"", L"TRG source file");
     setRegistryString(HKEY_LOCAL_MACHINE,
         L"Software\\Classes\\" + applicationId + L"\\DefaultIcon", L"",
-        L"\\\"" + runtimePath.wstring() + L"\\\",0");
+        L"\"" + checkerPath.wstring() + L"\",0");
     setRegistryString(HKEY_LOCAL_MACHINE,
         L"Software\\Classes\\" + applicationId + L"\\shell\\open\\command", L"",
-        L"\\\"" + runtimePath.wstring() + L"\\\" \\\"%1\\\"");
+        L"\"" + checkerPath.wstring() + L"\" \"%1\"");
+    setRegistryString(HKEY_LOCAL_MACHINE,
+        L"Software\\Classes\\" + applicationId + L"\\shell\\Edit in TRG\\command", L"",
+        L"\"" + editorPath.wstring() + L"\" edit \"%1\"");
     SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
 #endif
 }
@@ -258,7 +267,10 @@ void installPackage() {
         std::filesystem::create_directories(installDirectory, error);
         if (error) throw std::runtime_error("Could not create the Program Files installation folder.");
 
-        writeEmbeddedFile(runtimeResourceId, runtimePath, L"TRG.exe");
+        writeEmbeddedFile(editorResourceId, editorPath, L"TRG.exe");
+        writeEmbeddedFile(uiAppResourceId, uiAppPath, L"UI-app.exe");
+        writeEmbeddedFile(consoleAppResourceId, consoleAppPath, L"Console-app.exe");
+        writeEmbeddedFile(checkerResourceId, checkerPath, L"Checker.exe");
         writeEmbeddedFile(readmeResourceId, installDirectory / L"README.md", L"README.md");
         writeEmbeddedFile(iconResourceId, installDirectory / L"trg.ico", L"trg.ico");
         writeEmbeddedFile(editor2DResourceId, installDirectory / L"2DEditor.trg", L"2DEditor.trg");
@@ -285,8 +297,9 @@ void installPackage() {
 }
 
 void openExample() {
-    const HINSTANCE result = ShellExecuteW(installerWindow, L"open", runtimePath.c_str(),
-        (L"\\\"" + examplePath.wstring() + L"\\\"").c_str(), installDirectory.c_str(), SW_SHOWNORMAL);
+    const std::wstring exampleArguments = L"\"" + examplePath.wstring() + L"\"";
+    const HINSTANCE result = ShellExecuteW(installerWindow, L"open", checkerPath.c_str(),
+        exampleArguments.c_str(), installDirectory.c_str(), SW_SHOWNORMAL);
     if (reinterpret_cast<INT_PTR>(result) <= 32) {
         MessageBoxW(installerWindow, L"TRG was installed, but the example could not be opened.",
                     L"TRG Installer", MB_OK | MB_ICONERROR);
@@ -311,8 +324,8 @@ LRESULT CALLBACK installerWindowProc(HWND window, UINT message, WPARAM wParam, L
     if (message == WM_CREATE) {
         installerWindow = window;
         CreateWindowExW(0, L"STATIC",
-            L"TRG includes its runtime, purple icon, README, and interactive desktop example. "
-            L"The installer does not include TRG.cpp or require an internet connection.",
+            L"TRG includes Checker.exe, UI-app.exe, Console-app.exe, the purple icon, README, and an interactive example. "
+            L"The installer does not include C++ source code or require an internet connection.",
             WS_CHILD | WS_VISIBLE | SS_LEFT, 24, 88, 532, 54, window, nullptr,
             GetModuleHandleW(nullptr), nullptr);
         storageLabel = CreateWindowExW(0, L"STATIC", L"", WS_CHILD | WS_VISIBLE | SS_LEFT,
@@ -421,8 +434,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
     programFiles = programFilesBuffer;
     desktop = desktopBuffer;
 #endif
-    installDirectory = programFiles / L"TRG-code";
-    runtimePath = installDirectory / L"TRG.exe";
+    installDirectory = programFiles / L"TRG Code";
+    editorPath = installDirectory / L"TRG.exe";
+    uiAppPath = installDirectory / L"UI-app.exe";
+    consoleAppPath = installDirectory / L"Console-app.exe";
+    checkerPath = installDirectory / L"Checker.exe";
     try {
         shortcutPath = desktopShortcutPath(desktop);
         examplePath = desktopExamplePath(desktop);
@@ -432,9 +448,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int showCommand) {
         return 1;
     }
     try {
-        requiredStorage = embeddedSize(runtimeResourceId) + embeddedSize(readmeResourceId) +
-            embeddedSize(iconResourceId) + embeddedSize(exampleResourceId) +
-            embeddedSize(editor2DResourceId) + embeddedSize(editor3DResourceId) + 4096;
+        requiredStorage = embeddedSize(editorResourceId) + embeddedSize(uiAppResourceId) +
+            embeddedSize(consoleAppResourceId) + embeddedSize(checkerResourceId) +
+            embeddedSize(readmeResourceId) + embeddedSize(iconResourceId) +
+            embeddedSize(exampleResourceId) + embeddedSize(editor2DResourceId) +
+            embeddedSize(editor3DResourceId) + 4096;
     } catch (const std::exception& error) {
         const std::wstring message(error.what(), error.what() + strlen(error.what()));
         MessageBoxW(nullptr, message.c_str(), L"TRG Installer error", MB_OK | MB_ICONERROR);
