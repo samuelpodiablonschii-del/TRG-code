@@ -10,7 +10,7 @@ title TRG - BUILD INSTALLER
 if exist "C:\mingw64\bin\g++.exe" set "PATH=C:\mingw64\bin;%PATH%"
 if exist "C:\msys64\mingw64\bin\g++.exe" set "PATH=C:\msys64\mingw64\bin;%PATH%"
 
-echo [1/3] Building the latest TRG desktop runtime...
+echo [1/3] Building the TRG desktop apps and Checker...
 set "TRG_NO_PAUSE=1"
 call build.bat
 if errorlevel 1 (
@@ -23,7 +23,11 @@ if not exist "TRG-build.exe" (
     echo ERROR: TRG-build.exe was not produced by build.bat.
     goto :failed
 )
-for %%F in ("TRG-build.exe") do if %%~zF LEQ 0 (
+for %%F in ("TRG-build.exe" "UI-app.exe" "Console-app.exe" "Checker.exe") do if not exist "%%~F" (
+    echo ERROR: Required application was not built: %%~F.
+    goto :failed
+)
+for %%F in ("TRG-build.exe" "UI-app.exe" "Console-app.exe" "Checker.exe") do if %%~zF LEQ 0 (
     echo ERROR: TRG-build.exe is empty.
     goto :failed
 )
@@ -83,7 +87,7 @@ if not exist "TRG-Installer.exe" (
 echo.
 echo BUILD SUCCESSFUL
 echo Output: TRG-Installer.exe
-echo Embedded runtime: TRG-build.exe
+echo Embedded files: Checker.exe, UI-app.exe, Console-app.exe, TRG-build.exe
 goto :finish_success
 
 :failed
