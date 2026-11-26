@@ -82,6 +82,16 @@ jobs:
           console.log("UI preview smoke test passed: " + ui.blocks.length + " block, " + ui.sprites.length + " sprite, " + ui.texts.length + " text.");
 
           output = "";
+          await module.ccall("trg_web_run", null, ["string"], [
+            'say "TRG_BROWSER_ORIENTATION=" orientation\nsay "TRG_BROWSER_RATIO=" aspect_ratio'
+          ], { async: true });
+          if (!output.includes("TRG_BROWSER_ORIENTATION=landscape") ||
+              !output.includes("TRG_BROWSER_RATIO=16:9")) {
+            throw new Error("Browser orientation/aspect-ratio detection failed: " + output);
+          }
+          console.log("Browser orientation and aspect-ratio smoke test passed.");
+
+          output = "";
           globalThis.trgCompilerRequestInput = resolve => resolve("Ada");
           await module.ccall("trg_web_run", null, ["string"], [
             'var name = "there"\nask "What is your name?" name\nsay "Hello," name'

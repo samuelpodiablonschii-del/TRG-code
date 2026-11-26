@@ -195,6 +195,8 @@ static void trgEmitUiSnapshot() {
              << ",\"y\":" << trgNumber(item.y)
              << ",\"width\":" << trgNumber(item.width)
              << ",\"height\":" << trgNumber(item.height)
+             << ",\"autoW\":" << (item.widthAuto ? "true" : "false")
+             << ",\"autoH\":" << (item.heightAuto ? "true" : "false")
              << ",\"opacity\":" << trgNumber(item.opacity)
              << ",\"visible\":" << (item.visible ? "true" : "false")
              << ",\"data\":\"" << trgJsonEscape(trgSpriteData(item)) << "\"}";
@@ -258,6 +260,12 @@ EMSCRIPTEN_KEEPALIVE void trg_web_run(const char* source) {
 
     try {
         projectRoot = std::filesystem::current_path();
+        // Read the playground's real canvas dimensions. Node smoke tests use
+        // a deterministic 16:9 fallback when no document exists.
+        trgScreenWidth = std::max(1, emscripten_run_script_int(
+            "(()=>{if(typeof document==='undefined')return 1280;const c=document.getElementById('compilerPreviewCanvas');return c?(c.clientWidth||c.width||1280):1280;})()"));
+        trgScreenHeight = std::max(1, emscripten_run_script_int(
+            "(()=>{if(typeof document==='undefined')return 720;const c=document.getElementById('compilerPreviewCanvas');return c?(c.clientHeight||c.height||720):720;})()"));
         std::istringstream input(source ? source : "");
         const std::vector<std::string> program = readProgram(input);
         executeProgram(program);
