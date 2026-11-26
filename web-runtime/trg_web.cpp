@@ -52,21 +52,32 @@ static void trg_web_flush_captured_output() {
 
 static void trg_web_remove_completion_message() {
     if (!trgActiveCapturedOutput) return;
-    std::string output = trgActiveCapturedOutput->str();
+    const std::string output = trgActiveCapturedOutput->str();
     if (output.empty()) return;
-    const std::size_t previousNewline = output.size() > 1
-        ? output.find_last_of('\n', output.size() - 2)
-        : std::string::npos;
-    const std::size_t lineStart = previousNewline == std::string::npos ? 0 : previousNewline + 1;
-    const std::string finalLine = output.substr(lineStart);
-    const bool normalCompletion = finalLine == "Program finished.\n" || finalLine == "Program finished.";
-    const bool errorCompletion = finalLine.rfind("Program finished with ", 0) == 0 &&
-        finalLine.find(" error(s).") != std::string::npos;
-    if (normalCompletion || errorCompletion) {
-        output.erase(lineStart);
-        trgActiveCapturedOutput->str(output);
+
+    // The interpreter may print platform notices after its completion banner.
+    // Remove the banner wherever it appears, rather than assuming it is the last line.
+    std::istringstream input(output);
+    std::string line;
+    std::string filtered;
+    bool firstLine = true;
+    while (std::getline(input, line)) {
+        std::string comparable = line;
+        if (!comparable.empty() && comparable.back() == '\r') comparable.pop_back();
+        const bool normalCompletion = comparable == "Program finished.";
+        const bool errorCompletion = comparable.rfind("Program finished with ", 0) == 0 &&
+            comparable.find(" error(s).") != std::string::npos;
+        if (normalCompletion || errorCompletion) continue;
+        if (!firstLine) filtered += '\n';
+        filtered += line;
+        firstLine = false;
+    }
+    if (!output.empty() && output.back() == '\n' && !filtered.empty()) filtered += '\n';
+
+    if (filtered != output) {
+        trgActiveCapturedOutput->str(filtered);
         trgActiveCapturedOutput->clear();
-        trgEmittedOutputSize = std::min(trgEmittedOutputSize, output.size());
+        trgEmittedOutputSize = std::min(trgEmittedOutputSize, filtered.size());
     }
 }
 
