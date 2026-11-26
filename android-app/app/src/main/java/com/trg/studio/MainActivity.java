@@ -120,7 +120,7 @@ public final class MainActivity extends Activity {
     private static native void nativeSetMobileInput(String name, String state);
     private static native void nativeSetPointer(float x, float y, boolean down);
     private static native void nativeStop();
-    private static native void nativeSetEditorSelection(String name);
+    private static native String nativeSetEditorSelection(String name);
     private static native String nativeTransformEditorObject(String kind, String name, float dx, float dy, float dz);
     private static native String nativeScaleEditorObject(String kind, String name, float factor);
 
@@ -1651,6 +1651,8 @@ sourceText = exampleSource;
                     if (label == null || !selectionLabel.equals(label.optString("name"))) continue;
                     String candidate = label.optString("value");
                     if (!candidate.startsWith("No ")) {
+                        if (editor3D && candidate.endsWith(" (Selected)"))
+                            candidate = candidate.substring(0, candidate.length() - " (Selected)".length());
                         selectedEditorName = candidate;
                         selectedEditorKind = editor3D ? "3d" :
                                 findJsonObject(state.optJSONArray("blocks"), candidate) != null ? "block" :
@@ -1706,6 +1708,49 @@ sourceText = exampleSource;
             float scale = Math.min(width, height) * 0.115f * cameraZoom;
             return new float[] { width * 0.5f + (float) (viewX * scale * perspective),
                     height * 0.302f - (float) (viewY * scale * perspective), (float) perspective };
+        }
+
+        private void draw3DGrid(Canvas canvas, float width, float height) {
+            int save = canvas.save();
+            canvas.clipRect(width * 0.006f, height * 0.131f, width * 0.994f, height * 0.473f);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(Math.max(1f, dp(0.7f)));
+            paint.setColor(Color.argb(115, 91, 70, 126));
+            for (int z = -8; z <= 30; z += 2) {
+                float[] left = project3DPoint(-24, -1.35, z, width, height);
+                float[] right = project3DPoint(24, -1.35, z, width, height);
+                canvas.drawLine(left[0], left[1], right[0], right[1], paint);
+            }
+            for (int x = -24; x <= 24; x += 2) {
+                float[] near = project3DPoint(x, -1.35, -8, width, height);
+                float[] far = project3DPoint(x, -1.35, 30, width, height);
+                canvas.drawLine(near[0], near[1], far[0], far[1], paint);
+            }
+            paint.setStrokeWidth(dp(1.2f));
+            paint.setColor(Color.argb(145, 113, 89, 151));
+            canvas.drawLine(width * 0.01f, height * 0.285f, width * 0.99f, height * 0.285f, paint);
+            canvas.restoreToCount(save);
+
+            float ox = width * 0.91f, oy = height * 0.245f, axis = width * 0.058f;
+            paint.setStrokeWidth(dp(2.2f));
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setColor(Color.rgb(238, 55, 88));
+            canvas.drawLine(ox, oy, ox + axis, oy + axis * 0.22f, paint);
+            paint.setColor(Color.rgb(101, 224, 91));
+            canvas.drawLine(ox, oy, ox, oy - axis, paint);
+            paint.setColor(Color.rgb(67, 126, 255));
+            canvas.drawLine(ox, oy, ox - axis * 0.72f, oy + axis * 0.48f, paint);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setTypeface(android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD));
+            paint.setTextSize(dp(11));
+            paint.setColor(Color.rgb(238, 55, 88));
+            canvas.drawText("X", ox + axis + dp(5), oy + axis * 0.22f + dp(4), paint);
+            paint.setColor(Color.rgb(101, 224, 91));
+            canvas.drawText("Y", ox - dp(3), oy - axis - dp(5), paint);
+            paint.setColor(Color.rgb(67, 126, 255));
+            canvas.drawText("Z", ox - axis * 0.72f - dp(5), oy + axis * 0.48f + dp(13), paint);
+            paint.setStrokeCap(Paint.Cap.BUTT);
+            paint.setStyle(Paint.Style.FILL);
         }
 
         private void draw3DModels(Canvas canvas, float width, float height) {
@@ -1916,6 +1961,7 @@ sourceText = exampleSource;
                     drawBlockShape(canvas, block, buttonRect);
                 }
             }
+            if (editor3D) draw3DGrid(canvas, width, height);
             draw3DModels(canvas, width, height);
             for (JSONObject sprite : sprites) {
                 if (!sprite.optBoolean("visible", true)) continue;
@@ -1944,7 +1990,10 @@ sourceText = exampleSource;
                         Color.green(textColor), Color.blue(textColor)));
                 paint.setTextAlign("center".equals(text.optString("align")) ? Paint.Align.CENTER :
                         "right".equals(text.optString("align")) ? Paint.Align.RIGHT : Paint.Align.LEFT);
-                paint.setTypeface(text.optBoolean("bold", true) ? fixedUiFontBold : fixedUiFont);
+                paint.setTypeface(editor3D
+                        ? android.graphics.Typeface.create("sans-serif", text.optBoolean("bold", true)
+                            ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL)
+                        : text.optBoolean("bold", true) ? fixedUiFontBold : fixedUiFont);
                 String textValue = text.optString("value");
                 float textSize = (float) (Math.min(width, height) * text.optDouble("size") / 100);
                 paint.setTextSize(Math.max(dp(6), textSize));
@@ -1988,16 +2037,25 @@ sourceText = exampleSource;
                     paint.setColor(Color.argb(Math.round(Color.alpha(labelColor) * Math.max(0f,
                             Math.min(1f, (float) button.optDouble("opacity", 1.0)))), Color.red(labelColor),
                             Color.green(labelColor), Color.blue(labelColor)));
-                    paint.setTypeface(button.optBoolean("bold", true) ? fixedUiFontBold : fixedUiFont);
+                    paint.setTypeface(editor3D
+                            ? android.graphics.Typeface.create("sans-serif", button.optBoolean("bold", true)
+                                ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL)
+                            : button.optBoolean("bold", true) ? fixedUiFontBold : fixedUiFont);
                     paint.setTextSize((float) (button.optDouble("text_size", 0.34)
                             * Math.min(buttonRect.height(), buttonRect.width())));
-                    float labelWidth = paint.measureText(button.optString("label"));
+                    String[] labelLines = button.optString("label").split("\\n", -1);
+                    float widestLine = 0;
+                    for (String line : labelLines) widestLine = Math.max(widestLine, paint.measureText(line));
                     float labelLimit = buttonRect.width() * 0.88f;
-                    if (labelWidth > labelLimit && labelWidth > 0) {
-                        paint.setTextSize(paint.getTextSize() * labelLimit / labelWidth);
-                    }
-                    canvas.drawText(button.optString("label"), (left + right) / 2,
-                            (top + bottom) / 2 - (paint.ascent() + paint.descent()) / 2, paint);
+                    if (widestLine > labelLimit && widestLine > 0)
+                        paint.setTextSize(paint.getTextSize() * labelLimit / widestLine);
+                    float lineHeight = paint.getTextSize() * 1.12f;
+                    float firstBaseline = (top + bottom) * 0.5f
+                            - (labelLines.length - 1) * lineHeight * 0.5f
+                            - (paint.ascent() + paint.descent()) * 0.5f;
+                    for (int line = 0; line < labelLines.length; line++)
+                        canvas.drawText(labelLines[line], (left + right) * 0.5f,
+                                firstBaseline + line * lineHeight, paint);
                 }
             }
             if (animating) postInvalidateDelayed(16);
@@ -2071,6 +2129,13 @@ sourceText = exampleSource;
                         if (sequence == touchSequence) releaseSwipes();
                     }, 150);
                 } else if (buttonIndex >= 0) {
+                    String tappedName = buttonName(buttonIndex);
+                    if (editor3D && "reset_view".equals(tappedName)) {
+                        cameraYaw = 0.48f;
+                        cameraPitch = 0.32f;
+                        cameraZoom = 1.0f;
+                        invalidate();
+                    }
                     runButton(buttonIndex);
                     postDelayed(() -> {
                         if (sequence == touchSequence) releaseSwipes();
@@ -2173,7 +2238,7 @@ sourceText = exampleSource;
                 if (hit != null) {
                     selectedEditorKind = hit.kind;
                     selectedEditorName = hit.name;
-                    nativeSetEditorSelection(selectedEditorName);
+                    applyEditorTransform(nativeSetEditorSelection(selectedEditorName));
                     status.setText("Selected: " + selectedEditorName);
                     editorObjectDragging = true;
                     editorGestureMode = 1;
