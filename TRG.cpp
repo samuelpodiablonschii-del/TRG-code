@@ -6838,28 +6838,28 @@ void drawDesktop3DWorkspaceChrome(HDC dc, HWND window, const DesktopLayout& layo
         const Ui3DObject& model = *selected;
         auto field = [&](const wchar_t* name, const std::string& value) {
             RECT label = {desktop3DInspectorRect.left + scaleForDpi(window, 12), inspectorY,
-                desktop3DInspectorRect.right - scaleForDpi(window, 8), inspectorY + scaleForDpi(window, 20)};
-            drawLabel(name, label, RGB(141, 126, 165), 9, true);
-            inspectorY += scaleForDpi(window, 17);
-            label.top = inspectorY;
-            label.bottom += scaleForDpi(window, 2);
-            drawLabel(wideFromUtf8(value), label, RGB(231, 222, 246), 10);
-            inspectorY += scaleForDpi(window, 27);
+                desktop3DInspectorRect.right - scaleForDpi(window, 8), inspectorY + scaleForDpi(window, 14)};
+            drawLabel(name, label, RGB(157, 137, 188), 8, true);
+            RECT valueCard = {desktop3DInspectorRect.left + scaleForDpi(window, 9),
+                inspectorY + scaleForDpi(window, 15),
+                desktop3DInspectorRect.right - scaleForDpi(window, 9),
+                inspectorY + scaleForDpi(window, 33)};
+            fillPanel(valueCard, RGB(35, 27, 50), RGB(66, 51, 91), 5);
+            RECT valueLabel = valueCard;
+            InflateRect(&valueLabel, -scaleForDpi(window, 7), 0);
+            drawLabel(wideFromUtf8(value), valueLabel, RGB(235, 226, 250), 9);
+            inspectorY += scaleForDpi(window, 36);
         };
-        field(L"OBJECT", model.name + "  [" + model.shape + "]");
+        field(L"NAME", model.name + "  [" + model.shape + "]");
         field(L"POSITION  X / Y / Z",
             std::to_string(model.x) + "  /  " + std::to_string(model.y) + "  /  " + std::to_string(model.z));
         field(L"ROTATION  X / Y / Z",
             std::to_string(model.rotateX) + "  /  " + std::to_string(model.rotateY) + "  /  " + std::to_string(model.rotateZ));
         field(L"SIZE  W / H / D",
             std::to_string(model.width) + "  /  " + std::to_string(model.height) + "  /  " + std::to_string(model.depth));
-        field(L"MATERIAL", model.color);
+        field(L"MATERIAL / COLOR", model.color);
         field(L"TEXTURE", model.texture);
-        RECT hint = {desktop3DInspectorRect.left + scaleForDpi(window, 12),
-            desktop3DInspectorRect.bottom - scaleForDpi(window, 28),
-            desktop3DInspectorRect.right - scaleForDpi(window, 8),
-            desktop3DInspectorRect.bottom - scaleForDpi(window, 8)};
-        drawLabel(L"Right-click the model for actions", hint, RGB(143, 126, 166), 9);
+        field(L"VISIBILITY", model.visible ? "Visible" : "Hidden");
     }
 
     RECT assetHeader = {desktop3DAssetShelfRect.left + scaleForDpi(window, 12),
@@ -7604,7 +7604,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 [](const Ui3DObject& model) { return model.name == desktop3DSelectedName; });
             if (selected == ui3DObjects.end()) return 0;
             const LONG rowTop = desktop3DInspectorRect.top + scaleForDpi(window, 48);
-            const LONG rowHeight = scaleForDpi(window, 44);
+            const LONG rowHeight = scaleForDpi(window, 36);
             const int row = static_cast<int>((point.y - rowTop) / rowHeight);
             std::string value;
             double number = 0.0;
