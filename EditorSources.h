@@ -346,9 +346,9 @@ block z 2 x 28 y 65.1 w 21 h 3.6 color #2B203D edges round name POS_X_FIELD
 text pos_x_value "0.00" x 30 y 67.6 size 1.2 color #F1E9FF
 button pos_x " " x 28 y 65.1 w 21 h 3.6 color #2B203D opacity 0 (
     if objectCount > 0 (
-        ask "X position offset (+/-):" editValue
-        3d move selectedName editValue 0 0
-        posX = posX + editValue
+        ask "New X position:" editValue
+        3d move selectedName editValue-posX 0 0
+        posX = editValue
         set_text pos_x_value posX
     )
 )
@@ -356,9 +356,9 @@ block z 2 x 51 y 65.1 w 21 h 3.6 color #2B203D edges round name POS_Y_FIELD
 text pos_y_value "0.00" x 53 y 67.6 size 1.2 color #F1E9FF
 button pos_y " " x 51 y 65.1 w 21 h 3.6 color #2B203D opacity 0 (
     if objectCount > 0 (
-        ask "Y position offset (+/-):" editValue
-        3d move selectedName 0 editValue 0
-        posY = posY + editValue
+        ask "New Y position:" editValue
+        3d move selectedName 0 editValue-posY 0
+        posY = editValue
         set_text pos_y_value posY
     )
 )
@@ -366,9 +366,9 @@ block z 2 x 74 y 65.1 w 22 h 3.6 color #2B203D edges round name POS_Z_FIELD
 text pos_z_value "0.00" x 76 y 67.6 size 1.2 color #F1E9FF
 button pos_z " " x 74 y 65.1 w 22 h 3.6 color #2B203D opacity 0 (
     if objectCount > 0 (
-        ask "Z position offset (+/-):" editValue
-        3d move selectedName 0 0 editValue
-        posZ = posZ + editValue
+        ask "New Z position:" editValue
+        3d move selectedName 0 0 editValue-posZ
+        posZ = editValue
         set_text pos_z_value posZ
     )
 )
@@ -378,9 +378,9 @@ block z 2 x 28 y 69.7 w 21 h 3.6 color #2B203D edges round name SCALE_X_FIELD
 text scale_x_value "1.00" x 30 y 72.2 size 1.2 color #F1E9FF
 button scale_x " " x 28 y 69.7 w 21 h 3.6 color #2B203D opacity 0 (
     if objectCount > 0 (
-        ask "X scale multiplier (0.1-10):" editValue
-        3d scale selectedName editValue 1 1
-        scaleX = scaleX * editValue
+        ask "New X scale (positive value):" editValue
+        3d scale selectedName editValue/scaleX 1 1
+        scaleX = editValue
         set_text scale_x_value scaleX
     )
 )
@@ -388,9 +388,9 @@ block z 2 x 51 y 69.7 w 21 h 3.6 color #2B203D edges round name SCALE_Y_FIELD
 text scale_y_value "1.00" x 53 y 72.2 size 1.2 color #F1E9FF
 button scale_y " " x 51 y 69.7 w 21 h 3.6 color #2B203D opacity 0 (
     if objectCount > 0 (
-        ask "Y scale multiplier (0.1-10):" editValue
-        3d scale selectedName 1 editValue 1
-        scaleY = scaleY * editValue
+        ask "New Y scale (positive value):" editValue
+        3d scale selectedName 1 editValue/scaleY 1
+        scaleY = editValue
         set_text scale_y_value scaleY
     )
 )
@@ -398,9 +398,9 @@ block z 2 x 74 y 69.7 w 22 h 3.6 color #2B203D edges round name SCALE_Z_FIELD
 text scale_z_value "1.00" x 76 y 72.2 size 1.2 color #F1E9FF
 button scale_z " " x 74 y 69.7 w 22 h 3.6 color #2B203D opacity 0 (
     if objectCount > 0 (
-        ask "Z scale multiplier (0.1-10):" editValue
-        3d scale selectedName 1 1 editValue
-        scaleZ = scaleZ * editValue
+        ask "New Z scale (positive value):" editValue
+        3d scale selectedName 1 1 editValue/scaleZ
+        scaleZ = editValue
         set_text scale_z_value scaleZ
     )
 )
