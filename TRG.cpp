@@ -1837,7 +1837,12 @@ bool conditionIsTrue(const std::string& cond, Vars& variables) {
         const auto resolveConditionValue = [&](const std::string& expression) {
             const std::string raw = trim(expression);
             const std::vector<std::string> parts = tokenize(raw);
-            if (parts.size() == 1) return valueFor(parts.front(), variables);
+            if (parts.size() == 1) {
+                const bool quotedLiteral = raw.size() >= 2 &&
+                    ((raw.front() == '"' && raw.back() == '"') ||
+                     (raw.front() == '\'' && raw.back() == '\''));
+                return quotedLiteral ? parts.front() : valueFor(parts.front(), variables);
+            }
             return raw;
         };
         const std::string leftValue = resolveConditionValue(leftText);
