@@ -130,6 +130,47 @@ void showError(const std::wstring& message) {
     MessageBoxW(nullptr, message.c_str(), L"TRG Checker", MB_OK | MB_ICONERROR);
 }
 
+struct MainWindowSearch {
+    DWORD processId = 0;
+    HWND window = nullptr;
+};
+
+BOOL CALLBACK findProcessMainWindow(HWND window, LPARAM parameter) {
+    auto* search = reinterpret_cast<MainWindowSearch*>(parameter);
+    DWORD windowProcessId = 0;
+    GetWindowThreadProcessId(window, &windowProcessId);
+    if (!search || windowProcessId != search->processId) return TRUE;
+    if (GetWindow(window, GW_OWNER) != nullptr) return TRUE;
+    if ((GetWindowLongPtrW(window, GWL_STYLE) & WS_CHILD) != 0) return TRUE;
+    search->window = window;
+    return FALSE;
+}
+
+void showLaunchedApplication(HANDLE process) {
+    if (!process) return;
+    const DWORD processId = GetProcessId(process);
+    if (processId == 0) return;
+
+    // Wait briefly for the selected executable to create its main window.
+    // If it creates the window hidden, make it a normal foreground window.
+    for (int attempt = 0; attempt < 100; ++attempt) {
+        MainWindowSearch search;
+        search.processId = processId;
+        EnumWindows(findProcessMainWindow, reinterpret_cast<LPARAM>(&search));
+        if (search.window) {
+            ShowWindow(search.window, SW_SHOWNORMAL);
+            SetWindowPos(search.window, HWND_TOP, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+            BringWindowToTop(search.window);
+            SetForegroundWindow(search.window);
+            UpdateWindow(search.window);
+            return;
+        }
+        if (WaitForSingleObject(process, 0) == WAIT_OBJECT_0) return;
+        Sleep(100);
+    }
+}
+
 } // namespace
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
@@ -187,38 +228,31 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         return 1;
     }
 
-    std::wstring commandLine = L"\"" + appPath.wstring() + L"\" \"" +
-                               sourcePath.wstring() + L"\"";
-    std::vector<wchar_t> mutableCommand(commandLine.begin(), commandLine.end());
-    mutableCommand.push_back(L'\0');
-
-    STARTUPINFOW startup = {};
-    startup.cb = sizeof(startup);
-    PROCESS_INFORMATION process = {};
-
+    const std::wstring parameters = L"\"" + sourcePath.wstring() + L"\"";
     std::filesystem::path workingDirectory = sourcePath.parent_path();
     if (workingDirectory.empty()) workingDirectory = std::filesystem::current_path();
 
-    const BOOL started = CreateProcessW(
-        appPath.c_str(),
-        mutableCommand.data(),
-        nullptr,
-        nullptr,
-        FALSE,
-        CREATE_UNICODE_ENVIRONMENT,
-        nullptr,
-        workingDirectory.c_str(),
-        &startup,
-        &process);
+    // Use the normal Windows "open" verb so the selected EXE starts as a
+    // visible desktop application rather than an unshown child process.
+    SHELLEXECUTEINFOW launch = {};
+    launch.cbSize = sizeof(launch);
+    launch.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
+    launch.lpVerb = L"open";
+    launch.lpFile = appPath.c_str();
+    launch.lpParameters = parameters.c_str();
+    launch.lpDirectory = workingDirectory.c_str();
+    launch.nShow = SW_SHOWNORMAL;
 
-    if (!started) {
+    if (!ShellExecuteExW(&launch)) {
         const DWORD error = GetLastError();
-        showError(L"Checker could not start the selected TRG application:\n\n" +
+        showError(L"Checker could not open the selected TRG application:\n\n" +
                   appPath.wstring() + L"\n\nWindows error: " + std::to_wstring(error));
         return 1;
     }
 
-    CloseHandle(process.hThread);
-    CloseHandle(process.hProcess);
+    if (launch.hProcess) {
+        showLaunchedApplication(launch.hProcess);
+        CloseHandle(launch.hProcess);
+    }
     return 0;
 }
