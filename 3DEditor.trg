@@ -149,15 +149,15 @@ text "PROPERTIES" x 80.4 y 20.4 size 1.15 color #F4ECFF bold true
 text selected_label "Cube (Selected)" x 80.4 y 25.5 size 1.05 color #DCCBFA bold true
 block z 2 x 80.3 y 27 w 18 h 0.15 color #45315E name PROPERTIES_DIVIDER
 text "TRANSFORM" x 80.4 y 30 size 0.9 color #BDA7F5 bold true
-text "Position X / Y / Z" x 80.4 y 34 size 0.85 color #D8CBEA
+text "Move Offset  X / Y / Z" x 80.4 y 34 size 0.85 color #D8CBEA
 button edit_position "Edit Position" x 80.4 y 36 w 17.5 h 4.3 color #302044 (
-    ask "X position:" editX
-    ask "Y position:" editY
-    ask "Z position:" editZ
+    ask "Move X offset:" editX
+    ask "Move Y offset:" editY
+    ask "Move Z offset:" editZ
     3d move selectedName editX editY editZ
     say "Position updated."
 )
-text "Rotation" x 80.4 y 42 size 0.85 color #D8CBEA
+text "Rotation Delta" x 80.4 y 42 size 0.85 color #D8CBEA
 button edit_rotation "Edit Rotation" x 80.4 y 44 w 17.5 h 4.3 color #302044 (
     ask "Rotation X:" editX
     ask "Rotation Y:" editY
