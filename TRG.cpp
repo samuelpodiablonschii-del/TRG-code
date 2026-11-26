@@ -612,6 +612,7 @@ bool inputAccepted = false;
 bool loadingEditorText = false;
 bool highlightingEditor = false;
 bool editorDirty = false;
+bool restoreDesktopStateOnCreate = true;
 bool previewMode = false;
 bool standaloneAppMode = false;
 bool standaloneTerminalMode = false;
@@ -7270,7 +7271,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             SendMessageW(terminalSendButton, WM_SETFONT, reinterpret_cast<WPARAM>(openButtonFont), TRUE);
         terminalInputBrush = CreateSolidBrush(RGB(12, 9, 19));
         outputControlBrush = CreateSolidBrush(RGB(8, 7, 12));
-        restoreDesktopAutosave();
+        if (restoreDesktopStateOnCreate) restoreDesktopAutosave();
         if (codeEditor && richEditModule) {
             SendMessageW(codeEditor, EM_SETBKGNDCOLOR, 0, RGB(19, 13, 31));
             CHARFORMAT2W baseFormat = {};
@@ -8708,6 +8709,7 @@ bool askForInput(const std::string& prompt, std::string& answer) {
 }
 
 bool runUi(bool showImmediately = true) {
+    restoreDesktopStateOnCreate = showImmediately;
     enablePerMonitorDpiAwareness();
     Gdiplus::GdiplusStartupInput gdiplusInput;
     Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusInput, nullptr);
