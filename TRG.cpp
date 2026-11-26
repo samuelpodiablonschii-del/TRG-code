@@ -9225,7 +9225,8 @@ bool runSourceFile(const std::filesystem::path& path) {
 #ifndef TRG_ANDROID_BRIDGE
 int runApplication(int argc, char** argv) {
 #if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
-    bool launchingProgram = argc > 1 && lower(argv[1]) != "compile";
+    const bool editMode = argc > 2 && lower(argv[1]) == "edit";
+    bool launchingProgram = argc > 1 && lower(argv[1]) != "compile" && !editMode;
     if (argc == 1) {
         wchar_t ownPath[32768] = {};
         const DWORD ownLength = GetModuleFileNameW(nullptr, ownPath, 32768);
@@ -9248,6 +9249,23 @@ int runApplication(int argc, char** argv) {
         return 1;
     }
 #endif
+
+    if (editMode) {
+        if (argc != 3) {
+            MessageBoxW(nullptr, L"Usage: TRG.exe edit <file.trg>", L"TRG Editor", MB_OK | MB_ICONERROR);
+            return 2;
+        }
+        const std::filesystem::path editPath = std::filesystem::u8path(argv[2]);
+        if (!loadSourceFile(editPath)) {
+            MessageBoxW(nullptr, L"TRG could not open this file in the editor.", L"TRG Editor", MB_OK | MB_ICONERROR);
+            return 1;
+        }
+        ShowWindow(mainWindow, SW_SHOW);
+        UpdateWindow(mainWindow);
+        SetFocus(codeEditor);
+        runMessageLoop();
+        return 0;
+    }
 
     if (argc > 1 && lower(argv[1]) == "compile") {
         if (argc != 3) {
