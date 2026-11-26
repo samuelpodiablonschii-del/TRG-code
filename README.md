@@ -24,7 +24,7 @@ Package a source file as a single-file executable:
 TRG.exe compile hello.trg
 ```
 
-This creates `hello.exe`, which contains the TRG app and source program. It runs without a separate `.trg` file, but is an interpreter package rather than native machine-code compilation. Packaged apps use the purple TRG icon. Programs that enable `add (ui)` open directly in the UI preview with the editor controls hidden; the desktop editor's own Preview button remains available when you run a project from the editor.
+This creates `hello.exe`, which contains the TRG app and source program. It runs without a separate `.trg` file, but is an interpreter package rather than native machine-code compilation. Packaged apps use the purple TRG icon. Launching a `.trg` file or a compiled app that enables `add (ui)` opens a separate full-window TRG UI app with the editor, code pane, and terminal hidden. Programs without `add (ui)` open in a dedicated purple TRG Terminal window; the desktop editor's own Preview button remains available when you run a project from the editor.
 
 Open `TRG-Example.trg` from your Desktop for a clickable tour. Each button explains the feature, shows the relevant code, and runs it; UI and animation examples appear in the display area.
 
@@ -65,6 +65,34 @@ UI text labels can be declared inside `add (ui)`:
 ```text
 text "TRG Studio" x 8 y 10 size 8 color #FFFFFF
 ```
+
+### Orientation, screen dimensions, and automatic image sizing
+
+TRG exposes the live window dimensions and orientation to every program. The values update when the desktop window is resized:
+
+- `screen_width` and `screen_height` are the client-area dimensions in pixels.
+- `orientation` (also `screen_orientation`) is `"landscape"`, `"portrait"`, or `"square"`.
+- `landscape`, `portrait`, `is_landscape`, and `is_portrait` are boolean values.
+- `aspect_ratio` is reduced automatically, such as `"16:9"`, `"3:4"`, or `"1:1"`; `aspect_width` and `aspect_height` are its numeric parts.
+
+```text
+if orientation = "landscape" (
+    say "Landscape layout"
+)
+if portrait = true (
+    say "Portrait layout"
+)
+say "Current ratio:" aspect_ratio
+```
+
+UI image coordinates and dimensions can be omitted and use automatic defaults. Images support optional `x`, `y`, `w`/`width`, and `h`/`height` properties. Set a dimension to `auto`, or omit it, to preserve the source image's intrinsic aspect ratio. For example, `w 5 h auto` fixes the width to five percent of the UI canvas and calculates the height from the image file's own ratio. With both dimensions automatic, the image is shown at its natural pixel size, scaled down only when needed to fit the canvas.
+
+```text
+add (ui)
+image logo "assets/logo.png" x 5 y 5 w 5 h auto
+```
+
+Omitted block and button coordinates retain their default automatic positions and sizes; `auto` is accepted for their optional x/y/w/h properties as well.
 
 ## Learn TRG the easy way
 

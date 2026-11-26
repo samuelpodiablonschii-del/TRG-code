@@ -16,3 +16,11 @@ if ready = true (
 else (
     print "TRG_BEGINNER_TESTS_FAILED"
 )
+
+
+if orientation = "landscape" (
+    say "TRG_ORIENTATION_LANDSCAPE_PASSED"
+)
+if aspect_ratio = "16:9" (
+    say "TRG_ASPECT_RATIO_16_9_PASSED"
+)

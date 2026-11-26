@@ -349,6 +349,8 @@ struct UiSprite {
     double width = 10;
     double height = 10;
     double opacity = 1.0;
+    bool widthAuto = true;
+    bool heightAuto = true;
     bool visible = true;
 };
 
@@ -461,6 +463,52 @@ std::unordered_set<std::string> activeRunFiles;
 Vars uiVariables;
 Types uiTypes;
 Defaults uiDefaults;
+int trgScreenWidth = 1280;
+int trgScreenHeight = 720;
+#ifdef _WIN32
+extern HWND mainWindow;
+#endif
+void refreshDisplayVariables(Vars& variables, Types& types) {
+#ifdef _WIN32
+    if (mainWindow) {
+        RECT client = {};
+        if (GetClientRect(mainWindow, &client)) {
+            trgScreenWidth = std::max(1L, client.right - client.left);
+            trgScreenHeight = std::max(1L, client.bottom - client.top);
+        }
+    }
+#endif
+    const int width = std::max(1, trgScreenWidth);
+    const int height = std::max(1, trgScreenHeight);
+    const int divisor = std::max(1, std::gcd(width, height));
+    const int ratioWidth = width / divisor;
+    const int ratioHeight = height / divisor;
+    const std::string orientation = width > height ? "landscape" :
+        (height > width ? "portrait" : "square");
+    const std::string ratio = std::to_string(ratioWidth) + ":" + std::to_string(ratioHeight);
+    variables["screen_width"] = static_cast<double>(width);
+    variables["screen_height"] = static_cast<double>(height);
+    variables["orientation"] = orientation;
+    variables["screen_orientation"] = orientation;
+    variables["landscape"] = width > height;
+    variables["portrait"] = height > width;
+    variables["is_landscape"] = width > height;
+    variables["is_portrait"] = height > width;
+    variables["aspect_width"] = static_cast<double>(ratioWidth);
+    variables["aspect_height"] = static_cast<double>(ratioHeight);
+    variables["aspect_ratio"] = ratio;
+    types["screen_width"] = "num";
+    types["screen_height"] = "num";
+    types["orientation"] = "word";
+    types["screen_orientation"] = "word";
+    types["landscape"] = "toggle";
+    types["portrait"] = "toggle";
+    types["is_landscape"] = "toggle";
+    types["is_portrait"] = "toggle";
+    types["aspect_width"] = "num";
+    types["aspect_height"] = "num";
+    types["aspect_ratio"] = "word";
+}
 std::unordered_map<std::string, int> keyboardControls;
 std::unordered_map<std::string, unsigned> controllerControls;
 bool controlsEnabled = false;
@@ -564,6 +612,7 @@ bool highlightingEditor = false;
 bool editorDirty = false;
 bool previewMode = false;
 bool standaloneAppMode = false;
+bool standaloneTerminalMode = false;
 std::string inputResult;
 constexpr int openButtonId = 101;
 constexpr int inputEditId = 201;
@@ -753,6 +802,43 @@ void layoutOutputControls(HWND window) {
     const LONG headerHeight = scaleForDpi(window, 84);
     const LONG gap = scaleForDpi(window, 5);
     const LONG margin = scaleForDpi(window, 12);
+
+    if (standaloneAppMode) {
+        const HWND controls[] = {openButton, saveButton, runButton, previewButton,
+            newButton, buildButton, dictionaryButton, editor2DButton, editor3DButton,
+            exportButton, codeEditor, outputControl, terminalInputControl, terminalSendButton};
+        for (HWND control : controls) if (control) ShowWindow(control, SW_HIDE);
+        return;
+    }
+    if (standaloneTerminalMode) {
+        const HWND controls[] = {openButton, saveButton, runButton, previewButton,
+            newButton, buildButton, dictionaryButton, editor2DButton, editor3DButton,
+            exportButton, codeEditor};
+        for (HWND control : controls) if (control) ShowWindow(control, SW_HIDE);
+        const LONG terminalMargin = scaleForDpi(window, 16);
+        const LONG header = scaleForDpi(window, 66);
+        const LONG inputHeight = terminalInputActive ? scaleForDpi(window, terminalInputHeight + 8) : 0;
+        if (outputControl) {
+            MoveWindow(outputControl, terminalMargin, header + scaleForDpi(window, 12),
+                std::max<LONG>(1, width - terminalMargin * 2),
+                std::max<LONG>(1, height - header - terminalMargin - inputHeight - scaleForDpi(window, 12)),
+                TRUE);
+            ShowWindow(outputControl, SW_SHOW);
+        }
+        if (terminalInputControl && terminalSendButton) {
+            const LONG inputWidth = std::min<LONG>(scaleForDpi(window, 560),
+                std::max<LONG>(scaleForDpi(window, 150),
+                    width - terminalMargin * 2 - scaleForDpi(window, 90)));
+            const LONG inputY = height - terminalMargin - scaleForDpi(window, terminalInputHeight);
+            MoveWindow(terminalInputControl, terminalMargin, inputY, inputWidth,
+                scaleForDpi(window, 30), TRUE);
+            MoveWindow(terminalSendButton, terminalMargin + inputWidth + scaleForDpi(window, 8),
+                inputY, scaleForDpi(window, 76), scaleForDpi(window, 30), TRUE);
+            ShowWindow(terminalInputControl, terminalInputActive ? SW_SHOW : SW_HIDE);
+            ShowWindow(terminalSendButton, terminalInputActive ? SW_SHOW : SW_HIDE);
+        }
+        return;
+    }
 
     if (previewMode) {
         const HWND controls[] = {openButton, saveButton, runButton, newButton, buildButton,
@@ -5986,13 +6072,16 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 } else if (key == "radius") {
                     if (!parseNumber(property, number) || number < 0) { reportError(i + 1, "button radius must be zero or more", property); validButton = false; }
                     else button.cornerRadius = number;
+                } else if ((key == "x" || key == "y" || key == "w" || key == "h" ||
+                            key == "width" || key == "height") && lower(property) == "auto") {
+                    // Missing and auto properties use the button's intrinsic defaults.
                 } else if (!parseNumber(property, number)) {
                     reportError(i + 1, "invalid button coordinate", tokens[a + 1]);
                     validButton = false;
                 } else if (key == "x") button.x = number;
                 else if (key == "y") button.y = number;
-                else if (key == "w") button.width = number;
-                else if (key == "h") button.height = number;
+                else if (key == "w" || key == "width") button.width = number;
+                else if (key == "h" || key == "height") button.height = number;
                 else if (key == "opacity") button.opacity = number;
                 else {
                     reportError(i + 1, "unknown button property", key);
@@ -6059,12 +6148,14 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 } else if (key == "radius") {
                     if (!parseNumber(value, number) || number < 0) { reportError(i + 1, "block radius must be zero or more", value); block.name.clear(); break; }
                     block.cornerRadius = number;
-                } else if (key == "z" || key == "x" || key == "y" || key == "h" || key == "w") {
+                } else if (key == "z" || key == "x" || key == "y" ||
+                           key == "h" || key == "w" || key == "height" || key == "width") {
+                    if (lower(value) == "auto" && key != "z") continue;
                     if (!parseNumber(value, number)) { reportError(i + 1, "invalid block coordinate", value); block.name.clear(); break; }
                     if (key == "z") block.z = static_cast<int>(number);
                     else if (key == "x") block.x = number;
                     else if (key == "y") block.y = number;
-                    else if (key == "h") block.height = number;
+                    else if (key == "h" || key == "height") block.height = number;
                     else block.width = number;
                 } else { reportError(i + 1, "unknown block property", key); block.name.clear(); break; }
             }
@@ -6079,34 +6170,46 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             continue;
         }
         if (cmd == "image" || cmd == "sprite") {
-            if (!uiMode || (tokens.size() != 11 && tokens.size() != 13) || !validName(tokens[1])) {
-                reportError(i + 1, "use sprite NAME FILE x X y Y w WIDTH h HEIGHT [opacity 0..1] inside add (ui)");
+            if (!uiMode || tokens.size() < 3 || !validName(tokens[1]) ||
+                (tokens.size() - 3) % 2 != 0) {
+                reportError(i + 1, "use image NAME FILE [x X] [y Y] [w WIDTH|auto] [h HEIGHT|auto] [opacity 0..1] inside add (ui)");
                 continue;
             }
             UiSprite sprite;
             sprite.name = tokens[1];
             sprite.group = currentUiGroup;
             sprite.path = valueFor(tokens[2], variables);
-            double* values[] = {&sprite.x, &sprite.y, &sprite.width, &sprite.height};
-            const char* keys[] = {"x", "y", "w", "h"};
             bool valid = true;
-            for (std::size_t field = 0; field < 4; ++field) {
+            for (std::size_t a = 3; a + 1 < tokens.size(); a += 2) {
+                const std::string key = lower(tokens[a]);
+                const std::string property = valueFor(tokens[a + 1], variables);
+                const std::string setting = lower(property);
                 double number = 0;
-                const std::size_t keyIndex = 3 + field * 2;
-                if (lower(tokens[keyIndex]) != keys[field] || !parseNumber(valueFor(tokens[keyIndex + 1], variables), number)) {
-                    valid = false; break;
+                if (key == "x" || key == "y") {
+                    if (setting == "auto") number = 0;
+                    else if (!parseNumber(property, number)) valid = false;
+                    if (key == "x") sprite.x = number;
+                    else sprite.y = number;
+                } else if (key == "w" || key == "width") {
+                    if (setting == "auto") sprite.widthAuto = true;
+                    else if (!parseNumber(property, number) || number <= 0) valid = false;
+                    else { sprite.width = number; sprite.widthAuto = false; }
+                } else if (key == "h" || key == "height") {
+                    if (setting == "auto") sprite.heightAuto = true;
+                    else if (!parseNumber(property, number) || number <= 0) valid = false;
+                    else { sprite.height = number; sprite.heightAuto = false; }
+                } else if (key == "opacity") {
+                    if (!parseNumber(property, number) || number < 0 || number > 1) valid = false;
+                    else sprite.opacity = number;
+                } else {
+                    valid = false;
                 }
-                *values[field] = number;
-            }
-            if (valid && tokens.size() == 13) {
-                double alpha = 0;
-                valid = lower(tokens[11]) == "opacity" && parseNumber(valueFor(tokens[12], variables), alpha) && alpha >= 0 && alpha <= 1;
-                if (valid) sprite.opacity = alpha;
+                if (!valid) break;
             }
             bool pathValid = false;
             const auto imagePath = projectFilePath(sprite.path, pathValid);
-            if (!valid || sprite.width <= 0 || sprite.height <= 0 || !pathValid || !std::filesystem::is_regular_file(imagePath)) {
-                reportError(i + 1, "sprite needs a project image and valid x/y/w/h values", sprite.path);
+            if (!valid || !pathValid || !std::filesystem::is_regular_file(imagePath)) {
+                reportError(i + 1, "image needs a project file and valid optional x/y/w/h/opacity properties", sprite.path);
                 continue;
             }
             sprite.path = imagePath.u8string();
@@ -6465,6 +6568,9 @@ DesktopLayout desktopLayout(HWND window, const RECT& client) {
     const LONG width = std::max<LONG>(0, client.right - client.left);
     const LONG height = std::max<LONG>(0, client.bottom - client.top);
     const LONG margin = scaleForDpi(window, 20);
+    if (standaloneAppMode) {
+        return {width, height, 0, height, std::max<LONG>(1, height), 0, height, height};
+    }
     if (previewMode) {
         const LONG outputHeight = std::min<LONG>(
             std::max<LONG>(scaleForDpi(window, 132), height / 5),
@@ -7135,7 +7241,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             CHARFORMAT2W outputFormat = {};
             outputFormat.cbSize = sizeof(outputFormat);
             outputFormat.dwMask = CFM_COLOR | CFM_FACE | CFM_SIZE;
-            outputFormat.crTextColor = RGB(235, 229, 245);
+            outputFormat.crTextColor = RGB(255, 255, 255);
             outputFormat.yHeight = 180;
             std::wcsncpy(outputFormat.szFaceName, L"Consolas", LF_FACESIZE - 1);
             outputFormat.szFaceName[LF_FACESIZE - 1] = L'\0';
@@ -7228,11 +7334,12 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
     if ((message == WM_CTLCOLOREDIT || message == WM_CTLCOLORSTATIC) &&
         reinterpret_cast<HWND>(lParam) == outputControl) {
         HDC dc = reinterpret_cast<HDC>(wParam);
-        SetTextColor(dc, RGB(235, 229, 245));
+        SetTextColor(dc, RGB(255, 255, 255));
         SetBkColor(dc, RGB(8, 7, 12));
         return reinterpret_cast<LRESULT>(outputControlBrush);
     }
     if (message == WM_SIZE) {
+        refreshDisplayVariables(uiVariables, uiTypes);
         layoutOutputControls(window);
         InvalidateRect(window, nullptr, TRUE);
         return 0;
@@ -7898,6 +8005,45 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         HDC dc = BeginPaint(window, &paint);
         RECT client;
         GetClientRect(window, &client);
+        if (standaloneTerminalMode) {
+            HBRUSH terminalBackground = CreateSolidBrush(RGB(12, 9, 20));
+            FillRect(dc, &client, terminalBackground);
+            DeleteObject(terminalBackground);
+            RECT terminalHeader = {0, 0, client.right, scaleForDpi(window, 66)};
+            HBRUSH terminalHeaderBrush = CreateSolidBrush(RGB(35, 22, 58));
+            FillRect(dc, &terminalHeader, terminalHeaderBrush);
+            DeleteObject(terminalHeaderBrush);
+            RECT accent = {0, 0, client.right, scaleForDpi(window, 4)};
+            HBRUSH accentBrush = CreateSolidBrush(RGB(169, 125, 255));
+            FillRect(dc, &accent, accentBrush);
+            DeleteObject(accentBrush);
+            SetBkMode(dc, TRANSPARENT);
+            SetTextColor(dc, RGB(255, 255, 255));
+            HFONT terminalTitleFont = CreateFontW(-scaleForDpi(window, 21), 0, 0, 0,
+                FW_BOLD, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+                CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS,
+                L"Segoe UI");
+            HGDIOBJ oldTerminalFont = SelectObject(dc, terminalTitleFont);
+            RECT titleRect = {scaleForDpi(window, 18), scaleForDpi(window, 10),
+                client.right - scaleForDpi(window, 18), scaleForDpi(window, 42)};
+            DrawTextW(dc, L"TRG TERMINAL", -1, &titleRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            SelectObject(dc, oldTerminalFont);
+            DeleteObject(terminalTitleFont);
+            SetTextColor(dc, RGB(198, 169, 242));
+            HFONT subtitleFont = CreateFontW(-scaleForDpi(window, 10), 0, 0, 0,
+                FW_NORMAL, FALSE, FALSE, FALSE, DEFAULT_CHARSET, OUT_DEFAULT_PRECIS,
+                CLIP_DEFAULT_PRECIS, CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS,
+                L"Segoe UI");
+            HGDIOBJ oldSubtitleFont = SelectObject(dc, subtitleFont);
+            RECT subtitleRect = {scaleForDpi(window, 20), scaleForDpi(window, 39),
+                client.right - scaleForDpi(window, 18), scaleForDpi(window, 60)};
+            DrawTextW(dc, L"LOCAL PROGRAM OUTPUT", -1, &subtitleRect,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            SelectObject(dc, oldSubtitleFont);
+            DeleteObject(subtitleFont);
+            EndPaint(window, &paint);
+            return 0;
+        }
         HBRUSH background = CreateSolidBrush(RGB(17, 12, 27));
         FillRect(dc, &client, background);
         DeleteObject(background);
@@ -8118,11 +8264,28 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                     image = std::make_unique<Gdiplus::Image>(path.c_str());
                 }
                 if (image->GetLastStatus() != Gdiplus::Ok) continue;
+                const double naturalWidth = std::max<UINT>(1, image->GetWidth());
+                const double naturalHeight = std::max<UINT>(1, image->GetHeight());
+                const double aspect = naturalWidth / naturalHeight;
+                double drawWidth = sprite.widthAuto ? naturalWidth : sprite.width * canvasWidth / 100.0;
+                double drawHeight = sprite.heightAuto ? naturalHeight : sprite.height * canvasHeight / 100.0;
+                if (sprite.widthAuto && !sprite.heightAuto) {
+                    drawWidth = drawHeight * aspect;
+                } else if (!sprite.widthAuto && sprite.heightAuto) {
+                    drawHeight = drawWidth / aspect;
+                } else if (sprite.widthAuto && sprite.heightAuto) {
+                    const double fit = std::min({1.0,
+                        static_cast<double>(canvasWidth) / naturalWidth,
+                        static_cast<double>(canvasHeight) / naturalHeight});
+                    drawWidth *= fit;
+                    drawHeight *= fit;
+                }
+                if (drawWidth <= 0 || drawHeight <= 0) continue;
                 const Gdiplus::RectF destination(
                     static_cast<Gdiplus::REAL>(sprite.x * canvasWidth / 100.0),
                     static_cast<Gdiplus::REAL>(layout.headerHeight + sprite.y * canvasHeight / 100.0),
-                    static_cast<Gdiplus::REAL>(sprite.width * canvasWidth / 100.0),
-                    static_cast<Gdiplus::REAL>(sprite.height * canvasHeight / 100.0));
+                    static_cast<Gdiplus::REAL>(drawWidth),
+                    static_cast<Gdiplus::REAL>(drawHeight));
                 graphics.DrawImage(image.get(), destination);
             }
         }
@@ -8529,7 +8692,7 @@ bool askForInput(const std::string& prompt, std::string& answer) {
 #endif
 }
 
-bool runUi() {
+bool runUi(bool showImmediately = true) {
     enablePerMonitorDpiAwareness();
     Gdiplus::GdiplusStartupInput gdiplusInput;
     Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusInput, nullptr);
@@ -8550,9 +8713,14 @@ bool runUi() {
     int fps = 60;
     for (const UiAnimation& animation : uiAnimations) fps = std::max(fps, animation.fps);
     if (!uiAnimations.empty() || !everyTasks.empty()) SetTimer(mainWindow, 1, static_cast<UINT>(std::max(1, 1000 / fps)), nullptr);
-    ShowWindow(mainWindow, SW_SHOW);
-    UpdateWindow(mainWindow);
-    appendOutput("TRG is ready. Output and errors appear here.\r\n");
+    if (showImmediately) {
+        ShowWindow(mainWindow, SW_SHOW);
+        UpdateWindow(mainWindow);
+        appendOutput("TRG is ready. Output and errors appear here.\r\n");
+    } else {
+        layoutOutputControls(mainWindow);
+        refreshDisplayVariables(uiVariables, uiTypes);
+    }
     return true;
 }
 
@@ -8605,6 +8773,7 @@ void executeProgram(const std::vector<std::string>& program) {
     uiVariables.clear();
     uiTypes.clear();
     uiDefaults = standardDefaults();
+    refreshDisplayVariables(uiVariables, uiTypes);
     keyboardControls.clear();
     controllerControls.clear();
     controlsEnabled = false;
@@ -9018,7 +9187,8 @@ bool runSourceFile(const std::filesystem::path& path) {
 #ifndef TRG_ANDROID_BRIDGE
 int runApplication(int argc, char** argv) {
 #if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
-    if (!runUi()) {
+    const bool launchingProgram = argc > 1 && lower(argv[1]) != "compile";
+    if (!runUi(!launchingProgram)) {
         MessageBoxW(nullptr, L"Could not create the TRG window.", L"TRG error", MB_OK | MB_ICONERROR);
         return 1;
     }
@@ -9133,6 +9303,10 @@ int runApplication(int argc, char** argv) {
     if (hasEmbeddedSource) {
         std::istringstream input(embeddedSource);
         program = readProgram(input);
+        if (!scriptPath.empty()) {
+            currentSourcePath = std::filesystem::absolute(scriptPath);
+            projectRoot = currentSourcePath.parent_path();
+        }
     } else if (!scriptPath.empty() && argc > 1) {
         std::ifstream file(scriptPath);
         if (!file.is_open()) {
@@ -9148,9 +9322,6 @@ int runApplication(int argc, char** argv) {
         program = readProgram(file);
         currentSourcePath = std::filesystem::absolute(scriptPath);
         projectRoot = currentSourcePath.parent_path();
-#ifdef _WIN32
-        loadSourceFile(scriptPath);
-#endif
     } else if (argc == 1) {
 #ifdef _WIN32
         if (mainWindow) runMessageLoop();
@@ -9177,18 +9348,21 @@ int runApplication(int argc, char** argv) {
 #if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
     LibraryState launchLibraries;
     scanLibraries(program, launchLibraries);
-    if (launchLibraries.ui) {
-        standaloneAppMode = true;
-        previewMode = true;
-        if (mainWindow) {
-            SetWindowTextW(mainWindow, (L"TRG App - " +
-                (scriptPath.empty() ? std::wstring(L"Untitled") : scriptPath.filename().wstring())).c_str());
-            layoutOutputControls(mainWindow);
-        }
+    standaloneAppMode = launchLibraries.ui;
+    standaloneTerminalMode = !launchLibraries.ui;
+    previewMode = true;
+    if (mainWindow) {
+        const std::wstring appName = scriptPath.empty() ? L"Untitled" : scriptPath.filename().wstring();
+        SetWindowTextW(mainWindow, (standaloneAppMode ? L"TRG App - " : L"TRG Terminal - ") + appName);
+        layoutOutputControls(mainWindow);
     }
 #endif
     executeProgram(program);
 #if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
+    if (launchingProgram && mainWindow) {
+        ShowWindow(mainWindow, SW_SHOW);
+        UpdateWindow(mainWindow);
+    }
     runMessageLoop();
 #endif
     return 0;
