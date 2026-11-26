@@ -301,7 +301,7 @@ add (json)
 add (all)
 ```
 
-`add (all)` enables every built-in library, including `json`, `math`, `ai`, `binary`, `regex`, `compression`, `time`, `convert`, `stats`, `units`, and `3d`. Everyday text and number commands such as `find`, `replace_text`, `add_numbers`, and `square_root` work without adding a library.
+`add (all)` enables every built-in library, including `json`, `math`, `ai`, `binary`, `regex`, `compression`, `time`, `convert`, `stats`, `units`, `style`, and `3d`. Everyday text and number commands such as `find`, `replace_text`, `add_numbers`, and `square_root` work without adding a library.
 
 The PowerShell, Raspberry, and accessibility libraries are also registered:
 
@@ -667,6 +667,32 @@ Commands:
 - `physics remove OBJECT` unregisters an object.
 
 The first version resolves axis-aligned rectangle collisions against registered solid bodies. It does not yet include rotated-shape collision, frictional contact, joints, or continuous collision detection for very fast objects. For accurate results, use small fixed steps (for example, 0.016 seconds).
+
+### Reusable UI styles
+
+`add (style)` enables named, reusable visual styles for UI blocks, buttons, and text. Define a style with `style name NAME ( ... )` and apply it with `style apply OBJECT NAME`. The property commands are deliberately simpler than CSS:
+
+```text
+add (ui)
+add (style)
+
+style name glow (
+    background #171329
+    text #F8F7FF
+    glow #A88AFF 0.8
+    radius 12
+    opacity 0.9
+    font sans
+    size 0.6
+    bold true
+    align center
+)
+
+block name panel x 10 y 10 w 40 h 20 color #FFFFFF
+style apply panel glow
+```
+
+Supported style properties are `background`, `text`, `glow COLOR [INTENSITY]`, `radius`, `opacity`, `font`, `size`, `bold`, and `align`. Blocks use background, glow, radius, and opacity. Buttons also support text colour, font, text size, and bold. Text labels support text colour, font, size, bold, alignment, and opacity. Glow is currently rendered on blocks.
 
 ### Editing 2D UI objects
 
