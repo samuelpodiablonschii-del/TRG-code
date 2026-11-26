@@ -238,6 +238,12 @@ word currentColor = "#8B42F5"
 word currentTexture = "smooth"
 word renameInput = ""
 word editValue = ""
+num posX = 0
+num posY = 0
+num posZ = 0
+num scaleX = 1
+num scaleY = 1
+num scaleZ = 1
 list objects
 num objectCount = 1
 num selectedIndex = 0
@@ -259,7 +265,7 @@ button select_tool "➤  Select" x 2 y 7.1 w 20 h 4.7 color #6630B5 (
     say "Select an object in the viewport. Drag it to move it."
 )
 button reset_view "⟳  Reset" x 23 y 7.1 w 19 h 4.7 color #302044 (
-    say "Camera reset."
+    say "Camera reset to its starting position."
 )
 button save_scene "▣  Save" x 43 y 7.1 w 18 h 4.7 color #302044 (
     3d save "scene.trgscene"
@@ -275,30 +281,32 @@ button code "‹/›  Code" x 81 y 7.1 w 17 h 4.7 color #302044 (
 
 // Large, uncluttered perspective viewport.
 block z 1 x 0.6 y 13.1 w 98.8 h 34.2 color #0C0915 edges round name VIEWPORT_PANEL
-block z 2 x 1 y 29 w 98 h 0.12 color #28203A name GRID_H1
-block z 2 x 1 y 34 w 98 h 0.12 color #28203A name GRID_H2
-block z 2 x 1 y 39 w 98 h 0.12 color #28203A name GRID_H3
-block z 2 x 1 y 44 w 98 h 0.12 color #28203A name GRID_H4
-block z 2 x 10 y 28 w 40 h 0.12 color #28203A name GRID_D1
-block z 2 x 50 y 28 w 40 h 0.12 color #28203A name GRID_D2
-block z 2 x 1 y 46 w 98 h 0.12 color #28203A name GRID_HORIZON
-text "PERSPECTIVE" x 3 y 15.2 size 0.95 color #A895C6 bold true
-text "X  Y  Z" x 96 y 15.2 size 0.9 color #9C83C4 align right
-text "DRAG TO MOVE  •  TWO FINGERS TO ORBIT + ZOOM" x 50 y 46.3 size 0.78 color #89799E align center
+// Perspective floor grid and axis gizmo are rendered by the native Android viewport.text "DRAG TO MOVE  •  TWO FINGERS TO ORBIT + ZOOM" x 50 y 46.3 size 0.78 color #89799E align center
 
 // Hierarchy / inspector navigation tabs.
 block z 1 x 0 y 47.7 w 100 h 5.4 color #160F23 name EDITOR_TABS
 button tab_hierarchy "▰  Hierarchy" x 1.5 y 48.2 w 48 h 4.7 color #572A9B (
-    say "Hierarchy selected."
+    set_color tab_hierarchy #572A9B
+    set_color tab_inspector #281B3A
+    say "Hierarchy selected. Tap a model in the viewport to select it."
 )
 button tab_inspector "⚙  Inspector" x 50.5 y 48.2 w 48 h 4.7 color #281B3A (
-    say "Inspector selected."
+    set_color tab_hierarchy #281B3A
+    set_color tab_inspector #572A9B
+    say "Inspector selected. Edit the selected model below."
 )
 
 // Inspector card, matching the reference's compact stacked form.
 block z 1 x 0.7 y 53.4 w 98.6 h 26.1 color #191226 edges round name INSPECTOR_CARD
 text "◆" x 5 y 57.3 size 3.0 color #A65BFF
 text model_label "Cube (Selected)" x 14 y 57.3 size 1.8 color #F5EEFF bold true
+button hierarchy_item "" x 4 y 54.5 w 92 h 5.1 color #191226 opacity 0 (
+    if objectCount > 0 (
+        get objects selectedIndex selectedName
+        set_text model_label selectedName
+        set_text rename_value selectedName
+    )
+)
 block z 2 x 4 y 59.1 w 92 h 0.12 color #342447 name INSPECTOR_DIVIDER
 
 text "Name" x 4 y 62.3 size 1.35 color #D8CBEA
@@ -317,40 +325,52 @@ text rename_value "Cube" x 31 y 63 size 1.25 color #F1E9FF
 text "Position" x 4 y 67.2 size 1.3 color #D8CBEA
 button pos_x "0.00" x 28 y 65.1 w 21 h 3.6 color #2B203D (
     if objectCount > 0 (
-        ask "X position change (+/-):" editValue
+        ask "X position offset (+/-):" editValue
         3d move selectedName editValue 0 0
+        posX = posX + editValue
+        set_text pos_x posX
     )
 )
 button pos_y "0.00" x 51 y 65.1 w 21 h 3.6 color #2B203D (
     if objectCount > 0 (
-        ask "Y position change (+/-):" editValue
+        ask "Y position offset (+/-):" editValue
         3d move selectedName 0 editValue 0
+        posY = posY + editValue
+        set_text pos_y posY
     )
 )
 button pos_z "0.00" x 74 y 65.1 w 22 h 3.6 color #2B203D (
     if objectCount > 0 (
-        ask "Z position change (+/-):" editValue
+        ask "Z position offset (+/-):" editValue
         3d move selectedName 0 0 editValue
+        posZ = posZ + editValue
+        set_text pos_z posZ
     )
 )
 
 text "Scale" x 4 y 71.8 size 1.3 color #D8CBEA
 button scale_x "1.00" x 28 y 69.7 w 21 h 3.6 color #2B203D (
     if objectCount > 0 (
-        ask "Uniform scale multiplier:" editValue
-        3d scale selectedName editValue
+        ask "X scale multiplier (0.1-10):" editValue
+        3d scale selectedName editValue 1 1
+        scaleX = scaleX * editValue
+        set_text scale_x scaleX
     )
 )
 button scale_y "1.00" x 51 y 69.7 w 21 h 3.6 color #2B203D (
     if objectCount > 0 (
-        ask "Uniform scale multiplier:" editValue
-        3d scale selectedName editValue
+        ask "Y scale multiplier (0.1-10):" editValue
+        3d scale selectedName 1 editValue 1
+        scaleY = scaleY * editValue
+        set_text scale_y scaleY
     )
 )
 button scale_z "1.00" x 74 y 69.7 w 22 h 3.6 color #2B203D (
     if objectCount > 0 (
-        ask "Uniform scale multiplier:" editValue
-        3d scale selectedName editValue
+        ask "Z scale multiplier (0.1-10):" editValue
+        3d scale selectedName 1 1 editValue
+        scaleZ = scaleZ * editValue
+        set_text scale_z scaleZ
     )
 )
 
@@ -384,6 +404,20 @@ button asset_box "◆\nBox" x 3 y 85 w 17.5 h 12.2 color #302044 (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text model_label selectedName
+    set_text rename_value selectedName
+    set_text object_count objectCount
+    posX = 0
+    posY = 0
+    posZ = 0
+    scaleX = 1
+    scaleY = 1
+    scaleZ = 1
+    set_text pos_x posX
+    set_text pos_y posY
+    set_text pos_z posZ
+    set_text scale_x scaleX
+    set_text scale_y scaleY
+    set_text scale_z scaleZ
 )
 button asset_sphere "●\nSphere" x 22 y 85 w 17.5 h 12.2 color #302044 (
     3d sphere auto x 0 y 0 z 0 size 1.7 color #8D62F4
@@ -392,30 +426,86 @@ button asset_sphere "●\nSphere" x 22 y 85 w 17.5 h 12.2 color #302044 (
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text model_label selectedName
+    set_text rename_value selectedName
+    set_text object_count objectCount
+    posX = 0
+    posY = 0
+    posZ = 0
+    scaleX = 1
+    scaleY = 1
+    scaleZ = 1
+    set_text pos_x posX
+    set_text pos_y posY
+    set_text pos_z posZ
+    set_text scale_x scaleX
+    set_text scale_y scaleY
+    set_text scale_z scaleZ
 )
 button asset_camera "◉\nCamera" x 41 y 85 w 17.5 h 12.2 color #302044 (
-    3d camera auto x 0 y 1 z 0 w 1.1 h 0.8 d 1.4 color #B79BEA
+    3d box auto x 0 y 1 z 0 w 1.1 h 0.8 d 1.4 color #B79BEA
     push objects last_3d_object
     length objects objectCount
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text model_label selectedName
+    set_text rename_value selectedName
+    set_text object_count objectCount
+    posX = 0
+    posY = 0
+    posZ = 0
+    scaleX = 1
+    scaleY = 1
+    scaleZ = 1
+    set_text pos_x posX
+    set_text pos_y posY
+    set_text pos_z posZ
+    set_text scale_x scaleX
+    set_text scale_y scaleY
+    set_text scale_z scaleZ
 )
 button asset_spawn "▶\nSpawn" x 60 y 85 w 17.5 h 12.2 color #302044 (
-    3d spawn auto x 0 y 0 z 0 size 1 color #58C78D
+    3d sphere auto x 0 y 0 z 0 size 1 color #58C78D
     push objects last_3d_object
     length objects objectCount
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text model_label selectedName
+    set_text rename_value selectedName
+    set_text object_count objectCount
+    posX = 0
+    posY = 0
+    posZ = 0
+    scaleX = 1
+    scaleY = 1
+    scaleZ = 1
+    set_text pos_x posX
+    set_text pos_y posY
+    set_text pos_z posZ
+    set_text scale_x scaleX
+    set_text scale_y scaleY
+    set_text scale_z scaleZ
 )
 button asset_plane "◇\nPlane" x 79 y 85 w 18 h 12.2 color #302044 (
-    3d plane auto x 0 y -1 z 0 w 6 h 0.15 d 6 color #70B68A
+    3d box auto x 0 y -1 z 0 w 6 h 0.15 d 6 color #70B68A
     push objects last_3d_object
     length objects objectCount
     selectedIndex = objectCount - 1
     get objects selectedIndex selectedName
     set_text model_label selectedName
+    set_text rename_value selectedName
+    set_text object_count objectCount
+    posX = 0
+    posY = 0
+    posZ = 0
+    scaleX = 1
+    scaleY = 1
+    scaleZ = 1
+    set_text pos_x posX
+    set_text pos_y posY
+    set_text pos_z posZ
+    set_text scale_x scaleX
+    set_text scale_y scaleY
+    set_text scale_z scaleZ
 )
 )TRGEDITOR3D";
 inline constexpr const char* desktopEditor3D = R"TRGDESKTOP3D(// Native Windows editor owns the desktop 3D workspace and renders the scene UI.
