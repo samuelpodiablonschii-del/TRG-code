@@ -9250,6 +9250,7 @@ int runApplication(int argc, char** argv) {
     }
 #endif
 
+#if defined(_WIN32) && !defined(TRG_TEST_CONSOLE)
     if (editMode) {
         if (argc != 3) {
             MessageBoxW(nullptr, L"Usage: TRG.exe edit <file.trg>", L"TRG Editor", MB_OK | MB_ICONERROR);
@@ -9266,6 +9267,8 @@ int runApplication(int argc, char** argv) {
         runMessageLoop();
         return 0;
     }
+
+#endif
 
     if (argc > 1 && lower(argv[1]) == "compile") {
         if (argc != 3) {
