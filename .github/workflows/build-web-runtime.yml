@@ -94,7 +94,7 @@ jobs:
           output = "";
           globalThis.trgCompilerRequestInput = resolve => resolve("yas fatherin");
           await module.ccall("trg_web_run", null, ["string"], [
-            'word name = "huss"\\nask "huss" name\\nsay "absolutely king"\\nif name = "yas fatherin" {\\n  say "sure baba grill I\'m a man tho"\\n}'
+            'word name = "huss"\nask "huss" name\nsay "absolutely king"\nif name = "yas fatherin" {\n  say "sure baba grill I\'m a man tho"\n}'
           ], { async: true });
           if (!output.includes("absolutely king") || !output.includes("sure baba grill I'm a man tho")) {
             throw new Error("Typed-word/string-condition/curly-block regression failed: " + output);
@@ -104,7 +104,7 @@ jobs:
           output = "";
           globalThis.trgCompilerRequestInput = resolve => resolve("yas fatherin");
           await module.ccall("trg_web_run", null, ["string"], [
-            'word name = "huss"\\nask "huss" name\\nif name = "yas fatherin" (\\n  say "legacy parentheses still work"\\n)'
+            'word name = "huss"\nask "huss" name\nif name = "yas fatherin" (\n  say "legacy parentheses still work"\n)'
           ], { async: true });
           if (!output.includes("legacy parentheses still work")) {
             throw new Error("Legacy parenthesis-block regression failed: " + output);
