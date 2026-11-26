@@ -9433,8 +9433,16 @@ int runApplication(int argc, char** argv) {
     scanLibraries(launchProgram, launchLibraries);
     preparedLaunchProgram = launchProgram;
     preparedLaunchProgramReady = true;
+#if defined(TRG_FORCE_UI_APP)
+    standaloneAppMode = true;
+    standaloneTerminalMode = false;
+#elif defined(TRG_FORCE_CONSOLE_APP)
+    standaloneAppMode = false;
+    standaloneTerminalMode = true;
+#else
     standaloneAppMode = launchLibraries.ui;
     standaloneTerminalMode = !launchLibraries.ui;
+#endif
     previewMode = true;
     if (mainWindow) {
         const std::wstring appName = scriptPath.empty() ? L"Untitled" : scriptPath.filename().wstring();
