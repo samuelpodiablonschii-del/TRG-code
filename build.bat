@@ -47,10 +47,8 @@ windres.exe "%ROOT%TRG.rc" -O coff -o "%RESOURCE_OBJ%"
 if errorlevel 1 goto :failed
 
 echo.
-echo [2/4] Building UI-app.exe...
-g++.exe -std=c++17 -O2 -pipe -static -static-libgcc -static-libstdc++ -mwindows -municode -DTRG_FORCE_UI_APP "%ROOT%TRG.cpp" "%RESOURCE_OBJ%" -lcomdlg32 -lshell32 -lgdiplus -lgdi32 -luser32 -lwinhttp -lwinmm -o "%OUTPUT%"
-if errorlevel 1 goto :failed
-copy /Y "%OUTPUT%" "%ROOT%UI-app.exe" >nul
+echo [2/5] Building TRG Studio...
+g++.exe -std=c++17 -O2 -pipe -static -static-libgcc -static-libstdc++ -mwindows -municode "%ROOT%TRG.cpp" "%RESOURCE_OBJ%" -lcomdlg32 -lshell32 -lgdiplus -lgdi32 -luser32 -lwinhttp -lwinmm -o "%OUTPUT%"
 if errorlevel 1 goto :failed
 copy /Y "%OUTPUT%" "%ROOT%TRG.exe" >nul
 if errorlevel 1 (
@@ -58,12 +56,17 @@ if errorlevel 1 (
 )
 
 echo.
-echo [3/4] Building Console-app.exe...
+echo [3/5] Building UI-app.exe...
+g++.exe -std=c++17 -O2 -pipe -static -static-libgcc -static-libstdc++ -mwindows -municode -DTRG_FORCE_UI_APP "%ROOT%TRG.cpp" "%RESOURCE_OBJ%" -lcomdlg32 -lshell32 -lgdiplus -lgdi32 -luser32 -lwinhttp -lwinmm -o "%ROOT%UI-app.exe"
+if errorlevel 1 goto :failed
+
+echo.
+echo [4/5] Building Console-app.exe...
 g++.exe -std=c++17 -O2 -pipe -static -static-libgcc -static-libstdc++ -mwindows -municode -DTRG_FORCE_CONSOLE_APP "%ROOT%TRG.cpp" "%RESOURCE_OBJ%" -lcomdlg32 -lshell32 -lgdiplus -lgdi32 -luser32 -lwinhttp -lwinmm -o "%ROOT%Console-app.exe"
 if errorlevel 1 goto :failed
 
 echo.
-echo [4/4] Building Checker.exe...
+echo [5/5] Building Checker.exe...
 g++.exe -std=c++17 -O2 -pipe -static -static-libgcc -static-libstdc++ -mwindows -municode "%ROOT%Checker.cpp" "%RESOURCE_OBJ%" -lshell32 -luser32 -o "%ROOT%Checker.exe"
 if errorlevel 1 goto :failed
 goto :check_output
@@ -83,10 +86,8 @@ rc.exe /nologo /fo "%RESOURCE_RES%" "%ROOT%TRG.rc"
 if errorlevel 1 goto :failed
 
 echo.
-echo [2/4] Building UI-app.exe...
-cl.exe /nologo /std:c++17 /EHsc /O2 /MT /DTRG_FORCE_UI_APP "%ROOT%TRG.cpp" "%RESOURCE_RES%" /link /SUBSYSTEM:WINDOWS comdlg32.lib shell32.lib gdiplus.lib user32.lib gdi32.lib winhttp.lib winmm.lib /OUT:"%OUTPUT%"
-if errorlevel 1 goto :failed
-copy /Y "%OUTPUT%" "%ROOT%UI-app.exe" >nul
+echo [2/5] Building TRG Studio...
+cl.exe /nologo /std:c++17 /EHsc /O2 /MT "%ROOT%TRG.cpp" "%RESOURCE_RES%" /link /SUBSYSTEM:WINDOWS comdlg32.lib shell32.lib gdiplus.lib user32.lib gdi32.lib winhttp.lib winmm.lib /OUT:"%OUTPUT%"
 if errorlevel 1 goto :failed
 copy /Y "%OUTPUT%" "%ROOT%TRG.exe" >nul
 if errorlevel 1 (
@@ -94,12 +95,17 @@ if errorlevel 1 (
 )
 
 echo.
-echo [3/4] Building Console-app.exe...
+echo [3/5] Building UI-app.exe...
+cl.exe /nologo /std:c++17 /EHsc /O2 /MT /DTRG_FORCE_UI_APP "%ROOT%TRG.cpp" "%RESOURCE_RES%" /link /SUBSYSTEM:WINDOWS comdlg32.lib shell32.lib gdiplus.lib user32.lib gdi32.lib winhttp.lib winmm.lib /OUT:"%ROOT%UI-app.exe"
+if errorlevel 1 goto :failed
+
+echo.
+echo [4/5] Building Console-app.exe...
 cl.exe /nologo /std:c++17 /EHsc /O2 /MT /DTRG_FORCE_CONSOLE_APP "%ROOT%TRG.cpp" "%RESOURCE_RES%" /link /SUBSYSTEM:WINDOWS comdlg32.lib shell32.lib gdiplus.lib user32.lib gdi32.lib winhttp.lib winmm.lib /OUT:"%ROOT%Console-app.exe"
 if errorlevel 1 goto :failed
 
 echo.
-echo [4/4] Building Checker.exe...
+echo [5/5] Building Checker.exe...
 cl.exe /nologo /std:c++17 /EHsc /O2 /MT "%ROOT%Checker.cpp" "%RESOURCE_RES%" /link /SUBSYSTEM:WINDOWS shell32.lib user32.lib /OUT:"%ROOT%Checker.exe"
 if errorlevel 1 goto :failed
 
