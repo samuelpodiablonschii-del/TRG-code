@@ -1765,19 +1765,21 @@ sourceText = exampleSource;
             paint.setStyle(Paint.Style.STROKE);
             paint.setStrokeWidth(Math.max(1f, dp(0.7f)));
             paint.setColor(Color.argb(115, 91, 70, 126));
-            for (int z = -8; z <= 30; z += 2) {
-                float[] left = project3DPoint(-24, -1.35, z, width, height);
-                float[] right = project3DPoint(24, -1.35, z, width, height);
-                canvas.drawLine(left[0], left[1], right[0], right[1], paint);
+            float vanishingX = width * 0.5f + (cameraYaw - 0.48f) * width * 0.08f;
+            float horizonY = height * (0.225f + (cameraPitch - 0.32f) * 0.035f);
+            float floorY = height * 0.472f;
+            for (int line = 1; line <= 9; line++) {
+                float t = line / 9.0f;
+                float y = horizonY + (floorY - horizonY) * t * t;
+                canvas.drawLine(width * 0.005f, y, width * 0.995f, y, paint);
             }
-            for (int x = -24; x <= 24; x += 2) {
-                float[] near = project3DPoint(x, -1.35, -8, width, height);
-                float[] far = project3DPoint(x, -1.35, 30, width, height);
-                canvas.drawLine(near[0], near[1], far[0], far[1], paint);
+            for (int line = 0; line <= 14; line++) {
+                float bottomX = width * (0.08f + 0.84f * line / 14.0f);
+                canvas.drawLine(vanishingX, horizonY, bottomX, floorY, paint);
             }
             paint.setStrokeWidth(dp(1.2f));
             paint.setColor(Color.argb(145, 113, 89, 151));
-            canvas.drawLine(width * 0.01f, height * 0.285f, width * 0.99f, height * 0.285f, paint);
+            canvas.drawLine(width * 0.01f, horizonY, width * 0.99f, horizonY, paint);
             canvas.restoreToCount(save);
 
             float ox = width * 0.91f, oy = height * 0.245f, axis = width * 0.058f;
