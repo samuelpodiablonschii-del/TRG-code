@@ -244,6 +244,21 @@ void registerTrgFileType() {
     setRegistryString(HKEY_LOCAL_MACHINE,
         L"Software\\Classes\\" + applicationId + L"\\shell\\Edit in TRG\\command", L"",
         L"\"" + editorPath.wstring() + L"\" edit \"%1\"");
+
+    // Per-user file associations take precedence over machine-wide classes.
+    // Replace any previous Runtime.exe registration left by older installs.
+    setRegistryString(HKEY_CURRENT_USER, L"Software\\Classes\\.trg", L"", applicationId);
+    setRegistryString(HKEY_CURRENT_USER,
+        L"Software\\Classes\\" + applicationId, L"", L"TRG source file");
+    setRegistryString(HKEY_CURRENT_USER,
+        L"Software\\Classes\\" + applicationId + L"\\DefaultIcon", L"",
+        L"\"" + checkerPath.wstring() + L"\",0");
+    setRegistryString(HKEY_CURRENT_USER,
+        L"Software\\Classes\\" + applicationId + L"\\shell\\open\\command", L"",
+        L"\"" + checkerPath.wstring() + L"\" \"%1\"");
+    setRegistryString(HKEY_CURRENT_USER,
+        L"Software\\Classes\\" + applicationId + L"\\shell\\Edit in TRG\\command", L"",
+        L"\"" + editorPath.wstring() + L"\" edit \"%1\"");
     SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
 #endif
 }
