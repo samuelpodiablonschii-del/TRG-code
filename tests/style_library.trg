@@ -13,6 +13,16 @@ style name glow (
     align center
 )
 
+style name control_style (
+    background #7043BE
+    text #FFFFFF
+    radius 7
+    opacity 0.85
+    font sans
+    size 0.5
+    bold true
+)
+
 style name label_style (
     text #C8B7FF
     opacity 0.95
@@ -29,7 +39,7 @@ button action "Run" x 10 y 40 w 30 h 12 (
 text title "TRG styles" x 10 y 60 size 5 color #FFFFFF
 
 style apply panel glow
-style apply action glow
+style apply action control_style
 style apply title label_style
 
 say "TRG_STYLE_LIBRARY_PASSED"
