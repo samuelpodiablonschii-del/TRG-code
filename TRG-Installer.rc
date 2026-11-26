@@ -1,5 +1,5 @@
 #include "resource.h"
-#define IDR_RUNTIME 201
+#define IDR_EDITOR 201
 #define IDR_EXAMPLE 202
 #define IDR_README 203
 #define IDR_ICON 204
@@ -7,9 +7,12 @@
 #define IDR_3D_EDITOR 206
 
 IDI_TRG ICON "trg.ico"
-IDR_RUNTIME RCDATA "TRG-build.exe"
+IDR_EDITOR RCDATA "TRG-build.exe"
 IDR_EXAMPLE RCDATA "TRG-Example.trg"
 IDR_README RCDATA "README.md"
 IDR_ICON RCDATA "trg.ico"
 IDR_2D_EDITOR RCDATA "2DEditor.trg"
 IDR_3D_EDITOR RCDATA "3DEditor.trg"
+IDR_UI_APP 207 RCDATA "UI-app.exe"
+IDR_CONSOLE_APP 208 RCDATA "Console-app.exe"
+IDR_CHECKER 209 RCDATA "Checker.exe"
