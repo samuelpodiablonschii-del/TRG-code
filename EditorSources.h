@@ -302,7 +302,8 @@ text model_label "Cube (Selected)" x 14 y 57.3 size 1.8 color #F5EEFF bold true
 block z 2 x 4 y 59.1 w 92 h 0.12 color #342447 name INSPECTOR_DIVIDER
 
 text "Name" x 4 y 62.3 size 1.35 color #D8CBEA
-button rename_action "Cube" x 28 y 60.5 w 68 h 3.9 color #2B203D (
+block z 2 x 28 y 60.5 w 68 h 3.9 color #2B203D edges round name NAME_FIELD
+button rename_action "" x 28 y 60.5 w 68 h 3.9 color #2B203D (
     if objectCount > 0 (
         ask "Object name:" renameInput
         3d rename selectedName renameInput
@@ -311,6 +312,7 @@ button rename_action "Cube" x 28 y 60.5 w 68 h 3.9 color #2B203D (
         set_text rename_value selectedName
     )
  )
+text rename_value "Cube" x 31 y 63 size 1.25 color #F1E9FF
 
 text "Position" x 4 y 67.2 size 1.3 color #D8CBEA
 button pos_x "0.00" x 28 y 65.1 w 21 h 3.6 color #2B203D (
