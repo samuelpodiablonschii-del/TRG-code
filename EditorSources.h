@@ -317,7 +317,7 @@ button tab_inspector "⚙  Inspector" x 50.5 y 48.2 w 48 h 4.7 color #281B3A (
 block z 1 x 0.7 y 53.4 w 98.6 h 26.1 color #191226 edges round name INSPECTOR_CARD
 text "◆" x 5 y 57.3 size 3.0 color #A65BFF
 text model_label "Cube (Selected)" x 14 y 57.3 size 1.8 color #F5EEFF bold true
-button hierarchy_item "" x 4 y 54.5 w 92 h 5.1 color #191226 opacity 0 (
+button hierarchy_item " " x 4 y 54.5 w 92 h 5.1 color #191226 opacity 0 (
     if objectCount > 0 (
         get objects selectedIndex selectedName
         set_text model_label selectedName
@@ -329,7 +329,7 @@ block z 2 x 4 y 59.1 w 92 h 0.12 color #342447 name INSPECTOR_DIVIDER
 text "Name" x 4 y 62.3 size 1.35 color #D8CBEA
 block z 2 x 28 y 60.5 w 68 h 3.9 color #2B203D edges round name NAME_FIELD
 text rename_value "Cube" x 31 y 63 size 1.25 color #F1E9FF
-button rename_action "" x 28 y 60.5 w 68 h 3.9 color #2B203D opacity 0 (
+button rename_action " " x 28 y 60.5 w 68 h 3.9 color #2B203D opacity 0 (
     if objectCount > 0 (
         ask "Object name:" renameInput
         3d rename selectedName renameInput
@@ -344,7 +344,7 @@ button rename_action "" x 28 y 60.5 w 68 h 3.9 color #2B203D opacity 0 (
 text "Position" x 4 y 67.2 size 1.3 color #D8CBEA
 block z 2 x 28 y 65.1 w 21 h 3.6 color #2B203D edges round name POS_X_FIELD
 text pos_x_value "0.00" x 30 y 67.6 size 1.2 color #F1E9FF
-button pos_x "" x 28 y 65.1 w 21 h 3.6 color #2B203D opacity 0 (
+button pos_x " " x 28 y 65.1 w 21 h 3.6 color #2B203D opacity 0 (
     if objectCount > 0 (
         ask "X position offset (+/-):" editValue
         3d move selectedName editValue 0 0
@@ -354,7 +354,7 @@ button pos_x "" x 28 y 65.1 w 21 h 3.6 color #2B203D opacity 0 (
 )
 block z 2 x 51 y 65.1 w 21 h 3.6 color #2B203D edges round name POS_Y_FIELD
 text pos_y_value "0.00" x 53 y 67.6 size 1.2 color #F1E9FF
-button pos_y "" x 51 y 65.1 w 21 h 3.6 color #2B203D opacity 0 (
+button pos_y " " x 51 y 65.1 w 21 h 3.6 color #2B203D opacity 0 (
     if objectCount > 0 (
         ask "Y position offset (+/-):" editValue
         3d move selectedName 0 editValue 0
@@ -364,7 +364,7 @@ button pos_y "" x 51 y 65.1 w 21 h 3.6 color #2B203D opacity 0 (
 )
 block z 2 x 74 y 65.1 w 22 h 3.6 color #2B203D edges round name POS_Z_FIELD
 text pos_z_value "0.00" x 76 y 67.6 size 1.2 color #F1E9FF
-button pos_z "" x 74 y 65.1 w 22 h 3.6 color #2B203D opacity 0 (
+button pos_z " " x 74 y 65.1 w 22 h 3.6 color #2B203D opacity 0 (
     if objectCount > 0 (
         ask "Z position offset (+/-):" editValue
         3d move selectedName 0 0 editValue
@@ -376,7 +376,7 @@ button pos_z "" x 74 y 65.1 w 22 h 3.6 color #2B203D opacity 0 (
 text "Scale" x 4 y 71.8 size 1.3 color #D8CBEA
 block z 2 x 28 y 69.7 w 21 h 3.6 color #2B203D edges round name SCALE_X_FIELD
 text scale_x_value "1.00" x 30 y 72.2 size 1.2 color #F1E9FF
-button scale_x "" x 28 y 69.7 w 21 h 3.6 color #2B203D opacity 0 (
+button scale_x " " x 28 y 69.7 w 21 h 3.6 color #2B203D opacity 0 (
     if objectCount > 0 (
         ask "X scale multiplier (0.1-10):" editValue
         3d scale selectedName editValue 1 1
@@ -386,7 +386,7 @@ button scale_x "" x 28 y 69.7 w 21 h 3.6 color #2B203D opacity 0 (
 )
 block z 2 x 51 y 69.7 w 21 h 3.6 color #2B203D edges round name SCALE_Y_FIELD
 text scale_y_value "1.00" x 53 y 72.2 size 1.2 color #F1E9FF
-button scale_y "" x 51 y 69.7 w 21 h 3.6 color #2B203D opacity 0 (
+button scale_y " " x 51 y 69.7 w 21 h 3.6 color #2B203D opacity 0 (
     if objectCount > 0 (
         ask "Y scale multiplier (0.1-10):" editValue
         3d scale selectedName 1 editValue 1
@@ -396,7 +396,7 @@ button scale_y "" x 51 y 69.7 w 21 h 3.6 color #2B203D opacity 0 (
 )
 block z 2 x 74 y 69.7 w 22 h 3.6 color #2B203D edges round name SCALE_Z_FIELD
 text scale_z_value "1.00" x 76 y 72.2 size 1.2 color #F1E9FF
-button scale_z "" x 74 y 69.7 w 22 h 3.6 color #2B203D opacity 0 (
+button scale_z " " x 74 y 69.7 w 22 h 3.6 color #2B203D opacity 0 (
     if objectCount > 0 (
         ask "Z scale multiplier (0.1-10):" editValue
         3d scale selectedName 1 1 editValue
@@ -446,7 +446,7 @@ text asset_camera_label "Camera" x 49.75 y 96.4 size 1.7 color #F4ECFF align cen
 text asset_spawn_label "Spawn" x 68.75 y 96.4 size 1.7 color #F4ECFF align center
 text asset_plane_label "Plane" x 88 y 96.4 size 1.7 color #F4ECFF align center
 
-button asset_box "" x 3 y 85 w 17.5 h 12.2 color #302044 opacity 0 (
+button asset_box " " x 3 y 85 w 17.5 h 12.2 color #302044 opacity 0 (
     3d box auto x 0 y 0 z 0 w 2 h 2 d 2 color currentColor
     push objects last_3d_object
     length objects objectCount
@@ -469,7 +469,7 @@ button asset_box "" x 3 y 85 w 17.5 h 12.2 color #302044 opacity 0 (
     set_text scale_y_value scaleY
     set_text scale_z_value scaleZ
 )
-button asset_sphere "" x 22 y 85 w 17.5 h 12.2 color #302044 opacity 0 (
+button asset_sphere " " x 22 y 85 w 17.5 h 12.2 color #302044 opacity 0 (
     3d sphere auto x 0 y 0 z 0 size 1.7 color #8B42F5
     push objects last_3d_object
     length objects objectCount
@@ -492,7 +492,7 @@ button asset_sphere "" x 22 y 85 w 17.5 h 12.2 color #302044 opacity 0 (
     set_text scale_y_value scaleY
     set_text scale_z_value scaleZ
 )
-button asset_camera "" x 41 y 85 w 17.5 h 12.2 color #302044 opacity 0 (
+button asset_camera " " x 41 y 85 w 17.5 h 12.2 color #302044 opacity 0 (
     3d box auto x 0 y 1 z 0 w 1.1 h 0.8 d 1.4 color #8B42F5
     push objects last_3d_object
     length objects objectCount
@@ -515,7 +515,7 @@ button asset_camera "" x 41 y 85 w 17.5 h 12.2 color #302044 opacity 0 (
     set_text scale_y_value scaleY
     set_text scale_z_value scaleZ
 )
-button asset_spawn "" x 60 y 85 w 17.5 h 12.2 color #302044 opacity 0 (
+button asset_spawn " " x 60 y 85 w 17.5 h 12.2 color #302044 opacity 0 (
     3d sphere auto x 0 y 0 z 0 size 1 color #58B985
     push objects last_3d_object
     length objects objectCount
@@ -538,7 +538,7 @@ button asset_spawn "" x 60 y 85 w 17.5 h 12.2 color #302044 opacity 0 (
     set_text scale_y_value scaleY
     set_text scale_z_value scaleZ
 )
-button asset_plane "" x 79 y 85 w 18 h 12.2 color #302044 opacity 0 (
+button asset_plane " " x 79 y 85 w 18 h 12.2 color #302044 opacity 0 (
     3d box auto x 0 y -1 z 0 w 6 h 0.15 d 6 color #58B985
     push objects last_3d_object
     length objects objectCount
