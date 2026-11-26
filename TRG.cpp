@@ -1476,7 +1476,7 @@ bool findBlock(const std::vector<std::string>& program, std::size_t start,
         for (std::size_t i = firstCharacter; i < line.size(); ++i) {
             const char ch = line[i];
             if (quote != '\0') {
-                if (ch == '\\\\' && i + 1 < line.size()) {
+                if (ch == '\\' && i + 1 < line.size()) {
                     ++i;
                 } else if (ch == quote) {
                     quote = '\0';
