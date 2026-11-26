@@ -1435,20 +1435,25 @@ void reportError(std::size_t lineNumber, const std::string& reason, const std::s
 
 bool findBlock(const std::vector<std::string>& program, std::size_t start,
                std::size_t end, std::size_t& open, std::size_t& close) {
-    
-    
-    std::size_t depth = 0;
+    // Blocks may use either legacy parentheses or conventional curly braces.
+    // A stack keeps mixed nested blocks correctly paired.
+    std::vector<char> expectedClosers;
     open = std::string::npos;
     bool opened = false;
     for (close = start; close < end; ++close) {
-        std::string line = program[close];
+        const std::string& line = program[close];
         std::size_t firstCharacter = 0;
-        if (close == start && !line.empty()) {
+        if (close == start) {
             std::size_t lastCharacter = line.size();
-            while (lastCharacter > 0 && std::isspace(static_cast<unsigned char>(line[lastCharacter - 1]))) --lastCharacter;
-            if (lastCharacter > 0 && line[lastCharacter - 1] == '(') {
+            while (lastCharacter > 0 &&
+                   std::isspace(static_cast<unsigned char>(line[lastCharacter - 1]))) {
+                --lastCharacter;
+            }
+            if (lastCharacter > 0 &&
+                (line[lastCharacter - 1] == '(' || line[lastCharacter - 1] == '{')) {
+                const char opener = line[lastCharacter - 1];
                 open = close;
-                depth = 1;
+                expectedClosers.push_back(opener == '(' ? ')' : '}');
                 opened = true;
                 firstCharacter = lastCharacter;
             } else {
@@ -1466,23 +1471,33 @@ bool findBlock(const std::vector<std::string>& program, std::size_t start,
                 }
             }
         }
+
+        char quote = '\0';
         for (std::size_t i = firstCharacter; i < line.size(); ++i) {
-            if (line[i] == '"') {
-                ++i;
-                while (i < line.size() && (line[i] != '"' || (i > 0 && line[i - 1] == '\\'))) ++i;
+            const char ch = line[i];
+            if (quote != '\0') {
+                if (ch == '\\\\' && i + 1 < line.size()) {
+                    ++i;
+                } else if (ch == quote) {
+                    quote = '\0';
+                }
                 continue;
             }
-            if (line[i] == '/' && i + 1 < line.size() && line[i + 1] == '/') break;
-            if (line[i] == '(') {
+            if (ch == '"' || ch == '\'') {
+                quote = ch;
+                continue;
+            }
+            if (ch == '/' && i + 1 < line.size() && line[i + 1] == '/') break;
+            if (ch == '(' || ch == '{') {
                 if (!opened) {
-                    opened = true;
                     open = close;
-                    depth = 1;
-                } else {
-                    ++depth;
+                    opened = true;
                 }
-            } else if (line[i] == ')' && opened) {
-                if (--depth == 0) return true;
+                expectedClosers.push_back(ch == '(' ? ')' : '}');
+            } else if ((ch == ')' || ch == '}') && opened &&
+                       !expectedClosers.empty() && ch == expectedClosers.back()) {
+                expectedClosers.pop_back();
+                if (expectedClosers.empty()) return true;
             }
         }
     }
@@ -1817,8 +1832,16 @@ bool conditionIsTrue(const std::string& cond, Vars& variables) {
             if (op == "<") return left < right;
             return left > right;
         }
-        const std::string leftValue = valueFor(leftText, variables);
-        const std::string rightValue = valueFor(rightText, variables);
+        // Decode quoted string literals before comparing them with variables.
+        // tokenize() removes their surrounding quotes and preserves spaces.
+        const auto resolveConditionValue = [&](const std::string& expression) {
+            const std::string raw = trim(expression);
+            const std::vector<std::string> parts = tokenize(raw);
+            if (parts.size() == 1) return valueFor(parts.front(), variables);
+            return raw;
+        };
+        const std::string leftValue = resolveConditionValue(leftText);
+        const std::string rightValue = resolveConditionValue(rightText);
         return (op == "==" || op == "=") ? leftValue == rightValue :
             op == "!=" ? leftValue != rightValue : false;
     }
@@ -5105,7 +5128,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             } else if (cmd == "if") {
                 const auto conditionFromHeader = [](const std::string& header, const std::string& keyword) {
                     std::string condition = trim(header.substr(keyword.size()));
-                    if (!condition.empty() && condition.back() == '(') condition = trim(condition.substr(0, condition.size() - 1));
+                    if (!condition.empty() && (condition.back() == '(' || condition.back() == '{')) condition = trim(condition.substr(0, condition.size() - 1));
                     return condition;
                 };
                 bool branchTaken = false;
