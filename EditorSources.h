@@ -272,6 +272,19 @@ button save_scene "▣  Save" x 43 y 7.1 w 18 h 4.7 color #302044 (
 )
 button load_scene "▰  Load" x 62 y 7.1 w 18 h 4.7 color #302044 (
     3d load "scene.trgscene"
+    if objectCount > 0 (
+        selectedIndex = 0
+        get objects selectedIndex selectedName
+        set_text model_label selectedName
+        set_text rename_value selectedName
+        set_text pos_x posX
+        set_text pos_y posY
+        set_text pos_z posZ
+        set_text scale_x scaleX
+        set_text scale_y scaleY
+        set_text scale_z scaleZ
+        set_text material_value currentColor
+    )
     say "Scene loaded."
 )
 button code "‹/›  Code" x 81 y 7.1 w 17 h 4.7 color #302044 (
