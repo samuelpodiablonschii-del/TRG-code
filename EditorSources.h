@@ -280,7 +280,7 @@ button code "‹/›  Code" x 81 y 7.1 w 17 h 4.7 color #302044 (
 
 // Large, uncluttered perspective viewport.
 block z 1 x 0.6 y 13.1 w 98.8 h 34.2 color #0C0915 edges round name VIEWPORT_PANEL
-// Perspective floor grid and axis gizmo are rendered by the native Android viewport.text "DRAG TO MOVE  •  TWO FINGERS TO ORBIT + ZOOM" x 50 y 46.3 size 0.78 color #89799E align center
+// Perspective floor grid and axis gizmo are rendered by the native Android viewport.
 
 // Hierarchy / inspector navigation tabs.
 block z 1 x 0 y 47.7 w 100 h 5.4 color #160F23 name EDITOR_TABS
