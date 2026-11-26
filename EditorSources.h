@@ -237,6 +237,7 @@ word selectedName = "Cube"
 word currentColor = "#8B42F5"
 word currentTexture = "smooth"
 word renameInput = ""
+word editValue = ""
 list objects
 num objectCount = 1
 num selectedIndex = 0
@@ -301,7 +302,7 @@ text model_label "Cube (Selected)" x 14 y 57.3 size 1.8 color #F5EEFF bold true
 block z 2 x 4 y 59.1 w 92 h 0.12 color #342447 name INSPECTOR_DIVIDER
 
 text "Name" x 4 y 62.3 size 1.35 color #D8CBEA
-button rename_action "EDIT NAME" x 80 y 60.5 w 16 h 3.9 color #39264F (
+button rename_action "Cube" x 28 y 60.5 w 68 h 3.9 color #2B203D (
     if objectCount > 0 (
         ask "Object name:" renameInput
         3d rename selectedName renameInput
@@ -310,32 +311,51 @@ button rename_action "EDIT NAME" x 80 y 60.5 w 16 h 3.9 color #39264F (
         set_text rename_value selectedName
     )
  )
-text rename_value "Cube" x 31 y 63 size 1.25 color #F1E9FF
 
 text "Position" x 4 y 67.2 size 1.3 color #D8CBEA
-button pos_x "X  0.00" x 28 y 65.1 w 21 h 3.6 color #2B203D (
-    say "Drag the selected object in the viewport to change its position."
+button pos_x "0.00" x 28 y 65.1 w 21 h 3.6 color #2B203D (
+    if objectCount > 0 (
+        ask "X position change (+/-):" editValue
+        3d move selectedName editValue 0 0
+    )
 )
-button pos_y "Y  0.00" x 51 y 65.1 w 21 h 3.6 color #2B203D (
-    say "Drag the selected object in the viewport to change its position."
+button pos_y "0.00" x 51 y 65.1 w 21 h 3.6 color #2B203D (
+    if objectCount > 0 (
+        ask "Y position change (+/-):" editValue
+        3d move selectedName 0 editValue 0
+    )
 )
-button pos_z "Z  0.00" x 74 y 65.1 w 22 h 3.6 color #2B203D (
-    say "Drag the selected object in the viewport to change its position."
+button pos_z "0.00" x 74 y 65.1 w 22 h 3.6 color #2B203D (
+    if objectCount > 0 (
+        ask "Z position change (+/-):" editValue
+        3d move selectedName 0 0 editValue
+    )
 )
 
 text "Scale" x 4 y 71.8 size 1.3 color #D8CBEA
 button scale_x "1.00" x 28 y 69.7 w 21 h 3.6 color #2B203D (
-    say "Scale editing is available from the selected object's code."
+    if objectCount > 0 (
+        ask "Uniform scale multiplier:" editValue
+        3d scale selectedName editValue
+    )
 )
 button scale_y "1.00" x 51 y 69.7 w 21 h 3.6 color #2B203D (
-    say "Scale editing is available from the selected object's code."
+    if objectCount > 0 (
+        ask "Uniform scale multiplier:" editValue
+        3d scale selectedName editValue
+    )
 )
 button scale_z "1.00" x 74 y 69.7 w 22 h 3.6 color #2B203D (
-    say "Scale editing is available from the selected object's code."
+    if objectCount > 0 (
+        ask "Uniform scale multiplier:" editValue
+        3d scale selectedName editValue
+    )
 )
 
 text "Material" x 4 y 76.5 size 1.3 color #D8CBEA
-button material "CHANGE  ▾" x 78 y 74.3 w 18 h 3.8 color #39264F (
+block z 2 x 28 y 74.3 w 68 h 3.8 color #2B203D edges round name MATERIAL_FIELD
+text material_value "●  Purple" x 32 y 76.8 size 1.2 color #DCCEFF
+button material "▾" x 89 y 74.3 w 7 h 3.8 color #39264F (
     if objectCount > 0 (
         if currentColor = "#8B42F5" ( currentColor = "#438FF5" )
         else ( if currentColor = "#438FF5" ( currentColor = "#E2A34D" )
@@ -347,8 +367,7 @@ button material "CHANGE  ▾" x 78 y 74.3 w 18 h 3.8 color #39264F (
         else ( if currentColor = "#E2A34D" ( set_text material_value "●  Gold" )
         else ( set_text material_value "●  Green" ) ) )
     )
- )
-text material_value "●  Purple" x 32 y 76.8 size 1.2 color #DCCEFF
+)
 
 // Asset browser dock.
 block z 1 x 0.7 y 80.2 w 98.6 h 19.2 color #191226 edges round name ASSET_BROWSER
