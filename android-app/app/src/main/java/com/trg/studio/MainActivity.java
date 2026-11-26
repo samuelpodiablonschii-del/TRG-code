@@ -716,7 +716,7 @@ sourceText = exampleSource;
                 + "3d spawn NAME x X y Y z Z size SIZE color COLOR\n"
                 + "3d plane NAME x X y Y z Z w W h H d D color COLOR\n"
                 + "3d duplicate SOURCE NAME | 3d move NAME DX DY DZ | 3d rotate NAME RX RY RZ\n"
-                + "3d scale NAME FACTOR | 3d color NAME COLOR | 3d texture NAME smooth|grid|metal|wood|stone\n"
+                + "3d scale NAME FACTOR | 3d scale NAME X Y Z | 3d color NAME COLOR | 3d texture NAME smooth|grid|metal|wood|stone\n"
                 + "3d rename OLD NEW | 3d delete NAME | 3d save FILE.trgscene | 3d load FILE.trgscene\n"
                 + "DESKTOP 3D EDITOR\n"
                 + "W A S D move the editor camera; Q/E move vertically; arrow keys look around.\n"
