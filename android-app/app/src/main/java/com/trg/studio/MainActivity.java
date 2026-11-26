@@ -1327,9 +1327,28 @@ sourceText = exampleSource;
     }
 
     private void runButton(int index) {
+        String actionName = activeProgramPreview == null ? "" : activeProgramPreview.buttonName(index);
+        boolean syncHierarchySelection = activeProgramPreview != null && activeProgramPreview.editor3D
+                && ("tab_hierarchy".equals(actionName) || "hierarchy_item".equals(actionName));
         nativeSetMobileInput("mobile_tap", "press");
         executor.execute(() -> {
             String result = nativeClickButton(index);
+            if (syncHierarchySelection) {
+                try {
+                    JSONObject next = new JSONObject(result);
+                    JSONArray labels = next.optJSONArray("texts");
+                    if (labels != null) for (int i = 0; i < labels.length(); i++) {
+                        JSONObject label = labels.optJSONObject(i);
+                        if (label == null || !"model_label".equals(label.optString("name"))) continue;
+                        String selected = label.optString("value");
+                        if (selected.endsWith(" (Selected)"))
+                            selected = selected.substring(0, selected.length() - " (Selected)".length());
+                        if (!selected.isEmpty() && !selected.startsWith("No "))
+                            result = nativeSetEditorSelection(selected);
+                        break;
+                    }
+                } catch (JSONException ignored) { }
+            }
             nativeSetMobileInput("mobile_tap", "released");
             runOnUiThread(() -> applyState(result));
         });
