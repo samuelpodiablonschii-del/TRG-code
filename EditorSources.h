@@ -441,6 +441,8 @@ button asset_box "◆\nBox" x 3 y 85 w 17.5 h 12.2 color #302044 (
     scaleX = 1
     scaleY = 1
     scaleZ = 1
+    currentColor = "#8B42F5"
+    set_text material_value "●  Purple"
     set_text pos_x_value posX
     set_text pos_y_value posY
     set_text pos_z_value posZ
@@ -449,7 +451,7 @@ button asset_box "◆\nBox" x 3 y 85 w 17.5 h 12.2 color #302044 (
     set_text scale_z_value scaleZ
 )
 button asset_sphere "●\nSphere" x 22 y 85 w 17.5 h 12.2 color #302044 (
-    3d sphere auto x 0 y 0 z 0 size 1.7 color #8D62F4
+    3d sphere auto x 0 y 0 z 0 size 1.7 color #8B42F5
     push objects last_3d_object
     length objects objectCount
     selectedIndex = objectCount - 1
@@ -459,9 +461,11 @@ button asset_sphere "●\nSphere" x 22 y 85 w 17.5 h 12.2 color #302044 (
     posX = 0
     posY = 0
     posZ = 0
-    scaleX = 1
-    scaleY = 1
-    scaleZ = 1
+    scaleX = 0.85
+    scaleY = 0.85
+    scaleZ = 0.85
+    currentColor = "#8B42F5"
+    set_text material_value "●  Purple"
     set_text pos_x_value posX
     set_text pos_y_value posY
     set_text pos_z_value posZ
@@ -470,7 +474,7 @@ button asset_sphere "●\nSphere" x 22 y 85 w 17.5 h 12.2 color #302044 (
     set_text scale_z_value scaleZ
 )
 button asset_camera "◉\nCamera" x 41 y 85 w 17.5 h 12.2 color #302044 (
-    3d box auto x 0 y 1 z 0 w 1.1 h 0.8 d 1.4 color #B79BEA
+    3d box auto x 0 y 1 z 0 w 1.1 h 0.8 d 1.4 color #8B42F5
     push objects last_3d_object
     length objects objectCount
     selectedIndex = objectCount - 1
@@ -478,11 +482,13 @@ button asset_camera "◉\nCamera" x 41 y 85 w 17.5 h 12.2 color #302044 (
     set_text model_label selectedName
     set_text rename_value selectedName
     posX = 0
-    posY = 0
+    posY = 1
     posZ = 0
-    scaleX = 1
-    scaleY = 1
-    scaleZ = 1
+    scaleX = 0.55
+    scaleY = 0.40
+    scaleZ = 0.70
+    currentColor = "#8B42F5"
+    set_text material_value "●  Purple"
     set_text pos_x_value posX
     set_text pos_y_value posY
     set_text pos_z_value posZ
@@ -491,7 +497,7 @@ button asset_camera "◉\nCamera" x 41 y 85 w 17.5 h 12.2 color #302044 (
     set_text scale_z_value scaleZ
 )
 button asset_spawn "▶\nSpawn" x 60 y 85 w 17.5 h 12.2 color #302044 (
-    3d sphere auto x 0 y 0 z 0 size 1 color #58C78D
+    3d sphere auto x 0 y 0 z 0 size 1 color #58B985
     push objects last_3d_object
     length objects objectCount
     selectedIndex = objectCount - 1
@@ -501,9 +507,11 @@ button asset_spawn "▶\nSpawn" x 60 y 85 w 17.5 h 12.2 color #302044 (
     posX = 0
     posY = 0
     posZ = 0
-    scaleX = 1
-    scaleY = 1
-    scaleZ = 1
+    scaleX = 0.50
+    scaleY = 0.50
+    scaleZ = 0.50
+    currentColor = "#58B985"
+    set_text material_value "●  Green"
     set_text pos_x_value posX
     set_text pos_y_value posY
     set_text pos_z_value posZ
@@ -512,7 +520,7 @@ button asset_spawn "▶\nSpawn" x 60 y 85 w 17.5 h 12.2 color #302044 (
     set_text scale_z_value scaleZ
 )
 button asset_plane "◇\nPlane" x 79 y 85 w 18 h 12.2 color #302044 (
-    3d box auto x 0 y -1 z 0 w 6 h 0.15 d 6 color #70B68A
+    3d box auto x 0 y -1 z 0 w 6 h 0.15 d 6 color #58B985
     push objects last_3d_object
     length objects objectCount
     selectedIndex = objectCount - 1
@@ -520,11 +528,13 @@ button asset_plane "◇\nPlane" x 79 y 85 w 18 h 12.2 color #302044 (
     set_text model_label selectedName
     set_text rename_value selectedName
     posX = 0
-    posY = 0
+    posY = -1
     posZ = 0
-    scaleX = 1
-    scaleY = 1
-    scaleZ = 1
+    scaleX = 3
+    scaleY = 0.075
+    scaleZ = 3
+    currentColor = "#58B985"
+    set_text material_value "●  Green"
     set_text pos_x_value posX
     set_text pos_y_value posY
     set_text pos_z_value posZ
