@@ -612,9 +612,10 @@
                     reportError(i + 1, "3D scene contains invalid or incomplete object data", scenePath.string()); continue;
                 }
                 ui3DObjects = std::move(loadedObjects);
-                std::vector<std::string> loadedNames;
+                VariableList loadedNames;
                 loadedNames.reserve(ui3DObjects.size());
-                for (const Ui3DObject& item : ui3DObjects) loadedNames.push_back(item.name);
+                for (const Ui3DObject& item : ui3DObjects)
+                    loadedNames.push_back(std::make_shared<VariableValue>(item.name));
                 variables["objects"] = std::move(loadedNames);
                 types["objects"] = "list";
                 variables["objectCount"] = static_cast<double>(ui3DObjects.size());
