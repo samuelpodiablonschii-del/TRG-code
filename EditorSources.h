@@ -255,7 +255,6 @@ push objects "Cube"
 // App header.
 block z 0 x 0 y 0 w 100 h 100 color #100B1C name ENGINE_BACKGROUND
 block z 1 x 0 y 0 w 100 h 6.2 color #171027 name ENGINE_TITLEBAR
-text "◆" x 4.5 y 4.35 size 3.0 color #A65BFF bold true
 text "TRG ENGINE" x 15 y 4.15 size 2.55 color #F8F3FF bold true
 text "☰" x 94 y 4.4 size 3.0 color #A65BFF align center
 
