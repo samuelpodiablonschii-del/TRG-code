@@ -18,6 +18,7 @@ TESTS = [
     ("collections_strings.trg", "TRG_FEATURE_TESTS_PASSED"),
     ("advanced_libraries.trg", "TRG_ADVANCED_LIBRARIES_PASSED"),
     ("math_library.trg", "TRG_MATH_TESTS_PASSED"),
+    ("style_library.trg", "TRG_STYLE_LIBRARY_PASSED"),
     ("plain_english.trg", "TRG_PLAIN_ENGLISH_TESTS_PASSED"),
     ("3d_scene_roundtrip.trg", "TRG_3D_SCENE_ROUNDTRIP_PASSED"),
     ("stack_trace.trg", ["line 3: unknown command", "at inner_task (called from line 6)", "at outer_task (called from line 8)"], True),
