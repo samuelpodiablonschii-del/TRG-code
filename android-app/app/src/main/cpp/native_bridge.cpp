@@ -333,7 +333,6 @@ static void syncMobile3DInspector(const std::string& name) {
     const std::string selectedLabel = found->name + " (Selected)";
     for (UiText& item : uiTexts) {
         if (item.name == "model_label") item.value = selectedLabel;
-        else if (item.name == "rename_value") item.value = found->name;
         else if (item.name == "material_value") {
             const std::string colour = found->color;
             const std::string lowered = colour;
@@ -344,7 +343,8 @@ static void syncMobile3DInspector(const std::string& name) {
         }
     }
     for (UiButton& item : uiButtons) {
-        if (item.name == "pos_x") item.label = formatEditorNumber(found->x);
+        if (item.name == "rename_value") item.label = found->name;
+        else if (item.name == "pos_x") item.label = formatEditorNumber(found->x);
         else if (item.name == "pos_y") item.label = formatEditorNumber(found->y);
         else if (item.name == "pos_z") item.label = formatEditorNumber(found->z);
         else if (item.name == "scale_x") item.label = formatEditorNumber(found->width / 2.0);
