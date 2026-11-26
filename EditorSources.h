@@ -256,7 +256,7 @@ push objects "Cube"
 block z 0 x 0 y 0 w 100 h 100 color #100B1C name ENGINE_BACKGROUND
 block z 1 x 0 y 0 w 100 h 6.2 color #171027 name ENGINE_TITLEBAR
 text "TRG ENGINE" x 15 y 4.15 size 2.55 color #F8F3FF bold true
-button engine_menu "☰" x 90 y 1.1 w 8 h 4.7 color #171027 (
+button engine_menu "☰" x 90 y 1.1 w 8 h 4.7 color #171027 text_color #A65BFF (
     say "TRG ENGINE menu: use Save, Load, Reset or Code from the toolbar."
 )
 
