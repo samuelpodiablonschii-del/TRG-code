@@ -8722,7 +8722,9 @@ bool runUi(bool showImmediately = true, bool restoreEditorState = true) {
     windowClass.hIcon = LoadIconW(windowClass.hInstance, MAKEINTRESOURCEW(IDI_TRG));
     if (!RegisterClassW(&windowClass) && GetLastError() != ERROR_CLASS_ALREADY_EXISTS) return false;
     const int dpi = systemDpi();
-    mainWindow = CreateWindowExW(0, className, L"TRG", WS_OVERLAPPEDWINDOW,
+    const DWORD windowStyle = WS_OVERLAPPEDWINDOW |
+        (showImmediately ? WS_VISIBLE : 0);
+    mainWindow = CreateWindowExW(0, className, L"TRG", windowStyle,
         CW_USEDEFAULT, CW_USEDEFAULT, MulDiv(1000, dpi, 96), MulDiv(720, dpi, 96),
         nullptr, nullptr, windowClass.hInstance, nullptr);
     if (!mainWindow) return false;
@@ -8732,6 +8734,10 @@ bool runUi(bool showImmediately = true, bool restoreEditorState = true) {
     if (!uiAnimations.empty() || !everyTasks.empty()) SetTimer(mainWindow, 1, static_cast<UINT>(std::max(1, 1000 / fps)), nullptr);
     if (showImmediately) {
         ShowWindow(mainWindow, SW_SHOWNORMAL);
+        SetWindowPos(mainWindow, HWND_TOP, 0, 0, 0, 0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        BringWindowToTop(mainWindow);
+        SetForegroundWindow(mainWindow);
         UpdateWindow(mainWindow);
         if (!standaloneTerminalMode)
             appendOutput("TRG is ready. Output and errors appear here.\r\n");
