@@ -8708,8 +8708,8 @@ bool askForInput(const std::string& prompt, std::string& answer) {
 #endif
 }
 
-bool runUi(bool showImmediately = true) {
-    restoreDesktopStateOnCreate = showImmediately;
+bool runUi(bool showImmediately = true, bool restoreEditorState = true) {
+    restoreDesktopStateOnCreate = restoreEditorState;
     enablePerMonitorDpiAwareness();
     Gdiplus::GdiplusStartupInput gdiplusInput;
     Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusInput, nullptr);
@@ -8731,9 +8731,10 @@ bool runUi(bool showImmediately = true) {
     for (const UiAnimation& animation : uiAnimations) fps = std::max(fps, animation.fps);
     if (!uiAnimations.empty() || !everyTasks.empty()) SetTimer(mainWindow, 1, static_cast<UINT>(std::max(1, 1000 / fps)), nullptr);
     if (showImmediately) {
-        ShowWindow(mainWindow, SW_SHOW);
+        ShowWindow(mainWindow, SW_SHOWNORMAL);
         UpdateWindow(mainWindow);
-        appendOutput("TRG is ready. Output and errors appear here.\r\n");
+        if (!standaloneTerminalMode)
+            appendOutput("TRG is ready. Output and errors appear here.\r\n");
     } else {
         layoutOutputControls(mainWindow);
         refreshDisplayVariables(uiVariables, uiTypes);
@@ -9244,7 +9245,15 @@ int runApplication(int argc, char** argv) {
             }
         }
     }
-    if (!runUi(!launchingProgram)) {
+    // Give standalone launches a visible top-level window immediately.
+    // Start in terminal layout while libraries are scanned; the detected app
+    // mode replaces this layout once the program has been loaded.
+    if (launchingProgram) {
+        standaloneAppMode = false;
+        standaloneTerminalMode = true;
+        previewMode = true;
+    }
+    if (!runUi(true, !launchingProgram)) {
         MessageBoxW(nullptr, L"Could not create the TRG window.", L"TRG error", MB_OK | MB_ICONERROR);
         return 1;
     }
@@ -9452,7 +9461,9 @@ int runApplication(int argc, char** argv) {
     // Display the selected app window before executing user code. Programs that
     // wait for input or run continuously must not keep their window hidden.
     if (launchingProgram && mainWindow) {
-        ShowWindow(mainWindow, SW_SHOW);
+        ShowWindow(mainWindow, SW_SHOWNORMAL);
+        SetForegroundWindow(mainWindow);
+        BringWindowToTop(mainWindow);
         UpdateWindow(mainWindow);
     }
 #endif
