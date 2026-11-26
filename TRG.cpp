@@ -5722,10 +5722,26 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 object->rotateX += rx; object->rotateY += ry; object->rotateZ += rz;
                 continue;
             }
-            if (action == "scale" && tokens.size() == 4) {
-                double factor = 0;
-                if (!evaluateExpression(tokens[3], variables, factor) || factor <= 0 || factor > 10) { reportError(i + 1, "3d scale must be between 0 and 10"); continue; }
-                object->width *= factor; object->height *= factor; object->depth *= factor;
+            if (action == "scale" && (tokens.size() == 4 || tokens.size() == 6)) {
+                double scaleX = 1, scaleY = 1, scaleZ = 1;
+                if (tokens.size() == 4) {
+                    if (!evaluateExpression(tokens[3], variables, scaleX)) {
+                        reportError(i + 1, "3d scale needs a numeric factor"); continue;
+                    }
+                    scaleY = scaleX;
+                    scaleZ = scaleX;
+                } else if (!evaluateExpression(tokens[3], variables, scaleX) ||
+                           !evaluateExpression(tokens[4], variables, scaleY) ||
+                           !evaluateExpression(tokens[5], variables, scaleZ)) {
+                    reportError(i + 1, "use 3d scale NAME FACTOR or 3d scale NAME X Y Z"); continue;
+                }
+                if (scaleX <= 0 || scaleX > 10 || scaleY <= 0 || scaleY > 10 ||
+                    scaleZ <= 0 || scaleZ > 10) {
+                    reportError(i + 1, "3d scale factors must be greater than 0 and at most 10"); continue;
+                }
+                object->width *= scaleX;
+                object->height *= scaleY;
+                object->depth *= scaleZ;
                 continue;
             }
             if (action == "color" && tokens.size() == 4) {
