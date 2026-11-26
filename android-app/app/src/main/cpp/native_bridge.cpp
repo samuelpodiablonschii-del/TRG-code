@@ -333,23 +333,20 @@ static void syncMobile3DInspector(const std::string& name) {
     const std::string selectedLabel = found->name + " (Selected)";
     for (UiText& item : uiTexts) {
         if (item.name == "model_label") item.value = selectedLabel;
+        else if (item.name == "rename_value") item.value = found->name;
+        else if (item.name == "pos_x_value") item.value = formatEditorNumber(found->x);
+        else if (item.name == "pos_y_value") item.value = formatEditorNumber(found->y);
+        else if (item.name == "pos_z_value") item.value = formatEditorNumber(found->z);
+        else if (item.name == "scale_x_value") item.value = formatEditorNumber(found->width / 2.0);
+        else if (item.name == "scale_y_value") item.value = formatEditorNumber(found->height / 2.0);
+        else if (item.name == "scale_z_value") item.value = formatEditorNumber(found->depth / 2.0);
         else if (item.name == "material_value") {
             const std::string colour = found->color;
-            const std::string lowered = colour;
-            item.value = "●  " + (lowered == "#8B42F5" ? std::string("Purple") :
-                lowered == "#438FF5" ? std::string("Blue") :
-                lowered == "#E2A34D" ? std::string("Gold") :
-                lowered == "#58B985" ? std::string("Green") : colour);
+            item.value = "●  " + (colour == "#8B42F5" ? std::string("Purple") :
+                colour == "#438FF5" ? std::string("Blue") :
+                colour == "#E2A34D" ? std::string("Gold") :
+                colour == "#58B985" ? std::string("Green") : colour);
         }
-    }
-    for (UiButton& item : uiButtons) {
-        if (item.name == "rename_value") item.label = found->name;
-        else if (item.name == "pos_x") item.label = formatEditorNumber(found->x);
-        else if (item.name == "pos_y") item.label = formatEditorNumber(found->y);
-        else if (item.name == "pos_z") item.label = formatEditorNumber(found->z);
-        else if (item.name == "scale_x") item.label = formatEditorNumber(found->width / 2.0);
-        else if (item.name == "scale_y") item.label = formatEditorNumber(found->height / 2.0);
-        else if (item.name == "scale_z") item.label = formatEditorNumber(found->depth / 2.0);
     }
 
     auto list = uiVariables.find("objects");
