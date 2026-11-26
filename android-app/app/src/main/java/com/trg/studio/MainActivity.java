@@ -1744,6 +1744,18 @@ sourceText = exampleSource;
             paint.setStrokeWidth(Math.max(1f, dp(0.8f)));
             paint.setColor(Color.argb(210, 35, 18, 65));
             canvas.drawPath(face, paint);
+            Path outline = new Path();
+            outline.moveTo(cx, cy - sy);
+            outline.lineTo(cx + sx, cy - sy * 0.48f);
+            outline.lineTo(cx + sx, cy + sy * 0.48f);
+            outline.lineTo(cx, cy + sy);
+            outline.lineTo(cx - sx, cy + sy * 0.48f);
+            outline.lineTo(cx - sx, cy - sy * 0.48f);
+            outline.close();
+            canvas.drawPath(outline, paint);
+            canvas.drawLine(cx, cy + sy * 0.04f, cx, cy + sy, paint);
+            canvas.drawLine(cx - sx, cy - sy * 0.48f, cx, cy + sy * 0.04f, paint);
+            canvas.drawLine(cx + sx, cy - sy * 0.48f, cx, cy + sy * 0.04f, paint);
             paint.setStyle(Paint.Style.FILL);
         }
 
