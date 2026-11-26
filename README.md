@@ -732,7 +732,7 @@ add (3d)
 3d delete platform_copy
 ```
 
-The initial primitive set is box and sphere. Desktop and Android Studio render these using an isometric projection. Arbitrary imported meshes, a perspective camera, shaders, and full 3D physics are not implemented yet.
+The initial primitive set is box and sphere. Use `3d scale NAME FACTOR` for uniform scaling or `3d scale NAME X Y Z` for independent axis factors. The mobile Studio editor uses a perspective-style grid and axis gizmo, supports model selection and dragging, one-finger camera orbit, two-finger orbit and pinch zoom, inspector transforms and colour changes, and project-relative scene save/load. It remains a lightweight primitive renderer: arbitrary imported meshes, a shader pipeline, and full 3D physics are not implemented.
 
 For simple games, `add (collision)` enables automatic rectangle overlap checks and movement helpers. `watch_collision A B hit` keeps `hit` updated every scheduled tick, `collides A B hit` checks immediately, and `move_ui player x +1 y 0` moves a named item:
 
