@@ -3652,7 +3652,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 if (library == "(convert)") { convertEnabled = true; appendOutput("TRG convert library enabled.\r\n"); continue; }
                 if (library == "(stats)") { statsEnabled = true; appendOutput("TRG stats library enabled.\r\n"); continue; }
                 if (library == "(units)") { unitsEnabled = true; appendOutput("TRG units library enabled.\r\n"); continue; }
-                if (library == "(style)") { styleEnabled = true; appendOutput("TRG style library enabled.\\r\\n"); continue; }
+                if (library == "(style)") { styleEnabled = true; appendOutput("TRG style library enabled.\r\n"); continue; }
                 if (library == "(all)") {
                     filesEnabled = jsonEnabled = databaseEnabled = webEnabled = collisionEnabled = physicsEnabled = networkEnabled = aiEnabled = mathEnabled = true;
                     binaryEnabled = regexEnabled = compressionEnabled = true;
