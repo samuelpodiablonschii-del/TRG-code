@@ -1710,6 +1710,43 @@ sourceText = exampleSource;
                     height * 0.302f - (float) (viewY * scale * perspective), (float) perspective };
         }
 
+        private void draw3DEngineLogo(Canvas canvas, float width, float height) {
+            float cx = width * 0.075f;
+            float cy = height * 0.031f;
+            float sx = width * 0.038f;
+            float sy = height * 0.024f;
+            Path face = new Path();
+            paint.setStyle(Paint.Style.FILL);
+            face.moveTo(cx, cy - sy);
+            face.lineTo(cx + sx, cy - sy * 0.48f);
+            face.lineTo(cx, cy + sy * 0.04f);
+            face.lineTo(cx - sx, cy - sy * 0.48f);
+            face.close();
+            paint.setColor(Color.rgb(165, 91, 255));
+            canvas.drawPath(face, paint);
+            face.reset();
+            face.moveTo(cx - sx, cy - sy * 0.48f);
+            face.lineTo(cx, cy + sy * 0.04f);
+            face.lineTo(cx, cy + sy);
+            face.lineTo(cx - sx, cy + sy * 0.48f);
+            face.close();
+            paint.setColor(Color.rgb(106, 48, 190));
+            canvas.drawPath(face, paint);
+            face.reset();
+            face.moveTo(cx, cy + sy * 0.04f);
+            face.lineTo(cx + sx, cy - sy * 0.48f);
+            face.lineTo(cx + sx, cy + sy * 0.48f);
+            face.lineTo(cx, cy + sy);
+            face.close();
+            paint.setColor(Color.rgb(75, 35, 143));
+            canvas.drawPath(face, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(Math.max(1f, dp(0.8f)));
+            paint.setColor(Color.argb(210, 35, 18, 65));
+            canvas.drawPath(face, paint);
+            paint.setStyle(Paint.Style.FILL);
+        }
+
         private void draw3DGrid(Canvas canvas, float width, float height) {
             int save = canvas.save();
             canvas.clipRect(width * 0.006f, height * 0.131f, width * 0.994f, height * 0.473f);
@@ -2058,6 +2095,7 @@ sourceText = exampleSource;
                                 firstBaseline + line * lineHeight, paint);
                 }
             }
+            if (editor3D) draw3DEngineLogo(canvas, width, height);
             if (animating) postInvalidateDelayed(16);
             if ((blocks == null || blocks.length() == 0) && sprites.isEmpty() && models.isEmpty()
                     && (buttons == null || buttons.length() == 0)) {
