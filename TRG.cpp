@@ -5683,6 +5683,19 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     variables["selectedName"] = ui3DObjects.empty() ? std::string() : ui3DObjects.front().name;
                     types["selectedName"] = "word";
                 }
+                if (!ui3DObjects.empty()) {
+                    const Ui3DObject& selected = ui3DObjects.front();
+                    variables["currentColor"] = selected.color;
+                    variables["posX"] = selected.x;
+                    variables["posY"] = selected.y;
+                    variables["posZ"] = selected.z;
+                    variables["scaleX"] = selected.width / 2.0;
+                    variables["scaleY"] = selected.height / 2.0;
+                    variables["scaleZ"] = selected.depth / 2.0;
+                    types["currentColor"] = "word";
+                    types["posX"] = types["posY"] = types["posZ"] = "num";
+                    types["scaleX"] = types["scaleY"] = types["scaleZ"] = "num";
+                }
                 appendOutput("Loaded 3D scene: " + scenePath.string() + "\r\n");
                 continue;
             }
