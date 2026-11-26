@@ -97,9 +97,9 @@ jobs:
             'word name = "huss"\nask "huss" name\nsay "absolutely king"\nif name = "yas fatherin"\n{\n  say "sure baba grill I\'m a man tho"\n}'
           ], { async: true });
           if (!output.includes("absolutely king") || !output.includes("sure baba grill I'm a man tho")) {
-            throw new Error("Typed-word/string-condition/curly-block regression failed: " + output);
+            throw new Error("Typed-word/string-condition regression failed: " + output);
           }
-          console.log("Typed word + string equality + curly-brace block smoke test passed.");
+          console.log("Typed word + string equality + parenthesis block smoke test passed.");
 
           output = "";
           globalThis.trgCompilerRequestInput = resolve => resolve("yas fatherin");
