@@ -65,7 +65,7 @@ jobs:
           });
           module.FS_createDataFile("/", "pixel.png", new Uint8Array(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/pXcAAAAASUVORK5CYII=", "base64")), true, true, true);
           await module.ccall("trg_web_run", null, ["string"], [
-            'add (ui)\nblock x 10 y 15 w 30 h 20 color #8B5CF6 name panel\nsprite sample "pixel.png" x 50 y 50 w 10 h 10\ntext "TRG preview" x 10 y 42 size 6 color #FFFFFF\nsay "TRG WebAssembly smoke test passed"'
+            'add (ui)\nblock x 10 y 15 w 30 h 20 color #8B5CF6 name panel\nsprite sample "pixel.png" x 50 y 50 w 10 h auto\ntext "TRG preview" x 10 y 42 size 6 color #FFFFFF\nsay "TRG WebAssembly smoke test passed"'
           ], { async: true });
           const uiPointer = module.ccall("trg_web_get_ui_snapshot", "number", [], []);
           const ui = JSON.parse(module.UTF8ToString(uiPointer));
@@ -75,7 +75,7 @@ jobs:
           if (output.includes("Program finished")) {
             throw new Error("The web terminal should not display the interpreter completion banner: " + output);
           }
-          if (!ui || ui.blocks?.length !== 1 || ui.sprites?.length !== 1 || ui.texts?.length !== 1 || !ui.sprites[0].data.startsWith("data:image/png;base64,")) {
+          if (!ui || ui.blocks?.length !== 1 || ui.sprites?.length !== 1 || ui.texts?.length !== 1 || ui.sprites[0].autoW !== false || ui.sprites[0].autoH !== true || !ui.sprites[0].data.startsWith("data:image/png;base64,")) {
             throw new Error("The UI preview bridge did not return the expected block and text: " + JSON.stringify(ui));
           }
           console.log(output.trim());
@@ -83,10 +83,10 @@ jobs:
 
           output = "";
           await module.ccall("trg_web_run", null, ["string"], [
-            'say "TRG_BROWSER_ORIENTATION=" orientation\nsay "TRG_BROWSER_RATIO=" aspect_ratio'
+            'say "TRG_BROWSER_ORIENTATION"\nsay orientation\nsay "TRG_BROWSER_RATIO"\nsay aspect_ratio'
           ], { async: true });
-          if (!output.includes("TRG_BROWSER_ORIENTATION=landscape") ||
-              !output.includes("TRG_BROWSER_RATIO=16:9")) {
+          if (!output.includes("TRG_BROWSER_ORIENTATION") || !output.includes("landscape") ||
+              !output.includes("TRG_BROWSER_RATIO") || !output.includes("16:9")) {
             throw new Error("Browser orientation/aspect-ratio detection failed: " + output);
           }
           console.log("Browser orientation and aspect-ratio smoke test passed.");
