@@ -423,7 +423,7 @@ button material "▾" x 89 y 74.3 w 7 h 3.8 color #39264F (
 block z 1 x 0.7 y 80.2 w 98.6 h 19.2 color #191226 edges round name ASSET_BROWSER
 text "◆" x 4 y 83.2 size 2.0 color #A65BFF
 text "Asset Browser" x 11 y 83.2 size 1.45 color #F4ECFF bold true
-button asset_more "›" x 91.5 y 81.2 w 6 h 4.2 color #191226 (
+button asset_more "›" x 91.5 y 81.5 w 6 h 3.2 color #191226 (
     say "The Asset Browser contains the built-in scene primitives."
 )
 
