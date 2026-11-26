@@ -277,12 +277,12 @@ button load_scene "▰  Load" x 62 y 7.1 w 18 h 4.7 color #302044 (
         get objects selectedIndex selectedName
         set_text model_label selectedName
         set_text rename_value selectedName
-        set_text pos_x posX
-        set_text pos_y posY
-        set_text pos_z posZ
-        set_text scale_x scaleX
-        set_text scale_y scaleY
-        set_text scale_z scaleZ
+        set_text pos_x_value posX
+        set_text pos_y_value posY
+        set_text pos_z_value posZ
+        set_text scale_x_value scaleX
+        set_text scale_y_value scaleY
+        set_text scale_z_value scaleZ
         set_text material_value currentColor
     )
     say "Scene loaded."
@@ -322,7 +322,9 @@ button hierarchy_item "" x 4 y 54.5 w 92 h 5.1 color #191226 opacity 0 (
 block z 2 x 4 y 59.1 w 92 h 0.12 color #342447 name INSPECTOR_DIVIDER
 
 text "Name" x 4 y 62.3 size 1.35 color #D8CBEA
-button rename_value "Cube" x 28 y 60.5 w 68 h 3.9 color #2B203D (
+block z 2 x 28 y 60.5 w 68 h 3.9 color #2B203D edges round name NAME_FIELD
+text rename_value "Cube" x 31 y 63 size 1.25 color #F1E9FF
+button rename_action "" x 28 y 60.5 w 68 h 3.9 color #2B203D opacity 0 (
     if objectCount > 0 (
         ask "Object name:" renameInput
         3d rename selectedName renameInput
@@ -335,54 +337,66 @@ button rename_value "Cube" x 28 y 60.5 w 68 h 3.9 color #2B203D (
 )
 
 text "Position" x 4 y 67.2 size 1.3 color #D8CBEA
-button pos_x "0.00" x 28 y 65.1 w 21 h 3.6 color #2B203D (
+block z 2 x 28 y 65.1 w 21 h 3.6 color #2B203D edges round name POS_X_FIELD
+text pos_x_value "0.00" x 30 y 67.6 size 1.2 color #F1E9FF
+button pos_x "" x 28 y 65.1 w 21 h 3.6 color #2B203D opacity 0 (
     if objectCount > 0 (
         ask "X position offset (+/-):" editValue
         3d move selectedName editValue 0 0
         posX = posX + editValue
-        set_text pos_x posX
+        set_text pos_x_value posX
     )
 )
-button pos_y "0.00" x 51 y 65.1 w 21 h 3.6 color #2B203D (
+block z 2 x 51 y 65.1 w 21 h 3.6 color #2B203D edges round name POS_Y_FIELD
+text pos_y_value "0.00" x 53 y 67.6 size 1.2 color #F1E9FF
+button pos_y "" x 51 y 65.1 w 21 h 3.6 color #2B203D opacity 0 (
     if objectCount > 0 (
         ask "Y position offset (+/-):" editValue
         3d move selectedName 0 editValue 0
         posY = posY + editValue
-        set_text pos_y posY
+        set_text pos_y_value posY
     )
 )
-button pos_z "0.00" x 74 y 65.1 w 22 h 3.6 color #2B203D (
+block z 2 x 74 y 65.1 w 22 h 3.6 color #2B203D edges round name POS_Z_FIELD
+text pos_z_value "0.00" x 76 y 67.6 size 1.2 color #F1E9FF
+button pos_z "" x 74 y 65.1 w 22 h 3.6 color #2B203D opacity 0 (
     if objectCount > 0 (
         ask "Z position offset (+/-):" editValue
         3d move selectedName 0 0 editValue
         posZ = posZ + editValue
-        set_text pos_z posZ
+        set_text pos_z_value posZ
     )
 )
 
 text "Scale" x 4 y 71.8 size 1.3 color #D8CBEA
-button scale_x "1.00" x 28 y 69.7 w 21 h 3.6 color #2B203D (
+block z 2 x 28 y 69.7 w 21 h 3.6 color #2B203D edges round name SCALE_X_FIELD
+text scale_x_value "1.00" x 30 y 72.2 size 1.2 color #F1E9FF
+button scale_x "" x 28 y 69.7 w 21 h 3.6 color #2B203D opacity 0 (
     if objectCount > 0 (
         ask "X scale multiplier (0.1-10):" editValue
         3d scale selectedName editValue 1 1
         scaleX = scaleX * editValue
-        set_text scale_x scaleX
+        set_text scale_x_value scaleX
     )
 )
-button scale_y "1.00" x 51 y 69.7 w 21 h 3.6 color #2B203D (
+block z 2 x 51 y 69.7 w 21 h 3.6 color #2B203D edges round name SCALE_Y_FIELD
+text scale_y_value "1.00" x 53 y 72.2 size 1.2 color #F1E9FF
+button scale_y "" x 51 y 69.7 w 21 h 3.6 color #2B203D opacity 0 (
     if objectCount > 0 (
         ask "Y scale multiplier (0.1-10):" editValue
         3d scale selectedName 1 editValue 1
         scaleY = scaleY * editValue
-        set_text scale_y scaleY
+        set_text scale_y_value scaleY
     )
 )
-button scale_z "1.00" x 74 y 69.7 w 22 h 3.6 color #2B203D (
+block z 2 x 74 y 69.7 w 22 h 3.6 color #2B203D edges round name SCALE_Z_FIELD
+text scale_z_value "1.00" x 76 y 72.2 size 1.2 color #F1E9FF
+button scale_z "" x 74 y 69.7 w 22 h 3.6 color #2B203D opacity 0 (
     if objectCount > 0 (
         ask "Z scale multiplier (0.1-10):" editValue
         3d scale selectedName 1 1 editValue
         scaleZ = scaleZ * editValue
-        set_text scale_z scaleZ
+        set_text scale_z_value scaleZ
     )
 )
 
@@ -424,12 +438,12 @@ button asset_box "◆\nBox" x 3 y 85 w 17.5 h 12.2 color #302044 (
     scaleX = 1
     scaleY = 1
     scaleZ = 1
-    set_text pos_x posX
-    set_text pos_y posY
-    set_text pos_z posZ
-    set_text scale_x scaleX
-    set_text scale_y scaleY
-    set_text scale_z scaleZ
+    set_text pos_x_value posX
+    set_text pos_y_value posY
+    set_text pos_z_value posZ
+    set_text scale_x_value scaleX
+    set_text scale_y_value scaleY
+    set_text scale_z_value scaleZ
 )
 button asset_sphere "●\nSphere" x 22 y 85 w 17.5 h 12.2 color #302044 (
     3d sphere auto x 0 y 0 z 0 size 1.7 color #8D62F4
@@ -446,12 +460,12 @@ button asset_sphere "●\nSphere" x 22 y 85 w 17.5 h 12.2 color #302044 (
     scaleX = 1
     scaleY = 1
     scaleZ = 1
-    set_text pos_x posX
-    set_text pos_y posY
-    set_text pos_z posZ
-    set_text scale_x scaleX
-    set_text scale_y scaleY
-    set_text scale_z scaleZ
+    set_text pos_x_value posX
+    set_text pos_y_value posY
+    set_text pos_z_value posZ
+    set_text scale_x_value scaleX
+    set_text scale_y_value scaleY
+    set_text scale_z_value scaleZ
 )
 button asset_camera "◉\nCamera" x 41 y 85 w 17.5 h 12.2 color #302044 (
     3d box auto x 0 y 1 z 0 w 1.1 h 0.8 d 1.4 color #B79BEA
@@ -468,12 +482,12 @@ button asset_camera "◉\nCamera" x 41 y 85 w 17.5 h 12.2 color #302044 (
     scaleX = 1
     scaleY = 1
     scaleZ = 1
-    set_text pos_x posX
-    set_text pos_y posY
-    set_text pos_z posZ
-    set_text scale_x scaleX
-    set_text scale_y scaleY
-    set_text scale_z scaleZ
+    set_text pos_x_value posX
+    set_text pos_y_value posY
+    set_text pos_z_value posZ
+    set_text scale_x_value scaleX
+    set_text scale_y_value scaleY
+    set_text scale_z_value scaleZ
 )
 button asset_spawn "▶\nSpawn" x 60 y 85 w 17.5 h 12.2 color #302044 (
     3d sphere auto x 0 y 0 z 0 size 1 color #58C78D
@@ -490,12 +504,12 @@ button asset_spawn "▶\nSpawn" x 60 y 85 w 17.5 h 12.2 color #302044 (
     scaleX = 1
     scaleY = 1
     scaleZ = 1
-    set_text pos_x posX
-    set_text pos_y posY
-    set_text pos_z posZ
-    set_text scale_x scaleX
-    set_text scale_y scaleY
-    set_text scale_z scaleZ
+    set_text pos_x_value posX
+    set_text pos_y_value posY
+    set_text pos_z_value posZ
+    set_text scale_x_value scaleX
+    set_text scale_y_value scaleY
+    set_text scale_z_value scaleZ
 )
 button asset_plane "◇\nPlane" x 79 y 85 w 18 h 12.2 color #302044 (
     3d box auto x 0 y -1 z 0 w 6 h 0.15 d 6 color #70B68A
@@ -512,12 +526,12 @@ button asset_plane "◇\nPlane" x 79 y 85 w 18 h 12.2 color #302044 (
     scaleX = 1
     scaleY = 1
     scaleZ = 1
-    set_text pos_x posX
-    set_text pos_y posY
-    set_text pos_z posZ
-    set_text scale_x scaleX
-    set_text scale_y scaleY
-    set_text scale_z scaleZ
+    set_text pos_x_value posX
+    set_text pos_y_value posY
+    set_text pos_z_value posZ
+    set_text scale_x_value scaleX
+    set_text scale_y_value scaleY
+    set_text scale_z_value scaleZ
 )
 )TRGEDITOR3D";
 inline constexpr const char* desktopEditor3D = R"TRGDESKTOP3D(// Native Windows editor owns the desktop 3D workspace and renders the scene UI.
