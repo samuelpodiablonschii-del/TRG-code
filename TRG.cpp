@@ -9377,7 +9377,7 @@ int runApplication(int argc, char** argv) {
     previewMode = true;
     if (mainWindow) {
         const std::wstring appName = scriptPath.empty() ? L"Untitled" : scriptPath.filename().wstring();
-        SetWindowTextW(mainWindow, (standaloneAppMode ? L"TRG App - " : L"TRG Terminal - ") + appName);
+        SetWindowTextW(mainWindow, ((standaloneAppMode ? L"TRG App - " : L"TRG Terminal - ") + appName).c_str());
         layoutOutputControls(mainWindow);
     }
 #endif
