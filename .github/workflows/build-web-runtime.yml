@@ -94,7 +94,7 @@ jobs:
           output = "";
           globalThis.trgCompilerRequestInput = resolve => resolve("yas fatherin");
           await module.ccall("trg_web_run", null, ["string"], [
-            'word name = "huss"\nask "huss" name\nsay "absolutely king"\nif name = "yas fatherin"\n{\n  say "sure baba grill I\'m a man tho"\n}'
+            'word name = "huss"\nask "huss" name\nsay "absolutely king"\nif name = "yas fatherin"\n(\n  say "sure baba grill I\'m a man tho"\n)'
           ], { async: true });
           if (!output.includes("absolutely king") || !output.includes("sure baba grill I'm a man tho")) {
             throw new Error("Typed-word/string-condition regression failed: " + output);
