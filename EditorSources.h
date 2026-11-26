@@ -305,7 +305,13 @@ block z 1 x 0 y 47.7 w 100 h 5.4 color #160F23 name EDITOR_TABS
 button tab_hierarchy "▰  Hierarchy" x 1.5 y 48.2 w 41 h 4.7 color #572A9B (
     set_color tab_hierarchy #572A9B
     set_color tab_inspector #281B3A
-    say "Hierarchy selected. Tap a model in the viewport to select it."
+    if objectCount > 0 (
+        selectedIndex = selectedIndex + 1
+        if selectedIndex >= objectCount ( selectedIndex = 0 )
+        get objects selectedIndex selectedName
+        set_text model_label selectedName
+        set_text rename_value selectedName
+    )
 )
 button tab_inspector "⚙  Inspector" x 43.5 y 48.2 w 35.5 h 4.7 color #281B3A (
     set_color tab_hierarchy #281B3A
@@ -319,6 +325,8 @@ text "◆" x 5 y 57.3 size 3.0 color #A65BFF
 text model_label "Cube (Selected)" x 14 y 57.3 size 1.8 color #F5EEFF bold true
 button hierarchy_item " " x 4 y 54.5 w 92 h 5.1 color #191226 opacity 0 (
     if objectCount > 0 (
+        selectedIndex = selectedIndex + 1
+        if selectedIndex >= objectCount ( selectedIndex = 0 )
         get objects selectedIndex selectedName
         set_text model_label selectedName
         set_text rename_value selectedName
