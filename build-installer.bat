@@ -28,7 +28,7 @@ for %%F in ("TRG-build.exe" "UI-app.exe" "Console-app.exe" "Checker.exe") do if 
     goto :failed
 )
 for %%F in ("TRG-build.exe" "UI-app.exe" "Console-app.exe" "Checker.exe") do if %%~zF LEQ 0 (
-    echo ERROR: TRG-build.exe is empty.
+    echo ERROR: %%~nxF is empty.
     goto :failed
 )
 for %%F in ("TRG-Example.trg" "2DEditor.trg" "3DEditor.trg" "trg.ico" "README.md" "TRG-Installer.rc" "TRG-Installer.cpp" "resource.h") do if not exist "%%~F" (
@@ -53,7 +53,7 @@ if errorlevel 1 (
     goto :failed
 )
 echo.
-echo [2/3] Embedding the fresh runtime and installer assets...
+echo [2/3] Embedding Checker, the app variants, and installer assets...
 windres.exe TRG-Installer.rc -O coff -o trg-installer-resource.o
 if errorlevel 1 goto :failed
 
@@ -70,7 +70,7 @@ if errorlevel 1 (
     goto :failed
 )
 echo.
-echo [2/3] Embedding the fresh runtime and installer assets...
+echo [2/3] Embedding Checker, the app variants, and installer assets...
 rc.exe /nologo /fo trg-installer-resource.res TRG-Installer.rc
 if errorlevel 1 goto :failed
 
