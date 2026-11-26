@@ -402,6 +402,28 @@ struct UiText {
     bool visible = true;
 };
 
+struct UiStyle {
+    bool hasBackground = false;
+    bool hasText = false;
+    bool hasGlow = false;
+    bool hasRadius = false;
+    bool hasOpacity = false;
+    bool hasFont = false;
+    bool hasSize = false;
+    bool hasBold = false;
+    bool hasAlign = false;
+    std::string background;
+    std::string text;
+    std::string glow;
+    double glowIntensity = 0.5;
+    double radius = 0;
+    double opacity = 1.0;
+    std::string font = "sans";
+    double size = 5;
+    bool bold = true;
+    std::string align = "left";
+};
+
 struct UiGroup { std::string name; bool visible = false; std::string parent = "default"; };
 
 using Defaults = std::unordered_map<std::string, std::string>;
@@ -419,6 +441,7 @@ std::unordered_map<std::string, PhysicsBody> physicsBodies;
 std::unordered_map<std::string, AiModel> aiModels;
 std::vector<UiButton> uiButtons;
 std::vector<UiText> uiTexts;
+std::unordered_map<std::string, UiStyle> uiStyles;
 std::vector<UiGroup> uiGroups;
 std::string currentUiGroup = "default";
 std::unordered_map<std::string, StructDefinition> userStructs;
@@ -453,6 +476,7 @@ bool timeEnabled = false;
 bool convertEnabled = false;
 bool statsEnabled = false;
 bool unitsEnabled = false;
+bool styleEnabled = false;
 bool threeDEnabled = false;
 std::string webPageHtml;
 std::vector<std::string> readProgram(std::istream& source);
@@ -2519,6 +2543,7 @@ struct LibraryState {
     bool convert = false;
     bool stats = false;
     bool units = false;
+    bool style = false;
     bool physics = false;
     bool threeD = false;
     bool bouncyballs = false;
@@ -2618,6 +2643,7 @@ void scanLibraries(const std::vector<std::string>& program, LibraryState& librar
             libraries.powershell = libraries.raspberry = libraries.accessibility = true;
             libraries.stats = libraries.units = true;
             libraries.physics = true;
+            libraries.style = true;
             libraries.threeD = true;
             libraries.bouncyballs = true;
         } else if (name == "files") libraries.files = true;
@@ -2644,6 +2670,7 @@ void scanLibraries(const std::vector<std::string>& program, LibraryState& librar
         else if (name == "convert") libraries.convert = true;
         else if (name == "stats") libraries.stats = true;
         else if (name == "units") libraries.units = true;
+        else if (name == "style") libraries.style = true;
     }
 }
 
@@ -5715,6 +5742,115 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             continue;
         }
 
+        if (cmd == "style") {
+            if (!styleEnabled) { reportError(i + 1, "style needs add (style)"); continue; }
+            if (tokens.size() >= 4 && lower(tokens[1]) == "apply") {
+                const std::string targetName = tokens[2];
+                const std::string styleName = lower(tokens[3]);
+                const auto styleIt = uiStyles.find(styleName);
+                if (styleIt == uiStyles.end()) { reportError(i + 1, "unknown style", styleName); continue; }
+                const UiStyle& style = styleIt->second;
+                bool targetFound = false;
+                for (UiBlock& item : uiBlocks) if (item.name == targetName) {
+                    if (style.hasBackground) item.color = style.background;
+                    if (style.hasGlow) { item.glowColor = style.glow; item.glowIntensity = style.glowIntensity; }
+                    if (style.hasRadius) item.cornerRadius = style.radius;
+                    if (style.hasOpacity) item.opacity = style.opacity;
+                    targetFound = true; break;
+                }
+                if (!targetFound) for (UiButton& item : uiButtons) if (item.name == targetName) {
+                    if (style.hasBackground) item.color = style.background;
+                    if (style.hasText) item.textColor = style.text;
+                    if (style.hasRadius) item.cornerRadius = style.radius;
+                    if (style.hasOpacity) item.opacity = style.opacity;
+                    if (style.hasFont) item.font = style.font;
+                    if (style.hasSize) item.textSize = std::clamp(style.size, 0.05, 1.0);
+                    if (style.hasBold) item.textBold = style.bold;
+                    if (style.hasGlow) reportError(i + 1, "glow styles currently apply to blocks, not buttons", targetName);
+                    targetFound = true; break;
+                }
+                if (!targetFound) for (UiText& item : uiTexts) if (item.name == targetName) {
+                    if (style.hasText) item.color = style.text;
+                    if (style.hasOpacity) item.opacity = style.opacity;
+                    if (style.hasFont) item.font = style.font;
+                    if (style.hasSize) item.size = style.size;
+                    if (style.hasBold) item.bold = style.bold;
+                    if (style.hasAlign) item.align = style.align;
+                    if (style.hasBackground || style.hasGlow || style.hasRadius)
+                        reportError(i + 1, "background, glow, and radius styles apply to blocks or buttons", targetName);
+                    targetFound = true; break;
+                }
+                if (!targetFound) reportError(i + 1, "unknown UI object for style", targetName);
+                continue;
+            }
+            if (tokens.size() < 3 || lower(tokens[1]) != "name" || !validName(tokens[2])) {
+                reportError(i + 1, "use style name NAME ( ... ) or style apply OBJECT NAME");
+                continue;
+            }
+            std::size_t open = 0, close = 0;
+            if (!findBlock(program, i, end, open, close)) {
+                reportError(i + 1, "style definition needs a ( ... ) block", tokens[2]);
+                continue;
+            }
+            UiStyle style;
+            bool validStyle = true;
+            for (std::size_t row = open + 1; row < close; ++row) {
+                const auto parts = tokenize(trim(program[row]));
+                if (parts.empty()) continue;
+                const std::string property = lower(parts[0]);
+                auto getValue = [&](std::size_t index) -> std::string {
+                    return index < parts.size() ? valueFor(parts[index], variables) : std::string();
+                };
+                double number = 0;
+                unsigned red = 0, green = 0, blue = 0;
+                if (property == "background" && parts.size() == 2) {
+                    style.background = getValue(1);
+                    validStyle = parseColor(style.background, red, green, blue);
+                    style.hasBackground = validStyle;
+                } else if (property == "text" && parts.size() == 2) {
+                    style.text = getValue(1);
+                    validStyle = parseColor(style.text, red, green, blue);
+                    style.hasText = validStyle;
+                } else if (property == "glow" && (parts.size() == 2 || parts.size() == 3)) {
+                    style.glow = getValue(1);
+                    validStyle = parseColor(style.glow, red, green, blue);
+                    if (validStyle && parts.size() == 3)
+                        validStyle = parseNumber(getValue(2), style.glowIntensity) && style.glowIntensity >= 0 && style.glowIntensity <= 5;
+                    style.hasGlow = validStyle;
+                } else if (property == "radius" && parts.size() == 2) {
+                    validStyle = parseNumber(getValue(1), style.radius) && style.radius >= 0;
+                    style.hasRadius = validStyle;
+                } else if (property == "opacity" && parts.size() == 2) {
+                    validStyle = parseNumber(getValue(1), style.opacity) && style.opacity >= 0 && style.opacity <= 1;
+                    style.hasOpacity = validStyle;
+                } else if (property == "font" && parts.size() == 2) {
+                    style.font = lower(getValue(1));
+                    if (style.font == "monospace") style.font = "mono";
+                    validStyle = style.font == "sans" || style.font == "serif" || style.font == "mono";
+                    style.hasFont = validStyle;
+                } else if (property == "size" && parts.size() == 2) {
+                    validStyle = parseNumber(getValue(1), style.size) && style.size > 0;
+                    style.hasSize = validStyle;
+                } else if (property == "bold" && parts.size() == 2) {
+                    const std::string flag = lower(getValue(1));
+                    validStyle = flag == "true" || flag == "false" || flag == "1" || flag == "0";
+                    style.bold = flag == "true" || flag == "1";
+                    style.hasBold = validStyle;
+                } else if (property == "align" && parts.size() == 2) {
+                    style.align = lower(getValue(1));
+                    validStyle = style.align == "left" || style.align == "center" || style.align == "right";
+                    style.hasAlign = validStyle;
+                } else validStyle = false;
+                if (!validStyle) {
+                    reportError(row + 1, "invalid style property or value", property);
+                    break;
+                }
+            }
+            if (validStyle) uiStyles[lower(tokens[2])] = style;
+            i = close;
+            continue;
+        }
+
         if (cmd == "text") {
             if (!uiMode || tokens.size() < 10) {
                 reportError(i + 1, "use text NAME VALUE x X y Y size SIZE color COLOR [font sans|serif|mono] [align left|center|right]");
@@ -8355,6 +8491,8 @@ void executeProgram(const std::vector<std::string>& program) {
     convertEnabled = libraries.convert;
     statsEnabled = libraries.stats;
     unitsEnabled = libraries.units;
+    styleEnabled = libraries.style;
+    uiStyles.clear();
     threeDEnabled = libraries.threeD;
     aiModels.clear();
     if (libraries.controls) initializeControls(uiVariables, uiTypes);
