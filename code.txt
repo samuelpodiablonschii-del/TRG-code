@@ -3593,7 +3593,13 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 prompt += valueFor(tokens[a], variables);
             }
             std::string answer;
-            if (!askForInput(prompt, answer)) { reportError(i + 1, "input was cancelled"); continue; }
+            if (!askForInput(prompt, answer)) {
+                reportError(i + 1, "input was cancelled");
+                // Do not retry failed input inside a loop: that can spin forever
+                // when the standalone terminal has no active input control.
+                flow.stopped = true;
+                return;
+            }
             const std::string target = tokens[targetIndex];
             if (!types.count(target)) types[target] = "word";
             if (types[target] == "num") {
