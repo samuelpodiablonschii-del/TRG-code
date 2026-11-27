@@ -8692,8 +8692,22 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             {{1, 2, 6, 5}}, {{0, 1, 5, 4}}, {{3, 2, 6, 7}}
         }};
         const std::array<double, 6> faceLight = {{0.58, 1.0, 0.68, 0.78, 0.52, 0.90}};
-        for (const Ui3DObject& model : ui3DObjects) {
-            if (!model.visible || !uiGroupIsVisible(model.group)) continue;
+        std::vector<const Ui3DObject*> renderOrder;
+        renderOrder.reserve(ui3DObjects.size());
+        for (const Ui3DObject& object : ui3DObjects)
+            if (object.visible && uiGroupIsVisible(object.group)) renderOrder.push_back(&object);
+        auto objectDepth = [&](const Ui3DObject* object) {
+            const double dx = object->x - desktop3DCameraX;
+            const double dy = object->y - desktop3DCameraY;
+            const double dz = object->z - desktop3DCameraZ;
+            const double forward = dx * std::sin(desktop3DCameraYaw) + dz * std::cos(desktop3DCameraYaw);
+            return forward * std::cos(desktop3DCameraPitch) + dy * std::sin(desktop3DCameraPitch);
+        };
+        std::stable_sort(renderOrder.begin(), renderOrder.end(), [&](const Ui3DObject* a, const Ui3DObject* b) {
+            return objectDepth(a) > objectDepth(b);
+        });
+        for (const Ui3DObject* modelPointer : renderOrder) {
+            const Ui3DObject& model = *modelPointer;
             unsigned red = 0, green = 0, blue = 0;
             if (!parseColor(model.color, red, green, blue)) continue;
             const double rx = model.rotateX * 3.141592653589793 / 180.0;
@@ -8894,6 +8908,21 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 }
                 SelectObject(dc, oldBrush); SelectObject(dc, oldPen); DeleteObject(faceBrush); DeleteObject(facePen);
             }
+        }
+        if (desktop3DEngineActive && desktop3DPlayMode) {
+            RECT playBadge = {viewportLeft + scaleForDpi(window, 12),
+                viewportTop + scaleForDpi(window, 12),
+                viewportLeft + scaleForDpi(window, 330),
+                viewportTop + scaleForDpi(window, 40)};
+            HBRUSH playBrush = CreateSolidBrush(RGB(31, 91, 67));
+            FillRect(dc, &playBadge, playBrush);
+            DeleteObject(playBrush);
+            SetBkMode(dc, TRANSPARENT);
+            SetTextColor(dc, RGB(225, 255, 236));
+            RECT playText = playBadge;
+            InflateRect(&playText, -scaleForDpi(window, 7), 0);
+            DrawTextW(dc, L"PLAY TEST RUNNING  |  WASD MOVE  |  SPACE UP  |  SHIFT DOWN", -1,
+                &playText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
         }
         if (sceneClipSave) RestoreDC(dc, sceneClipSave);
         for (const UiButton& button : uiButtons) {
