@@ -3065,8 +3065,25 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             continue;
         }
         
-        const std::vector<std::string> tokens = tokenize(line);
+        std::vector<std::string> tokens = tokenize(line);
         if (tokens.empty()) continue;
+
+        // A code variable stores a TRG command. Calling it expands that command
+        // and appends any arguments supplied after the variable name.
+        const auto codeVariable = variables.find(tokens[0]);
+        if (codeVariable != variables.end() && types.count(tokens[0]) && types[tokens[0]] == "code") {
+            const std::string codeSource = static_cast<std::string>(codeVariable->second);
+            const std::size_t argumentStart = positionAfterArgument(line, tokens[0]);
+            const std::string arguments = argumentStart == std::string::npos ? "" : trim(line.substr(argumentStart));
+            line = codeSource;
+            if (!arguments.empty()) {
+                if (!line.empty() && line.back() != '\n' && line.back() != '\r') line += ' ';
+                line += arguments;
+            }
+            tokens = tokenize(line);
+            if (tokens.empty()) continue;
+        }
+
         std::string cmd = lower(tokens[0]);
         if (cmd == "print" || cmd == "show") cmd = "say";
         if (cmd == "ttrim") cmd = "trim";
@@ -3447,9 +3464,15 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
         
         if (cmd == "say") {
             std::string message;
+            bool separateNext = false;
             for (std::size_t a = 1; a < tokens.size(); ++a) {
-                if (a > 1) message += ' ';
+                if (tokens[a] == "/") {
+                    separateNext = true;
+                    continue;
+                }
+                if (separateNext && !message.empty()) message += ' ';
                 message += valueFor(tokens[a], variables);
+                separateNext = false;
             }
             appendOutput(message + "\r\n");
             continue;
@@ -5104,7 +5127,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             }
             continue;
         }
-        if (cmd == "word" || cmd == "num" || cmd == "toggle" || cmd == "color") {
+        if (cmd == "word" || cmd == "num" || cmd == "toggle" || cmd == "color" || cmd == "code") {
             if (tokens.size() < 2 || !validName(tokens[1])) {
                 reportError(i + 1, "invalid declaration", tokens.size() > 1 ? tokens[1] : "");
                 continue;
@@ -5123,6 +5146,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 if (valueTokens.size() == 1) value = valueFor(valueTokens[0], variables);
                 else value = rawValue;
                 if (cmd == "word" && rawValue.front() == '"') value = valueTokens.empty() ? "" : valueTokens[0];
+                if (cmd == "code") value = rawValue;
                 if (cmd == "num") {
                     double numeric = 0;
                     if (!evaluateExpression(rawValue, variables, numeric)) { reportError(i + 1, "invalid number", rawValue); continue; }
