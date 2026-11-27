@@ -4,3 +4,4 @@ word mk = hi
 
 lebleb mk
 say "lebleb" / hi
+say "TRG_CODE_TEST_PASSED"
