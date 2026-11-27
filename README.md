@@ -624,6 +624,8 @@ add global (
 )
 ```
 
+Project-wide discovery is performed for saved files inside a project folder. An untitled editor tab is treated as a standalone program, so save it into the project folder to load globals declared by other files. The current tab's own `add global` block still works before it is saved.
+
 ### Connected files and run
 
 `add connect (file.trg)` treats another project file as part of the same program. Connected files run once, share variables and data, and follow their own connections, so connections are transitive and undirected: if one file connects A and B, then A and B are connected too. A file can also run another file explicitly with `run (file.trg)`; if that file already ran as part of the connected program, `run` skips it instead of running it twice.
