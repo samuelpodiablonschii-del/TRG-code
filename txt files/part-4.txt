@@ -45,7 +45,7 @@
             }
             continue;
         }
-        if (cmd == "word" || cmd == "num" || cmd == "toggle" || cmd == "color") {
+        if (cmd == "word" || cmd == "num" || cmd == "toggle" || cmd == "color" || cmd == "code") {
             if (tokens.size() < 2 || !validName(tokens[1])) {
                 reportError(i + 1, "invalid declaration", tokens.size() > 1 ? tokens[1] : "");
                 continue;
@@ -64,6 +64,7 @@
                 if (valueTokens.size() == 1) value = valueFor(valueTokens[0], variables);
                 else value = rawValue;
                 if (cmd == "word" && rawValue.front() == '"') value = valueTokens.empty() ? "" : valueTokens[0];
+                if (cmd == "code") value = rawValue;
                 if (cmd == "num") {
                     double numeric = 0;
                     if (!evaluateExpression(rawValue, variables, numeric)) { reportError(i + 1, "invalid number", rawValue); continue; }
