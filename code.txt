@@ -3015,6 +3015,28 @@ void collectTrgFiles(const std::filesystem::path& root, std::vector<std::filesys
     std::sort(files.begin(), files.end());
 }
 
+// Quickly identify files that participate in project-wide merging. This scans
+// lines only; full tokenization, block indexing, and source loading are reserved
+// for files that actually contain add global or add connect.
+bool fileContainsProjectDirectives(const std::filesystem::path& path) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) return false;
+
+    std::string rawLine;
+    while (std::getline(input, rawLine)) {
+        const std::string line = trim(stripComment(rawLine));
+        if (line.size() < 3 || lower(line.substr(0, 3)) != "add") continue;
+        if (line.size() > 3 &&
+            !std::isspace(static_cast<unsigned char>(line[3])) &&
+            line[3] != '(') continue;
+
+        const std::vector<std::string> tokens = tokenize(line);
+        std::string kind;
+        if (addDirectiveKind(tokens, kind)) return true;
+    }
+    return false;
+}
+
 
 
 
@@ -3048,6 +3070,11 @@ std::vector<std::string> mergePrograms(const std::vector<std::string>& mainProgr
             const std::filesystem::path canonical = canonicalProjectPath(file);
             const std::string key = lower(canonical.u8string());
             if (key == mainKey) continue;
+
+            // Most project files have no project directives. Avoid loading and
+            // building a block index for those files just to discover that fact.
+            if (!fileContainsProjectDirectives(file)) continue;
+
             std::ifstream input(file, std::ios::binary);
             if (!input) continue;
             std::vector<std::string> kept, localGlobals, connects;
@@ -9155,7 +9182,9 @@ void executeProgram(const std::vector<std::string>& program) {
         preparedLaunchProgram.clear();
         preparedLaunchProgramReady = false;
     } else {
-        uiProgram = mergePrograms(program, currentSourcePath, true, true);
+        // An untitled editor tab has no project directory of its own. Do not
+        // crawl the process working directory for unrelated project globals.
+        uiProgram = mergePrograms(program, currentSourcePath, !currentSourcePath.empty(), true);
     }
 #endif
     LibraryState libraries;
