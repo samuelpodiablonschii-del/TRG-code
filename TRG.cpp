@@ -707,6 +707,9 @@ RECT desktop3DInspectorRect = {};
 RECT desktop3DAssetShelfRect = {};
 std::array<RECT, 13> desktop3DToolRects = {};
 bool desktop3DPlayMode = false;
+double desktop3DEditCameraX = 0.0, desktop3DEditCameraY = 0.0, desktop3DEditCameraZ = -12.0;
+double desktop3DEditCameraYaw = 0.0, desktop3DEditCameraPitch = 0.18;
+bool desktop3DPlayCameraSaved = false;
 int desktop3DActiveTab = 0;
 std::array<RECT, 5> desktop3DAssetRects = {};
 std::array<RECT, 5> desktop3DTextureRects = {};
@@ -7824,10 +7827,12 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         return 0;
     }
     if (message == WM_KEYDOWN && desktop3DEngineActive && previewMode && !terminalInputActive) {
-        const double step = (GetKeyState(VK_SHIFT) & 0x8000) ? 0.9 : 0.32;
+        const double step = (GetKeyState(VK_CONTROL) & 0x8000) ? 0.9 : 0.32;
         switch (wParam) {
             case 'W': case 'A': case 'S': case 'D':
                 return 0; // WASD movement is updated continuously by the camera timer.
+            case VK_SPACE: desktop3DCameraY += step; break;
+            case VK_SHIFT: desktop3DCameraY -= step; break;
             case 'Q': desktop3DCameraY -= step; break;
             case 'E': desktop3DCameraY += step; break;
             case VK_LEFT: desktop3DCameraYaw -= 0.055; break;
@@ -7841,7 +7846,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
     }
     if (message == WM_TIMER && wParam == 3 && desktop3DEngineActive && previewMode) {
         if (terminalInputActive || GetFocus() != window) return 0;
-        const double step = (GetAsyncKeyState(VK_SHIFT) & 0x8000) ? 0.23 : 0.075;
+        const double step = (GetAsyncKeyState(VK_CONTROL) & 0x8000) ? 0.23 : 0.075;
         const double yaw = desktop3DCameraYaw;
         bool moved = false;
         if (GetAsyncKeyState('W') & 0x8000) {
@@ -7864,6 +7869,8 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             desktop3DCameraZ -= std::sin(yaw) * step;
             moved = true;
         }
+        if (GetAsyncKeyState(VK_SPACE) & 0x8000) { desktop3DCameraY += step; moved = true; }
+        if (GetAsyncKeyState(VK_SHIFT) & 0x8000) { desktop3DCameraY -= step; moved = true; }
         if (moved) InvalidateRect(window, nullptr, FALSE);
         return 0;
     }
@@ -8056,11 +8063,39 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 const double worldZ = desktop3DCameraZ + std::cos(desktop3DCameraYaw) * 12.0;
                 createDesktop3DAsset(static_cast<int>(index) - 4, worldX, 0.0, worldZ);
             } else if (index == 9) {
-                desktop3DPlayMode = true;
-                appendOutput("Play preview enabled. Press Stop to return to editing.\\r\\n");
+                if (!desktop3DPlayMode) {
+                    desktop3DEditCameraX = desktop3DCameraX;
+                    desktop3DEditCameraY = desktop3DCameraY;
+                    desktop3DEditCameraZ = desktop3DCameraZ;
+                    desktop3DEditCameraYaw = desktop3DCameraYaw;
+                    desktop3DEditCameraPitch = desktop3DCameraPitch;
+                    desktop3DPlayCameraSaved = true;
+                    auto spawn = std::find_if(ui3DObjects.begin(), ui3DObjects.end(),
+                        [](const Ui3DObject& object) { return object.visible && object.shape == "spawn"; });
+                    if (spawn == ui3DObjects.end())
+                        spawn = std::find_if(ui3DObjects.begin(), ui3DObjects.end(),
+                            [](const Ui3DObject& object) { return object.visible; });
+                    if (spawn != ui3DObjects.end()) {
+                        desktop3DCameraX = spawn->x;
+                        desktop3DCameraY = spawn->y + 2.0;
+                        desktop3DCameraZ = spawn->z - 7.0;
+                        desktop3DCameraYaw = 0.0;
+                        desktop3DCameraPitch = 0.12;
+                    }
+                    desktop3DPlayMode = true;
+                    appendOutput("Play test started at the scene spawn. WASD moves, Space rises, Shift descends.\\r\\n");
+                }
             } else if (index == 10) {
                 desktop3DPlayMode = false;
-                appendOutput("Play preview stopped.\\r\\n");
+                if (desktop3DPlayCameraSaved) {
+                    desktop3DCameraX = desktop3DEditCameraX;
+                    desktop3DCameraY = desktop3DEditCameraY;
+                    desktop3DCameraZ = desktop3DEditCameraZ;
+                    desktop3DCameraYaw = desktop3DEditCameraYaw;
+                    desktop3DCameraPitch = desktop3DEditCameraPitch;
+                    desktop3DPlayCameraSaved = false;
+                }
+                appendOutput("Play test stopped. Editor camera restored.\\r\\n");
             } else if (index == 11) runDesktop3DCommand("3d save \"scene.trgscene\"");
             else if (index == 12) runDesktop3DCommand("3d load \"scene.trgscene\"");
             InvalidateRect(window, nullptr, FALSE);
@@ -8345,7 +8380,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
         }
         const bool animationsFinished = std::all_of(uiAnimations.begin(), uiAnimations.end(),
             [&](const UiAnimation& animation) { return elapsed >= animation.startTime + animation.duration; });
-        InvalidateRect(window, nullptr, FALSE);
+        if (!animationsFinished || !everyTasks.empty()) InvalidateRect(window, nullptr, FALSE);
         if (animationsFinished && everyTasks.empty()) KillTimer(window, 1);
         return 0;
     }
@@ -8800,14 +8835,31 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             }
             std::array<int, 6> faceOrder = {{0, 1, 2, 3, 4, 5}};
             std::stable_sort(faceOrder.begin(), faceOrder.end(), [&](int first, int second) {
-                double firstDepth = 0, secondDepth = 0;
-                for (int vertex : modelFaces[first]) firstDepth += rotated[vertex][2];
-                for (int vertex : modelFaces[second]) secondDepth += rotated[vertex][2];
-                return firstDepth < secondDepth;
+                auto faceDepth = [&](int face) {
+                    double depth = 0.0;
+                    for (int vertex : modelFaces[face]) {
+                        const double dx = rotated[vertex][0] - desktop3DCameraX;
+                        const double dy = rotated[vertex][1] - desktop3DCameraY;
+                        const double dz = rotated[vertex][2] - desktop3DCameraZ;
+                        const double forward = dx * std::sin(desktop3DCameraYaw) + dz * std::cos(desktop3DCameraYaw);
+                        depth += forward * std::cos(desktop3DCameraPitch) + dy * std::sin(desktop3DCameraPitch);
+                    }
+                    return depth;
+                };
+                return faceDepth(first) > faceDepth(second);
             });
             for (int faceIndex : faceOrder) {
                 POINT polygon[4];
-                for (int corner = 0; corner < 4; ++corner) polygon[corner] = projected[modelFaces[faceIndex][corner]];
+                double signedArea = 0.0;
+                for (int corner = 0; corner < 4; ++corner) {
+                    polygon[corner] = projected[modelFaces[faceIndex][corner]];
+                    const POINT& next = projected[modelFaces[faceIndex][(corner + 1) % 4]];
+                    signedArea += static_cast<double>(polygon[corner].x) * next.y -
+                        static_cast<double>(next.x) * polygon[corner].y;
+                }
+                // Back-face culling keeps the camera from drawing the far/internal
+                // sides of a solid block over its visible front surfaces.
+                if (signedArea >= 0.0) continue;
                 const double shade = faceLight[faceIndex] * std::clamp(model.opacity, 0.0, 1.0);
                 const COLORREF faceColor = RGB(static_cast<BYTE>(red * shade),
                     static_cast<BYTE>(green * shade), static_cast<BYTE>(blue * shade));
@@ -9489,6 +9541,7 @@ bool launchDesktopVisualEditor(const std::string& fileName) {
     if (desktop3DEngineActive) {
         desktop3DSelectedName.clear();
         desktop3DPlayMode = false;
+        desktop3DPlayCameraSaved = false;
         desktop3DCameraX = 0.0;
         desktop3DCameraY = 0.0;
         desktop3DCameraZ = -12.0;
@@ -9510,7 +9563,7 @@ bool launchDesktopVisualEditor(const std::string& fileName) {
     currentSourcePath = desktopPreviousPath;
     projectRoot = currentSourcePath.empty() ? std::filesystem::current_path() : currentSourcePath.parent_path();
     previewMode = true;
-    if (desktop3DEngineActive && mainWindow) SetTimer(mainWindow, 3, 16, nullptr);
+    if (desktop3DEngineActive && mainWindow) SetTimer(mainWindow, 3, 33, nullptr);
     if (previewButton) SetWindowTextW(previewButton, L"Code");
     layoutOutputControls(mainWindow);
     if (mainWindow) SetFocus(mainWindow);
