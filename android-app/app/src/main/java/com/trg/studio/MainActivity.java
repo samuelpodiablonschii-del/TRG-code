@@ -342,12 +342,13 @@ sourceText = exampleSource;
         editor.setMaxLines(Integer.MAX_VALUE);
         editor.setIncludeFontPadding(false);
         // Treat TRG source as code, never prose: disable keyboard corrections and suggestions.
-        int trgCodeInputType = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE
-                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD;
+        // Use a normal text keyboard. Password/no-personal-learning flags force
+        // some Android keyboards (including Gboard) into their private/incognito UI.
+        // Keep the editor as multiline text, but do not mark source as a password.
+        int trgCodeInputType = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE;
         editor.setInputType(trgCodeInputType);
         editor.setRawInputType(trgCodeInputType);
-        editor.setImeOptions(android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI
-                | android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
+        editor.setImeOptions(android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI);
         editor.setPadding(dp(12), dp(12), dp(12), dp(10));
         editor.setBackgroundColor(Color.rgb(16, 12, 27));
         editor.setVerticalScrollBarEnabled(true);
@@ -955,7 +956,7 @@ sourceText = exampleSource;
     private void createNewDocument() {
         final EditText nameInput = new EditText(this);
         nameInput.setSingleLine(true);
-        nameInput.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        nameInput.setInputType(InputType.TYPE_CLASS_TEXT);
         nameInput.setText("program" + (openDocuments.size() + 1) + ".trg");
         nameInput.setHint("filename.trg");
         new AlertDialog.Builder(this)
@@ -1404,7 +1405,7 @@ sourceText = exampleSource;
         field.setSingleLine(true);
         field.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
                 | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        field.setImeOptions(android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);
+        field.setImeOptions(0);
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle("TRG input")
                 .setMessage(prompt)
