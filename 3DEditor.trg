@@ -121,18 +121,21 @@ text "   ◉  Camera" x 2.8 y 31 size 1.0 color #CFC1E6
 text "   ▱  Baseplate" x 2.8 y 36 size 1.0 color #CFC1E6
 text "   ◆  Cube" x 2.8 y 41 size 1.0 color #CFC1E6
 button select_cube "Select Cube" x 1.5 y 44 w 15 h 4.2 color #392451 (
+    selectedIndex = 0
     selectedName = "Cube"
     set_text selected_label selectedName
     set_text tree_selected selectedName
     say "Cube selected."
 )
 button select_baseplate "Select Baseplate" x 1.5 y 49 w 15 h 4.2 color #2B203D (
+    selectedIndex = 1
     selectedName = "Baseplate"
     set_text selected_label selectedName
     set_text tree_selected selectedName
     say "Baseplate selected."
 )
 button select_camera "Select Camera" x 1.5 y 54 w 15 h 4.2 color #2B203D (
+    selectedIndex = 2
     selectedName = "Camera"
     set_text selected_label selectedName
     set_text tree_selected selectedName
@@ -200,6 +203,8 @@ button change_texture "Cycle Texture" x 80.4 y 66 w 17.5 h 4.3 color #302044 (
 button rename_object "Rename" x 80.4 y 71 w 8.2 h 4.3 color #302044 (
     ask "New object name:" renameInput
     3d rename selectedName renameInput
+    remove objects selectedIndex
+    insert objects selectedIndex renameInput
     selectedName = renameInput
     set_text selected_label selectedName
     set_text tree_selected selectedName
