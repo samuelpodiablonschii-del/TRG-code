@@ -2895,6 +2895,7 @@ void stripProjectDirectives(const std::vector<std::string>& program,
                             std::vector<std::string>& connects,
                             bool report,
                             std::unordered_set<std::string>* seenGlobals = nullptr) {
+    const ProgramBlockIndex blockIndex(program);
     for (std::size_t i = 0; i < program.size(); ++i) {
         const std::string line = trim(program[i]);
         const std::vector<std::string> tokens = tokenize(line);
@@ -2905,7 +2906,7 @@ void stripProjectDirectives(const std::vector<std::string>& program,
         }
         if (kind == "global") {
             std::size_t open = 0, close = 0;
-            if (findBlock(program, i, program.size(), open, close)) {
+            if (findBlock(program, i, program.size(), open, close, &blockIndex)) {
                 std::string signature;
                 for (std::size_t row = open + 1; row < close; ++row) signature += program[row] + '\n';
                 if (seenGlobals && !seenGlobals->insert(signature).second) {
@@ -3148,6 +3149,7 @@ std::vector<std::string> mergePrograms(const std::vector<std::string>& mainProgr
 
 void registerFunctions(const std::vector<std::string>& program, bool clearFirst = true) {
     if (clearFirst) userFunctions.clear();
+    const ProgramBlockIndex blockIndex(program);
     for (std::size_t i = 0; i < program.size(); ++i) {
         std::string line = trim(program[i]);
         if (lower(line).rfind("define ", 0) != 0) continue;
@@ -3165,7 +3167,7 @@ void registerFunctions(const std::vector<std::string>& program, bool clearFirst 
         }
 
         std::size_t open, close;
-        if (findBlock(program, i, program.size(), open, close)) {
+        if (findBlock(program, i, program.size(), open, close, &blockIndex)) {
             UserFunction function;
             function.name = name;
             function.params = params;
