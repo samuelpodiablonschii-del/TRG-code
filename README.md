@@ -30,6 +30,33 @@ This creates `hello.exe`, which contains the TRG app and source program. It runs
 
 Open `TRG-Example.trg` from your Desktop for a clickable tour. Each button explains the feature, shows the relevant code, and runs it; UI and animation examples appear in the display area.
 
+## Interpreter performance and asynchronous networking
+
+TRG precomputes matching block boundaries for each source body before execution. Nested control-flow blocks reuse that index, and reusable function, repeating-task, and UI-button bodies retain their own compiled block maps. This avoids repeatedly scanning large source vectors when entering the same blocks.
+
+For network operations, the existing `http_get` and `http_post` commands remain synchronous for compatibility. Use `http_get_async` or `http_post_async` to queue a request on TRG's small worker pool without blocking the interpreter's UI/update thread:
+
+```trg
+add (network)
+http_get_async "https://example.com" request
+word response = ""
+word status = pending
+
+loop status = pending (
+    http_result request response status
+    if status = pending (
+        wait 5ms
+    )
+)
+
+if status = complete (
+    say response
+)
+http_forget request
+```
+
+The status returned by `http_result` is `pending`, `complete`, `error`, or `unknown`. Completed request entries can be released with `http_forget`.
+
 ## Android app
 
 The Android Studio project is in `android-app`. Install Android Studio with a JDK (17 or newer; the CI build uses Java 21) and these SDK components: Android SDK Platform 35, Build-Tools 36.0.0, NDK 28.2.13676358, and CMake 3.22.1. Then double-click `build-apk.bat` in the repository root. It detects common Android Studio JDK/SDK locations, checks the required SDK components, runs the Gradle wrapper, and opens File Explorer with the generated APK selected. The first build needs internet access to download Gradle and Android/Gradle dependencies. You can also build from PowerShell:
