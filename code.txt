@@ -27,6 +27,7 @@
 #include <cwctype>
 #include <variant>
 #include <thread>
+#include <condition_variable>
 #include <atomic>
 #include <mutex>
 #include <stdexcept>
@@ -180,6 +181,7 @@ TRG_BLUETOOTH_DLL_EXPORT std::vector<std::string> bluetoothDevices;
 
 struct VariableValue;
 struct DictionaryData;
+class ProgramBlockIndex;
 using VariableList = std::vector<std::shared_ptr<VariableValue>>;
 struct VariableValue {
     std::variant<double, bool, std::string, std::vector<std::string>, std::shared_ptr<DictionaryData>, VariableList> value = std::string();
@@ -249,6 +251,7 @@ std::vector<TrgCallFrame> trgCallStack;
 
 struct EveryTask {
     std::vector<std::string> body;
+    std::shared_ptr<ProgramBlockIndex> blockIndex;
     std::chrono::milliseconds interval{1000};
     std::chrono::steady_clock::time_point nextRun;
     bool manualMode = false;
@@ -303,6 +306,7 @@ struct UserFunction {
     std::vector<std::string> params;
     std::vector<std::string> body;
     std::size_t sourceLine = 0;
+    std::shared_ptr<ProgramBlockIndex> blockIndex;
 };
 
 struct UiBlock {
@@ -387,6 +391,7 @@ struct UiButton {
     bool textBold = true;
     bool visible = true;
     std::vector<std::string> body;
+    std::shared_ptr<ProgramBlockIndex> blockIndex;
 };
 
 struct UiText {
@@ -567,7 +572,16 @@ struct HttpRequest {
     std::string resultVar;
 };
 
+struct AsyncHttpResult {
+    bool complete = false;
+    std::string response;
+    std::string error;
+};
+
 std::vector<HttpRequest> pendingHttpRequests;
+std::mutex asyncHttpResultsMutex;
+std::unordered_map<std::string, AsyncHttpResult> asyncHttpResults;
+std::atomic<std::uint64_t> asyncHttpNextId{1};
 
 std::string httpGet(const std::string& url, std::string& error);
 std::string httpPost(const std::string& url, const std::string& body, std::string& error);
@@ -1195,6 +1209,11 @@ void showDesktopDictionary(HWND owner) {
         L"  add (controls) | add (animation)\r\n"
         L"  move_ui OBJECT x DX y DY\r\n\r\n"
         L"WEB, MEDIA, AND AI\r\n"
+        L"NETWORK  (add (network))\r\n"
+        L"  http_get URL RESULT | http_post URL BODY RESULT  (synchronous)\r\n"
+        L"  http_get_async URL REQUEST_ID | http_post_async URL BODY REQUEST_ID\r\n"
+        L"  http_result REQUEST_ID RESPONSE STATUS  (pending/complete/error/unknown)\r\n"
+        L"  http_forget REQUEST_ID  Release a request result\r\n\r\n"
         L"  add (web): web_page, web_heading, web_text, web_button, web_image, web_show\r\n"
         L"  play_audio FILE | show_image FILE | play_video FILE\r\n"
         L"  add (ai): ai create, teach, train, predict, classify\r\n"
@@ -1304,6 +1323,7 @@ void showDesktopDictionary(HWND owner) {
         L"  var let num word code toggle color list default register registry dictionary\r\n"
         L"  if else loop for each every wait break continue stop define call return\r\n"
         L"  say print show ask add run create set increase decrease move\r\n"
+        L"  http_get http_post http_get_async http_post_async http_result http_forget\r\n"
         L"  add subtract multiply divide random math stats units convert time\r\n"
         L"  upper lower trim ttrim length contains index_of find find_position\r\n"
         L"  replace replace_text count_text starts_with ends_with substring\r\n"
@@ -1554,71 +1574,121 @@ void reportError(std::size_t lineNumber, const std::string& reason, const std::s
     appendOutput("ERROR " + msg + "\r\n");
 }
 
-bool findBlock(const std::vector<std::string>& program, std::size_t start,
-               std::size_t end, std::size_t& open, std::size_t& close) {
-    // Blocks may use either legacy parentheses or conventional curly braces.
-    // A stack keeps mixed nested blocks correctly paired.
-    std::vector<char> expectedClosers;
-    open = std::string::npos;
-    bool opened = false;
-    for (close = start; close < end; ++close) {
-        const std::string& line = program[close];
-        std::size_t firstCharacter = 0;
-        if (close == start) {
-            std::size_t lastCharacter = line.size();
-            while (lastCharacter > 0 &&
-                   std::isspace(static_cast<unsigned char>(line[lastCharacter - 1]))) {
-                --lastCharacter;
-            }
-            if (lastCharacter > 0 &&
-                (line[lastCharacter - 1] == '(' || line[lastCharacter - 1] == '{')) {
-                const char opener = line[lastCharacter - 1];
-                open = close;
-                expectedClosers.push_back(opener == '(' ? ')' : '}');
-                opened = true;
-                firstCharacter = lastCharacter;
-            } else {
-                const std::string header = lower(trim(line));
-                if (header == "if" || header.rfind("if ", 0) == 0 ||
-                    header == "else" || header.rfind("else ", 0) == 0 ||
-                    header == "loop" || header.rfind("loop ", 0) == 0 ||
-                    header == "every" || header.rfind("every ", 0) == 0 ||
-                    header == "group" || header.rfind("group ", 0) == 0 ||
-                    header == "record" || header.rfind("record ", 0) == 0 ||
-                    header.rfind("struct ", 0) == 0 || header.rfind("class ", 0) == 0 ||
-                    header == "define" || header.rfind("define ", 0) == 0 ||
-                    header == "add" || header.rfind("add ", 0) == 0) {
-                    firstCharacter = line.size();
+class ProgramBlockIndex {
+public:
+    struct Pair { std::size_t openLine=0, openColumn=0, closeLine=0; };
+    ProgramBlockIndex() = default;
+    explicit ProgramBlockIndex(const std::vector<std::string>& program) { build(program); }
+    void build(const std::vector<std::string>& program) {
+        pairs.clear();
+        struct Opening { char closer; std::size_t line; std::size_t column; };
+        std::vector<Opening> stack;
+        for(std::size_t lineNumber=0;lineNumber<program.size();++lineNumber) {
+            const std::string& line=program[lineNumber];
+            char quote='\0';
+            for(std::size_t column=0;column<line.size();++column) {
+                const char ch=line[column];
+                if(quote!='\0') {
+                    if(ch=='\\' && column+1<line.size()) ++column;
+                    else if(ch==quote) quote='\0';
+                    continue;
+                }
+                if(ch=='"' || ch=='\'') { quote=ch; continue; }
+                if(ch=='/' && column+1<line.size() && line[column+1]=='/') break;
+                if(ch=='(' || ch=='{') stack.push_back({ch=='('?')':'}',lineNumber,column});
+                else if((ch==')' || ch=='}') && !stack.empty() && ch==stack.back().closer) {
+                    const Opening opening=stack.back();
+                    stack.pop_back();
+                    pairs.push_back({opening.line,opening.column,lineNumber});
                 }
             }
         }
+        std::sort(pairs.begin(),pairs.end(),[](const Pair& a,const Pair& b) {
+            if(a.openLine!=b.openLine) return a.openLine<b.openLine;
+            return a.openColumn<b.openColumn;
+        });
+    }
+    bool find(const std::vector<std::string>& program,std::size_t start,std::size_t end,
+              std::size_t& open,std::size_t& close) const {
+        if(start>=program.size() || start>=end) return false;
+        const std::string& line=program[start];
+        std::size_t last=line.size();
+        while(last>0 && std::isspace(static_cast<unsigned char>(line[last-1]))) --last;
+        std::size_t queryLine=start,queryColumn=0;
+        if(last>0 && (line[last-1]=='(' || line[last-1]=='{')) queryColumn=last-1;
+        else {
+            const std::string header=lower(trim(line));
+            const bool isHeader=
+                header=="if" || header.rfind("if ",0)==0 ||
+                header=="else" || header.rfind("else ",0)==0 ||
+                header=="loop" || header.rfind("loop ",0)==0 ||
+                header=="every" || header.rfind("every ",0)==0 ||
+                header=="group" || header.rfind("group ",0)==0 ||
+                header=="record" || header.rfind("record ",0)==0 ||
+                header.rfind("struct ",0)==0 || header.rfind("class ",0)==0 ||
+                header=="define" || header.rfind("define ",0)==0 ||
+                header=="add" || header.rfind("add ",0)==0;
+            if(isHeader) ++queryLine;
+        }
+        const auto key=std::make_pair(queryLine,queryColumn);
+        const auto found=std::lower_bound(pairs.begin(),pairs.end(),key,
+            [](const Pair& candidate,const std::pair<std::size_t,std::size_t>& target) {
+                if(candidate.openLine!=target.first) return candidate.openLine<target.first;
+                return candidate.openColumn<target.second;
+            });
+        if(found==pairs.end() || found->closeLine>=end) return false;
+        open=found->openLine; close=found->closeLine; return true;
+    }
+private:
+    std::vector<Pair> pairs;
+};
 
-        char quote = '\0';
-        for (std::size_t i = firstCharacter; i < line.size(); ++i) {
-            const char ch = line[i];
-            if (quote != '\0') {
-                if (ch == '\\' && i + 1 < line.size()) {
-                    ++i;
-                } else if (ch == quote) {
-                    quote = '\0';
-                }
+bool findBlock(const std::vector<std::string>& program,std::size_t start,
+               std::size_t end,std::size_t& open,std::size_t& close,
+               const ProgramBlockIndex* index=nullptr) {
+    if(index && index->find(program,start,end,open,close)) return true;
+    std::vector<char> expectedClosers;
+    open=std::string::npos;
+    bool opened=false;
+    for(close=start;close<end;++close) {
+        const std::string& line=program[close];
+        std::size_t firstCharacter=0;
+        if(close==start) {
+            std::size_t lastCharacter=line.size();
+            while(lastCharacter>0 && std::isspace(static_cast<unsigned char>(line[lastCharacter-1]))) --lastCharacter;
+            if(lastCharacter>0 && (line[lastCharacter-1]=='(' || line[lastCharacter-1]=='{')) {
+                const char opener=line[lastCharacter-1];
+                open=close; expectedClosers.push_back(opener=='('?')':'}');
+                opened=true; firstCharacter=lastCharacter;
+            } else {
+                const std::string header=lower(trim(line));
+                if(header=="if" || header.rfind("if ",0)==0 ||
+                   header=="else" || header.rfind("else ",0)==0 ||
+                   header=="loop" || header.rfind("loop ",0)==0 ||
+                   header=="every" || header.rfind("every ",0)==0 ||
+                   header=="group" || header.rfind("group ",0)==0 ||
+                   header=="record" || header.rfind("record ",0)==0 ||
+                   header.rfind("struct ",0)==0 || header.rfind("class ",0)==0 ||
+                   header=="define" || header.rfind("define ",0)==0 ||
+                   header=="add" || header.rfind("add ",0)==0) firstCharacter=line.size();
+            }
+        }
+        char quote='\0';
+        for(std::size_t i=firstCharacter;i<line.size();++i) {
+            const char ch=line[i];
+            if(quote!='\0') {
+                if(ch=='\\' && i+1<line.size()) ++i;
+                else if(ch==quote) quote='\0';
                 continue;
             }
-            if (ch == '"' || ch == '\'') {
-                quote = ch;
-                continue;
-            }
-            if (ch == '/' && i + 1 < line.size() && line[i + 1] == '/') break;
-            if (ch == '(' || ch == '{') {
-                if (!opened) {
-                    open = close;
-                    opened = true;
-                }
-                expectedClosers.push_back(ch == '(' ? ')' : '}');
-            } else if ((ch == ')' || ch == '}') && opened &&
-                       !expectedClosers.empty() && ch == expectedClosers.back()) {
+            if(ch=='"' || ch=='\'') { quote=ch; continue; }
+            if(ch=='/' && i+1<line.size() && line[i+1]=='/') break;
+            if(ch=='(' || ch=='{') {
+                if(!opened) { open=close; opened=true; }
+                expectedClosers.push_back(ch=='('?')':'}');
+            } else if((ch==')' || ch=='}') && opened && !expectedClosers.empty() && ch==expectedClosers.back()) {
                 expectedClosers.pop_back();
-                if (expectedClosers.empty()) return true;
+                if(expectedClosers.empty()) return true;
             }
         }
     }
@@ -2438,6 +2508,7 @@ std::string httpGet(const std::string& url, std::string& error) {
     HINTERNET session = WinHttpOpen(L"TRG/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
                                     WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (!session) { error = "could not open WinHTTP session"; return {}; }
+    WinHttpSetTimeouts(session, 5000, 5000, 10000, 10000);
 
     std::wstring whost = wideFromUtf8(host);
     std::wstring wpath = wideFromUtf8(path);
@@ -2511,6 +2582,7 @@ std::string httpPost(const std::string& url, const std::string& body, std::strin
     HINTERNET session = WinHttpOpen(L"TRG/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
                                     WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (!session) { error = "could not open WinHTTP session"; return {}; }
+    WinHttpSetTimeouts(session, 5000, 5000, 10000, 10000);
 
     std::wstring whost = wideFromUtf8(host);
     std::wstring wpath = wideFromUtf8(path);
@@ -2566,6 +2638,123 @@ std::string httpPost(const std::string&, const std::string&, std::string& error)
     return {};
 }
 #endif
+
+// Asynchronous HTTP worker pool. The legacy http_get/http_post commands stay
+// synchronous for backwards compatibility; the *_async commands do not block
+// the interpreter/UI update thread while network requests are running.
+class HttpWorkerPool {
+public:
+    HttpWorkerPool() = default;
+    HttpWorkerPool(const HttpWorkerPool&) = delete;
+    HttpWorkerPool& operator=(const HttpWorkerPool&) = delete;
+    ~HttpWorkerPool() {
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            stopping = true;
+        }
+        ready.notify_all();
+        for (std::thread& worker : workers) if (worker.joinable()) worker.join();
+    }
+    void submit(std::function<void()> job) {
+        {
+            std::lock_guard<std::mutex> lock(mutex);
+            if (stopping) throw std::runtime_error("HTTP worker pool is stopping");
+            if (workers.empty()) {
+                workers.emplace_back([this]() { workerLoop(); });
+                workers.emplace_back([this]() { workerLoop(); });
+            }
+            jobs.push_back(std::move(job));
+        }
+        ready.notify_one();
+    }
+private:
+    void workerLoop() {
+        while (true) {
+            std::function<void()> job;
+            {
+                std::unique_lock<std::mutex> lock(mutex);
+                ready.wait(lock, [this]() { return stopping || !jobs.empty(); });
+                if (stopping && jobs.empty()) return;
+                job = std::move(jobs.front());
+                jobs.pop_front();
+            }
+            try { job(); } catch (...) { /* Keep the worker alive. */ }
+        }
+    }
+    std::mutex mutex;
+    std::condition_variable ready;
+    std::deque<std::function<void()>> jobs;
+    std::vector<std::thread> workers;
+    bool stopping = false;
+};
+
+HttpWorkerPool& httpWorkerPool() {
+    static HttpWorkerPool pool;
+    return pool;
+}
+
+std::string queueAsyncHttpRequest(const std::string& method, const std::string& url,
+                                  const std::string& body, std::string& error) {
+    error.clear();
+    const std::string requestId = "http_" +
+        std::to_string(asyncHttpNextId.fetch_add(1, std::memory_order_relaxed));
+    {
+        std::lock_guard<std::mutex> lock(asyncHttpResultsMutex);
+        if (asyncHttpResults.size() >= 512) {
+            for (auto item = asyncHttpResults.begin();
+                 item != asyncHttpResults.end() && asyncHttpResults.size() >= 512;) {
+                if (item->second.complete) item = asyncHttpResults.erase(item);
+                else ++item;
+            }
+        }
+        if (asyncHttpResults.size() >= 512) {
+            error = "too many outstanding HTTP requests; release completed requests with http_forget";
+            return {};
+        }
+        asyncHttpResults.emplace(requestId, AsyncHttpResult{});
+    }
+    try {
+        httpWorkerPool().submit([requestId, method, url, body]() {
+            std::string requestError;
+            std::string response;
+            try {
+                response = method == "POST"
+                    ? httpPost(url, body, requestError)
+                    : httpGet(url, requestError);
+            } catch (const std::exception& exception) {
+                requestError = std::string("HTTP worker error: ") + exception.what();
+            } catch (...) {
+                requestError = "HTTP worker error";
+            }
+            std::lock_guard<std::mutex> lock(asyncHttpResultsMutex);
+            const auto request = asyncHttpResults.find(requestId);
+            if (request != asyncHttpResults.end()) {
+                request->second.response = std::move(response);
+                request->second.error = std::move(requestError);
+                request->second.complete = true;
+            }
+        });
+    } catch (const std::exception& exception) {
+        std::lock_guard<std::mutex> lock(asyncHttpResultsMutex);
+        asyncHttpResults.erase(requestId);
+        error = std::string("could not queue HTTP request: ") + exception.what();
+        return {};
+    }
+    return requestId;
+}
+
+bool readAsyncHttpResult(const std::string& requestId, AsyncHttpResult& result) {
+    std::lock_guard<std::mutex> lock(asyncHttpResultsMutex);
+    const auto request = asyncHttpResults.find(requestId);
+    if (request == asyncHttpResults.end()) return false;
+    result = request->second;
+    return true;
+}
+
+void forgetAsyncHttpResult(const std::string& requestId) {
+    std::lock_guard<std::mutex> lock(asyncHttpResultsMutex);
+    asyncHttpResults.erase(requestId);
+}
 
 // ---------------------------------------------------------
 
@@ -2958,10 +3147,14 @@ void registerFunctions(const std::vector<std::string>& program, bool clearFirst 
 
         std::size_t open, close;
         if (findBlock(program, i, program.size(), open, close)) {
-            userFunctions[lower(name)] = {name, params,
-                std::vector<std::string>(program.begin() + static_cast<std::ptrdiff_t>(open + 1),
-                                         program.begin() + static_cast<std::ptrdiff_t>(close)),
-                i + 1};
+            UserFunction function;
+            function.name = name;
+            function.params = params;
+            function.body.assign(program.begin() + static_cast<std::ptrdiff_t>(open + 1),
+                                 program.begin() + static_cast<std::ptrdiff_t>(close));
+            function.sourceLine = i + 1;
+            function.blockIndex = std::make_shared<ProgramBlockIndex>(function.body);
+            userFunctions[lower(name)] = std::move(function);
         }
     }
 }
@@ -3049,7 +3242,13 @@ bool loadTrgDatabase(const std::filesystem::path& path, std::string& error) {
 
 void executeBlock(const std::vector<std::string>& program, std::size_t begin, std::size_t end,
                   Vars& variables, Types& types, Defaults& defaults, Flow& flow,
-                  bool manualMode = false, bool uiMode = false) {
+                  bool manualMode = false, bool uiMode = false,
+                  const ProgramBlockIndex* blockIndex = nullptr) {
+    ProgramBlockIndex localBlockIndex;
+    if (!blockIndex) {
+        localBlockIndex.build(program);
+        blockIndex = &localBlockIndex;
+    }
     for (std::size_t i = begin; i < end; ++i) {
 #ifdef __ANDROID__
         if (androidStopRequested.load()) {
@@ -3152,7 +3351,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
         if (cmd == "record" || cmd == "struct" || cmd == "class") {
             std::size_t open = 0, close = 0;
             const bool headerShape = tokens.size() == 2 || (tokens.size() == 3 && tokens[2] == "(");
-            if (!headerShape || !validName(tokens[1]) || !findBlock(program, i, end, open, close)) {
+            if (!headerShape || !validName(tokens[1]) || !findBlock(program, i, end, open, close, blockIndex)) {
                 reportError(i + 1, "use record NAME ( word field; num count = 0 )", tokens.size() > 1 ? tokens[1] : "");
                 continue;
             }
@@ -3424,7 +3623,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 (trgCallStack.empty() ? 0 : trgCallStack.back().definitionLine);
             trgCallStack.push_back({uf.name, callSiteLine, uf.sourceLine});
             executeBlock(uf.body, 0, uf.body.size(), localVariables, localTypes, localDefaults,
-                         inner, manualMode, uiMode);
+                         inner, manualMode, uiMode, uf.blockIndex.get());
             trgCallStack.pop_back();
 
             for (const auto& existing : callerVariables) {
@@ -3454,7 +3653,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
         }
         if (cmd == "define") {
             std::size_t open = 0, close = 0;
-            if (!findBlock(program, i, end, open, close)) {
+            if (!findBlock(program, i, end, open, close, blockIndex)) {
                 reportError(i + 1, "function definition needs a code block");
                 continue;
             }
@@ -3566,6 +3765,59 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             types[tokens[3]] = "word";
             continue;
         }
+
+        if (cmd == "http_get_async" || cmd == "http_post_async") {
+            if (!networkEnabled) { reportError(i + 1, "asynchronous HTTP needs add (network)"); continue; }
+            const bool isPost = cmd == "http_post_async";
+            const std::size_t expectedTokens = isPost ? 4 : 3;
+            const std::size_t resultIndex = isPost ? 3 : 2;
+            if (tokens.size() != expectedTokens || !validName(tokens[resultIndex])) {
+                reportError(i + 1, isPost
+                    ? "use http_post_async URL BODY REQUEST_ID"
+                    : "use http_get_async URL REQUEST_ID");
+                continue;
+            }
+            const std::string url = valueFor(tokens[1], variables);
+            const std::string body = isPost ? valueFor(tokens[2], variables) : std::string();
+            std::string error;
+            const std::string requestId = queueAsyncHttpRequest(isPost ? "POST" : "GET", url, body, error);
+            if (!error.empty()) { reportError(i + 1, error, url); continue; }
+            variables[tokens[resultIndex]] = requestId;
+            types[tokens[resultIndex]] = "word";
+            continue;
+        }
+
+        if (cmd == "http_result") {
+            if (!networkEnabled) { reportError(i + 1, "http_result needs add (network)"); continue; }
+            if (tokens.size() != 4 || !validName(tokens[2]) || !validName(tokens[3])) {
+                reportError(i + 1, "use http_result REQUEST_ID RESPONSE STATUS");
+                continue;
+            }
+            AsyncHttpResult request;
+            const std::string requestId = valueFor(tokens[1], variables);
+            if (!readAsyncHttpResult(requestId, request)) {
+                variables[tokens[2]] = "unknown HTTP request";
+                variables[tokens[3]] = "unknown";
+            } else if (!request.complete) {
+                variables[tokens[3]] = "pending";
+            } else if (!request.error.empty()) {
+                variables[tokens[2]] = request.error;
+                variables[tokens[3]] = "error";
+            } else {
+                variables[tokens[2]] = request.response;
+                variables[tokens[3]] = "complete";
+            }
+            types[tokens[2]] = "word";
+            types[tokens[3]] = "word";
+            continue;
+        }
+
+        if (cmd == "http_forget") {
+            if (!networkEnabled) { reportError(i + 1, "http_forget needs add (network)"); continue; }
+            if (tokens.size() != 2) { reportError(i + 1, "use http_forget REQUEST_ID"); continue; }
+            forgetAsyncHttpResult(valueFor(tokens[1], variables));
+            continue;
+        }
         if (cmd == "particle") {
             // particle NAME X Y COLOR SPEED LIFE SIZE
             if (tokens.size() < 7) { reportError(i + 1, "use particle NAME X Y COLOR SPEED LIFE SIZE"); continue; }
@@ -3647,12 +3899,12 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             
             if (second == "global" || second == "(global)") {
                 std::size_t open = 0, close = 0;
-                if (!findBlock(program, i, end, open, close)) {
+                if (!findBlock(program, i, end, open, close, blockIndex)) {
                     reportError(i + 1, "add global needs a ( ... ) block");
                     continue;
                 }
                 Flow inner;
-                executeBlock(program, open + 1, close, variables, types, defaults, inner, manualMode, uiMode);
+                executeBlock(program, open + 1, close, variables, types, defaults, inner, manualMode, uiMode, blockIndex);
                 if (inner.stopped) { flow.stopped = true; return; }
                 if (inner.returned) { flow.returned = true; flow.returnValue = inner.returnValue; return; }
                 i = close;
@@ -3807,7 +4059,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             if (!line.empty() && (line.back() == '(' || line.back() == '{')) {
                 if (line.back() == '(') {
                     std::size_t open = 0, close = 0;
-                    if (findBlock(program, i, end, open, close)) i = close;
+                    if (findBlock(program, i, end, open, close, blockIndex)) i = close;
                 }
                 reportError(i + 1, "libraries apply to the whole file; use add (json) without a block");
                 continue;
@@ -5200,7 +5452,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
         
         if (cmd == "group" || cmd == "if" || cmd == "loop" || cmd == "every" || cmd == "for") {
             std::size_t open = 0, close = 0;
-            if (!findBlock(program, i, end, open, close)) { reportError(i + 1, "missing block"); continue; }
+            if (!findBlock(program, i, end, open, close, blockIndex)) { reportError(i + 1, "missing block"); continue; }
             if (cmd == "group") {
                 const bool namedGroup = tokens.size() >= 2 && validName(tokens[1]);
                 const std::string groupName = namedGroup ? tokens[1] : "";
@@ -5222,7 +5474,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 const std::vector<std::string> membership = groupStack;
                 Flow inner;
                 executeBlock(program, open + 1, close, variables, types, localDefaults, inner, manualMode,
-                             namedGroup && uiMode ? true : uiMode);
+                             namedGroup && uiMode ? true : uiMode, blockIndex);
                 if (!groupName.empty()) { groupStack.pop_back(); groupSnapshots.pop_back(); }
                 currentUiGroup = previousGroup;
                 if (!groupName.empty()) {
@@ -5268,7 +5520,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                     else types[itemName] = "word";
                     Flow iteration;
                     executeBlock(program, open + 1, close, variables, types, defaults,
-                                 iteration, manualMode, uiMode);
+                                 iteration, manualMode, uiMode, blockIndex);
                     if (iteration.stopped) { flow.stopped = true; break; }
                     if (iteration.returned) {
                         flow.returned = true;
@@ -5293,6 +5545,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 EveryTask task;
                 task.body.assign(program.begin() + static_cast<std::ptrdiff_t>(open + 1),
                                  program.begin() + static_cast<std::ptrdiff_t>(close));
+                task.blockIndex = std::make_shared<ProgramBlockIndex>(task.body);
                 task.interval = std::chrono::milliseconds(interval);
                 task.nextRun = std::chrono::steady_clock::now() + task.interval;
                 task.manualMode = manualMode;
@@ -5310,7 +5563,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 const std::string firstHeader = trim(line);
                 if (conditionIsTrue(conditionFromHeader(firstHeader, "if"), variables)) {
                     branchTaken = true;
-                    executeBlock(program, open + 1, close, variables, types, defaults, branchFlow, manualMode, uiMode);
+                    executeBlock(program, open + 1, close, variables, types, defaults, branchFlow, manualMode, uiMode, blockIndex);
                 }
                 std::size_t chainLine = close + 1;
                 std::size_t finalChainClose = close;
@@ -5327,12 +5580,12 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                          std::isspace(static_cast<unsigned char>(loweredHeader[4]))));
                     if (!isElseIf && !isElse) break;
                     std::size_t chainOpen = 0, chainClose = 0;
-                    if (!findBlock(program, chainLine, end, chainOpen, chainClose)) break;
+                    if (!findBlock(program, chainLine, end, chainOpen, chainClose, blockIndex)) break;
                     finalChainClose = chainClose;
                     const bool matches = isElse || conditionIsTrue(conditionFromHeader(chainHeader, "else if"), variables);
                     if (!branchTaken && matches) {
                         branchTaken = true;
-                        executeBlock(program, chainOpen + 1, chainClose, variables, types, defaults, branchFlow, manualMode, uiMode);
+                        executeBlock(program, chainOpen + 1, chainClose, variables, types, defaults, branchFlow, manualMode, uiMode, blockIndex);
                     }
                     chainLine = chainClose + 1;
                     if (isElse) break;
@@ -5350,7 +5603,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 while (conditionIsTrue(condition, variables)) {
                     if (++guard > 100000) { reportError(i + 1, "loop limit"); break; }
                     Flow inner;
-                    executeBlock(program, open + 1, close, variables, types, defaults, inner, manualMode, uiMode);
+                    executeBlock(program, open + 1, close, variables, types, defaults, inner, manualMode, uiMode, blockIndex);
                     if (inner.stopped) { flow.stopped = true; return; }
                 if (inner.returned) { flow.returned = true; flow.returnValue = inner.returnValue; return; }
                     if (inner.broke) break;
@@ -5959,7 +6212,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 continue;
             }
             std::size_t open = 0, close = 0;
-            if (!findBlock(program, i, end, open, close)) {
+            if (!findBlock(program, i, end, open, close, blockIndex)) {
                 reportError(i + 1, "style definition needs a ( ... ) block", tokens[2]);
                 continue;
             }
@@ -6078,7 +6331,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
                 continue;
             }
             std::size_t open = 0, close = 0;
-            if (!findBlock(program, i, end, open, close)) {
+            if (!findBlock(program, i, end, open, close, blockIndex)) {
                 reportError(i + 1, "button needs a code block", tokens[1]);
                 continue;
             }
@@ -6148,6 +6401,7 @@ void executeBlock(const std::vector<std::string>& program, std::size_t begin, st
             }
             button.body.assign(program.begin() + static_cast<std::ptrdiff_t>(open + 1),
                                program.begin() + static_cast<std::ptrdiff_t>(close));
+            button.blockIndex = std::make_shared<ProgramBlockIndex>(button.body);
             uiButtons.push_back(std::move(button));
             i = close;
             continue;
@@ -8000,7 +8254,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
                 conditionIsTrue("false", uiVariables);
                 Flow flow;
                 executeBlock(button->body, 0, button->body.size(), uiVariables, uiTypes,
-                             uiDefaults, flow, false, true);
+                             uiDefaults, flow, false, true, button->blockIndex.get());
                 if (desktop3DEngineActive) {
                     if (button->name == "reset_view") {
                         desktop3DCameraX = 0.0;
@@ -8036,7 +8290,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             refreshCollisionWatches(uiVariables, uiTypes);
             Flow taskFlow;
             executeBlock(task.body, 0, task.body.size(), uiVariables, uiTypes,
-                         uiDefaults, taskFlow, task.manualMode, task.uiMode);
+                         uiDefaults, taskFlow, task.manualMode, task.uiMode, task.blockIndex.get());
             if (taskFlow.stopped) { everyTasks.clear(); break; }
             if (taskFlow.broke) everyTasks.erase(everyTasks.begin() + static_cast<std::ptrdiff_t>(index));
             else ++index;
