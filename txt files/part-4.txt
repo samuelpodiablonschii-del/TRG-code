@@ -167,27 +167,55 @@
                 everyTasks.push_back(task);
                 appendOutput("Scheduled repeating code every " + std::to_string(interval) + " ms.\r\n");
             } else if (cmd == "if") {
-                const std::size_t conditionStart = line.find_first_of(" \t");
-                std::string conditionText = conditionStart == std::string::npos ? "" : trim(line.substr(conditionStart + 1));
-                if (!conditionText.empty() && conditionText.back() == '(') conditionText = trim(conditionText.substr(0, conditionText.size() - 1));
-                std::size_t elseLine = close + 1;
-                while (elseLine < end && trim(program[elseLine]).empty()) ++elseLine;
-                std::size_t elseOpen = 0, elseClose = 0;
-                const std::string elseHeader = elseLine < end ? lower(trim(program[elseLine])) : std::string();
-                const bool hasElse = elseLine < end && elseHeader.rfind("else", 0) == 0 &&
-                    (elseHeader.size() == 4 || std::isspace(static_cast<unsigned char>(elseHeader[4])) ||
-                     elseHeader[4] == '(' || elseHeader[4] == '{') &&
-                    findBlock(program, elseLine, end, elseOpen, elseClose);
-                const bool conditionResult = conditionIsTrue(conditionText, variables);
-                if (conditionResult || hasElse) {
-                    Flow inner;
-                    if (conditionResult) executeBlock(program, open + 1, close, variables, types, defaults, inner, manualMode, uiMode);
-                    else if (hasElse) executeBlock(program, elseOpen + 1, elseClose, variables, types, defaults, inner, manualMode, uiMode);
-                    if (inner.stopped) { flow.stopped = true; return; }
-                    if (inner.broke) { flow.broke = true; return; }
-                    if (inner.continued) { flow.continued = true; return; }
+                const auto conditionFromHeader = [](const std::string& header, const std::string& keyword) {
+                    std::string condition = trim(header.substr(keyword.size()));
+                    if (!condition.empty() && (condition.back() == '(' || condition.back() == '{'))
+                        condition = trim(condition.substr(0, condition.size() - 1));
+                    return condition;
+                };
+                bool branchTaken = false;
+                Flow branchFlow;
+                if (conditionIsTrue(conditionFromHeader(trim(line), "if"), variables)) {
+                    branchTaken = true;
+                    executeBlock(program, open + 1, close, variables, types, defaults,
+                                 branchFlow, manualMode, uiMode);
                 }
-                if (hasElse) close = elseClose;
+
+                std::size_t chainLine = close + 1;
+                std::size_t finalChainClose = close;
+                while (chainLine < end) {
+                    while (chainLine < end && trim(program[chainLine]).empty()) ++chainLine;
+                    if (chainLine >= end) break;
+                    const std::string chainHeader = trim(program[chainLine]);
+                    const std::string loweredHeader = lower(chainHeader);
+                    const bool isElseIf = loweredHeader.rfind("else if", 0) == 0 &&
+                        (loweredHeader.size() == 7 ||
+                         std::isspace(static_cast<unsigned char>(loweredHeader[7])) ||
+                         loweredHeader[7] == '(');
+                    const bool isElse = !isElseIf &&
+                        (loweredHeader == "else" || loweredHeader.rfind("else(", 0) == 0 ||
+                         (loweredHeader.rfind("else", 0) == 0 && loweredHeader.size() > 4 &&
+                          std::isspace(static_cast<unsigned char>(loweredHeader[4]))));
+                    if (!isElseIf && !isElse) break;
+
+                    std::size_t chainOpen = 0, chainClose = 0;
+                    if (!findBlock(program, chainLine, end, chainOpen, chainClose)) break;
+                    finalChainClose = chainClose;
+                    const bool matches = isElse ||
+                        conditionIsTrue(conditionFromHeader(chainHeader, "else if"), variables);
+                    if (!branchTaken && matches) {
+                        branchTaken = true;
+                        executeBlock(program, chainOpen + 1, chainClose, variables, types,
+                                     defaults, branchFlow, manualMode, uiMode);
+                    }
+                    chainLine = chainClose + 1;
+                    if (isElse) break;
+                }
+
+                if (branchFlow.stopped) { flow.stopped = true; return; }
+                if (branchFlow.broke) { flow.broke = true; return; }
+                if (branchFlow.continued) { flow.continued = true; return; }
+                if (finalChainClose > close) close = finalChainClose;
             } else {
                 const std::size_t conditionStart = line.find_first_of(" \t");
                 std::string condition = conditionStart == std::string::npos ? "" : trim(line.substr(conditionStart + 1));
