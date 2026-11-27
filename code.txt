@@ -2639,9 +2639,9 @@ std::string httpPost(const std::string&, const std::string&, std::string& error)
 }
 #endif
 
-// Asynchronous HTTP worker pool. The legacy http_get/http_post commands stay
-// synchronous for backwards compatibility; the *_async commands do not block
-// the interpreter/UI update thread while network requests are running.
+#ifdef _WIN32
+// WinHTTP requests run on worker threads so slow DNS/network I/O cannot block
+// the desktop interpreter's UI/physics update thread.
 class HttpWorkerPool {
 public:
     HttpWorkerPool() = default;
@@ -2692,6 +2692,7 @@ HttpWorkerPool& httpWorkerPool() {
     static HttpWorkerPool pool;
     return pool;
 }
+#endif
 
 std::string queueAsyncHttpRequest(const std::string& method, const std::string& url,
                                   const std::string& body, std::string& error) {
@@ -2713,6 +2714,8 @@ std::string queueAsyncHttpRequest(const std::string& method, const std::string& 
         }
         asyncHttpResults.emplace(requestId, AsyncHttpResult{});
     }
+
+#ifdef _WIN32
     try {
         httpWorkerPool().submit([requestId, method, url, body]() {
             std::string requestError;
@@ -2740,6 +2743,22 @@ std::string queueAsyncHttpRequest(const std::string& method, const std::string& 
         error = std::string("could not queue HTTP request: ") + exception.what();
         return {};
     }
+#else
+    // The current non-Windows network backend is a fast "unavailable" stub.
+    // Complete it inline rather than pulling unsupported worker threads into
+    // the WebAssembly/mobile builds.
+    std::string requestError;
+    std::string response = method == "POST"
+        ? httpPost(url, body, requestError)
+        : httpGet(url, requestError);
+    std::lock_guard<std::mutex> lock(asyncHttpResultsMutex);
+    const auto request = asyncHttpResults.find(requestId);
+    if (request != asyncHttpResults.end()) {
+        request->second.response = std::move(response);
+        request->second.error = std::move(requestError);
+        request->second.complete = true;
+    }
+#endif
     return requestId;
 }
 
