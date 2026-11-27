@@ -8366,6 +8366,7 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
     if (message == WM_TIMER) {
         const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - uiStart).count();
         const auto now = std::chrono::steady_clock::now();
+        bool taskExecuted = false;
         for (std::size_t index = 0; index < everyTasks.size();) {
             if (now < everyTasks[index].nextRun) { ++index; continue; }
             const EveryTask task = everyTasks[index];
@@ -8374,13 +8375,14 @@ LRESULT CALLBACK mainWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM
             Flow taskFlow;
             executeBlock(task.body, 0, task.body.size(), uiVariables, uiTypes,
                          uiDefaults, taskFlow, task.manualMode, task.uiMode, task.blockIndex.get());
+            taskExecuted = true;
             if (taskFlow.stopped) { everyTasks.clear(); break; }
             if (taskFlow.broke) everyTasks.erase(everyTasks.begin() + static_cast<std::ptrdiff_t>(index));
             else ++index;
         }
         const bool animationsFinished = std::all_of(uiAnimations.begin(), uiAnimations.end(),
             [&](const UiAnimation& animation) { return elapsed >= animation.startTime + animation.duration; });
-        if (!animationsFinished || !everyTasks.empty()) InvalidateRect(window, nullptr, FALSE);
+        if (!animationsFinished || taskExecuted) InvalidateRect(window, nullptr, FALSE);
         if (animationsFinished && everyTasks.empty()) KillTimer(window, 1);
         return 0;
     }
